@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 16 — Modern JS: Destructuring, Spread, Modules</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="16-js-modern">
+<main><article>
+<h1>Lesson 16 — Modern JS: destructuring, spread &amp; modules</h1>
+<p class="lede">ES2015+ syntax you will read and write every day, especially in React.</p>
+
+<h2>Destructuring</h2>
+<textarea class="code" data-lang="js" data-run>
+const user = { id: 7, name: "Ada", address: { city: "London", zip: "N1" }, tags: ["a", "b"] };
+
+const { name, id } = user;                       // pick properties
+const { name: fullName, role = "guest" } = user; // rename + default
+const { address: { city } } = user;              // nested
+const [first, , third = "none", ...others] = ["x", "y", undefined, "p", "q"];
+console.log(name, id, fullName, role, city, first, third, others);
+
+// Swap without a temp
+let a = 1, b = 2; [a, b] = [b, a]; console.log(a, b);
+
+// In function parameters (this is the React props pattern)
+function show({ name, age = 18, ...rest }) { return `${name} ${age} ${JSON.stringify(rest)}`; }
+console.log(show({ name: "Grace", city: "NYC" }));
+
+// Returning multiple values
+const [min, max] = [Math.min(3, 1, 2), Math.max(3, 1, 2)];
+console.log(min, max);
+</textarea>
+
+<h2>Spread &amp; rest</h2>
+<textarea class="code" data-lang="js" data-run>
+const a = [1, 2], b = [3, 4];
+console.log([...a, ...b, 5], Math.max(...a, ...b));
+
+const base = { color: "red", size: 1 };
+const merged = { ...base, size: 2, extra: true };   // later keys win
+console.log(merged);
+
+const { color, ...restOfObj } = merged;             // rest in destructuring
+console.log(color, restOfObj);
+
+function sum(...nums) { return nums.reduce((s, n) => s + n, 0); }
+console.log(sum(1, 2, 3, 4));
+</textarea>
+
+<h2>More modern features</h2>
+<textarea class="code" data-lang="js" data-run>
+// Optional chaining, nullish coalescing (Lesson 10)
+const data = { user: null };
+console.log(data.user?.profile?.name ?? "anonymous", data.list?.[0], data.fn?.());
+
+// Short-circuit assignment
+const opts = {}; opts.retries ??= 3; opts.debug ||= false; console.log(opts);
+
+// Array helpers
+const arr = [5, 1, 4];
+console.log(arr.toSorted(), arr.toReversed(), arr.with(0, 99), arr.at(-1), arr);
+console.log(Object.groupBy([1, 2, 3, 4, 5], n => (n % 2 ? "odd" : "even")));
+console.log([1, [2, [3, [4]]]].flat(Infinity), [1, 2].flatMap(x => [x, x * 10]));
+
+// Numeric separators, exponent, labels
+console.log(1_000_000, 2 ** 8, "abc".padEnd(6, "."), "a-b-c".replaceAll("-", "+"));
+
+// Tagged template, Symbol, Date, Intl
+console.log(new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(1234.5));
+console.log(new Intl.DateTimeFormat("en-GB", { dateStyle: "long" }).format(new Date(2026, 0, 15)));
+</textarea>
+
+<h2>Modules (import / export)</h2>
+<p>Modules split code into files with their own scope. Load them with <code>&lt;script type="module"&gt;</code>. Modules are strict mode and deferred by default.</p>
+<textarea class="code" data-lang="js" data-file="math.js">
+// Named exports
+export const PI = 3.14159;
+export function area(r) { return PI * r * r; }
+
+// One default export per file
+export default class Circle { constructor(r) { this.r = r; } }
+
+const internal = 42;   // not exported = private to the module
+</textarea>
+<textarea class="code" data-lang="js" data-file="main.js">
+import Circle, { PI, area as circleArea } from "./math.js";   // default + named, with rename
+import * as math from "./math.js";                            // namespace import
+import { debounce } from "https://cdn.jsdelivr.net/npm/lodash-es@4.17.21/lodash.js";
+
+console.log(circleArea(2), new Circle(3), math.PI);
+
+// Dynamic import: load on demand (code splitting)
+button.addEventListener("click", async () => {
+  const { openEditor } = await import("./editor.js");
+  openEditor();
+});
+</textarea>
+<textarea class="code" data-lang="html" data-file="index.html">
+<script type="module" src="main.js"></script>
+</textarea>
+<div class="callout warn"><span class="label">Note</span>Modules need to be served over HTTP (use Live Server or <code>npx vite</code>); opening the file with <code>file://</code> blocks them. Include the <code>.js</code> extension in browser imports. Bundlers like Vite let you import npm packages by bare name: <code>import confetti from "canvas-confetti"</code>.</div>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Rewrite a function taking 5 positional arguments to take one options object with destructured defaults.</li>
+<li>Write <code>pick(obj, ...keys)</code> and <code>omit(obj, ...keys)</code> using destructuring/spread/<code>Object.fromEntries</code>.</li>
+<li>Merge two config objects deeply (write <code>deepMerge</code>).</li>
+<li>Split your Lesson 15 to-do app into modules: <code>store.js</code> (data), <code>view.js</code> (DOM), <code>main.js</code> (wiring).</li>
+<li>Use dynamic <code>import()</code> to load a module only when a button is clicked and watch the Network tab.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Named vs default exports?</summary>Named: many per file, imported with braces by exact name. Default: one per file, imported under any name. Named exports are easier to refactor and tree-shake.</details>
+<details><summary>Does spread deep-copy?</summary>No. It copies one level; nested objects stay shared.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 33 — Animation Loop, Transforms & Controls</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="33-three-animation">
+<main><article>
+<h1>Lesson 33 — Animation loop, transforms &amp; controls</h1>
+<p class="lede">Make the scene move at a consistent speed on any machine, understand the scene graph's transforms, and let users explore with the mouse.</p>
+
+<h2>Transforms and the scene graph</h2>
+<p>Every <code>Object3D</code> has <code>position</code> (Vector3), <code>rotation</code> (Euler, radians) or <code>quaternion</code>, and <code>scale</code>. Children are positioned <strong>relative to their parent</strong>, so moving a parent moves everything inside it. This is how you build solar systems, robot arms and character rigs.</p>
+<textarea class="code" data-lang="js">
+mesh.position.set(1, 2, 3);       mesh.position.x += 0.1;
+mesh.rotation.y = Math.PI / 4;    // radians! degrees: THREE.MathUtils.degToRad(45)
+mesh.scale.setScalar(2);
+mesh.lookAt(target.position);
+
+const group = new THREE.Group();   // an empty container: move/rotate many things as one
+group.add(a, b, c);
+scene.add(group);
+
+mesh.getWorldPosition(vec);        // position in world space (position is LOCAL)
+parent.attach(child);              // reparent and keep world transform
+</textarea>
+<p>Rotations apply in order X→Y→Z by default, which can cause <em>gimbal lock</em>. For arbitrary orientation or smooth interpolation use quaternions: <code>q.slerp(target, 0.1)</code>.</p>
+
+<h2>The render loop and delta time</h2>
+<p>Machines run at different frame rates (60, 120, 144 Hz). If you move "0.1 per frame", a fast monitor makes things faster. Multiply by the time since the last frame (<strong>delta time</strong>) to make motion framerate-independent.</p>
+<textarea class="code" data-lang="js">
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta();            // seconds since last frame
+  const t  = clock.elapsedTime;           // seconds since start
+  mesh.rotation.y += dt * 1.5;            // 1.5 rad / second, on any display
+  mesh.position.y = Math.sin(t * 2) * 0.5;   // oscillate
+  controls.update();
+  renderer.render(scene, camera);
+});
+</textarea>
+<p><code>renderer.setAnimationLoop</code> is preferred over a manual <code>requestAnimationFrame</code> (it also supports WebXR) and pauses when the tab is hidden.</p>
+
+<h3>Easing and smoothing</h3>
+<textarea class="code" data-lang="js">
+// Frame-rate independent smoothing toward a target (very common for cameras, UI follow)
+current.lerp(target, 1 - Math.exp(-dt * 8));      // higher number = snappier
+
+// Number helpers
+THREE.MathUtils.lerp(a, b, t); THREE.MathUtils.clamp(v, min, max);
+THREE.MathUtils.damp(x, y, lambda, dt); THREE.MathUtils.mapLinear(x, a1, a2, b1, b2);
+</textarea>
+<p>For timelines, sequences and easing curves use <strong>GSAP</strong> (<code>gsap.to(mesh.position, { x: 3, duration: 1, ease: "power2.inOut" })</code>), or Three's built-in <code>AnimationMixer</code> for baked clips (Lesson 34).</p>
+
+<h2>Controls and a debug GUI (live)</h2>
+<p>Drag to orbit, scroll to zoom, right-drag to pan. The panel changes values live.</p>
+<textarea class="code" data-lang="html" data-run data-height="420px">
+<style>html,body{margin:0;overflow:hidden;background:#111}</style>
+<script type="importmap">{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+  "lil-gui":"https://cdn.jsdelivr.net/npm/lil-gui@0.19.2/dist/lil-gui.esm.min.js"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import GUI from "lil-gui";
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#12111a");
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(6, 5, 9);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.append(renderer.domElement);
+
+scene.add(new THREE.AmbientLight("#fff", 0.5));
+const sun = new THREE.PointLight("#fff5d6", 600, 0); scene.add(sun);          // the "sun" at the origin
+scene.add(new THREE.GridHelper(30, 30, "#444", "#222"));
+
+// A tiny solar system built with the scene graph
+const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(1.2, 32, 16), new THREE.MeshBasicMaterial({ color: "#ffd166" }));
+scene.add(sunMesh);
+
+const earthOrbit = new THREE.Group();                 // pivot at the origin: rotating it orbits its child
+scene.add(earthOrbit);
+const earth = new THREE.Mesh(new THREE.SphereGeometry(0.5, 32, 16), new THREE.MeshStandardMaterial({ color: "#4cc9f0", roughness: 0.6 }));
+earth.position.x = 5;
+earthOrbit.add(earth);
+
+const moonOrbit = new THREE.Group();                  // pivot centered on the Earth
+earth.add(moonOrbit);
+const moon = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 8), new THREE.MeshStandardMaterial({ color: "#bbb" }));
+moon.position.x = 1.1;
+moonOrbit.add(moon);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;                         // smooth inertia (call controls.update() every frame)
+controls.target.set(0, 0, 0);
+
+const params = { speed: 1, earthDistance: 5, pause: false };
+const gui = new GUI();
+gui.add(params, "speed", 0, 5, 0.01);
+gui.add(params, "earthDistance", 2, 10, 0.1).onChange(v => earth.position.x = v);
+gui.add(params, "pause");
+gui.addColor(earth.material, "color");
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta();
+  if (!params.pause) {
+    earthOrbit.rotation.y += dt * 0.5 * params.speed;      // revolve around the sun
+    earth.rotation.y += dt * 2 * params.speed;             // spin
+    moonOrbit.rotation.y += dt * 2.5 * params.speed;       // moon orbits earth
+  }
+  controls.update();
+  renderer.render(scene, camera);
+});
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</textarea>
+
+<h2>Other controls</h2>
+<ul>
+<li><code>TrackballControls</code>, <code>FlyControls</code>, <code>PointerLockControls</code> (first-person), <code>MapControls</code>, <code>TransformControls</code> (gizmo for moving objects), <code>DragControls</code>.</li>
+<li><strong>CameraControls</strong> (yomotsu) and drei's <code>&lt;CameraControls/&gt;</code> add animated fly-to transitions.</li>
+<li>Clamp OrbitControls for product viewers: <code>minDistance</code>, <code>maxDistance</code>, <code>maxPolarAngle</code>, <code>enablePan = false</code>.</li>
+</ul>
+
+<h2>Scroll-driven 3D</h2>
+<textarea class="code" data-lang="js">
+// Tie the camera to page scroll: a staple of "scrollytelling" sites
+addEventListener("scroll", () => {
+  const p = scrollY / (document.body.scrollHeight - innerHeight);   // 0 → 1
+  targetZ = THREE.MathUtils.lerp(10, 2, p);
+});
+// In the loop: camera.position.z += (targetZ - camera.position.z) * (1 - Math.exp(-dt * 5));
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Add Mars and Jupiter with different orbit radii and speeds; add a faint orbit ring (<code>RingGeometry</code> or <code>LineLoop</code>) for each.</li>
+<li>Prove delta time works: temporarily add an artificial slowdown and show rotation speed doesn't change.</li>
+<li>Make a camera that smoothly follows a moving object using <code>lerp</code>/<code>damp</code>.</li>
+<li>Build an on-screen WASD + mouse-look fly camera using <code>PointerLockControls</code>.</li>
+<li>Use <code>gsap</code> to animate the camera between three "scenes" when buttons are clicked.</li>
+<li>Add <code>TransformControls</code> so you can drag cubes around with an axis gizmo.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why multiply movement by delta time?</summary>So speed is defined per second, not per frame, giving the same motion on 60 Hz and 144 Hz displays.</details>
+<details><summary>Why is a child's position "weird" after reparenting?</summary>position is local to the parent. Use <code>attach()</code> to preserve the world transform, or convert with getWorldPosition/worldToLocal.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 20 — Iterators, Generators, Map/Set & Functional Patterns</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="20-js-iterators">
+<main><article>
+<h1>Lesson 20 — Iterators, generators, Map/Set &amp; functional patterns</h1>
+<p class="lede">The last pieces of core JavaScript: better collections, lazy sequences, and patterns for writing predictable code.</p>
+
+<h2>Map, Set, WeakMap</h2>
+<textarea class="code" data-lang="js" data-run>
+// Set: unique values
+const s = new Set([1, 2, 2, 3, 3]);
+s.add(4); console.log(s.size, s.has(2), [...s]);
+console.log([...new Set("mississippi")].join(""));        // unique chars
+
+// Map: any type of key, preserves insertion order, fast get/set
+const m = new Map();
+const keyObj = { id: 1 };
+m.set("a", 1).set(keyObj, "object key").set(42, "number key");
+console.log(m.get(keyObj), m.size);
+for (const [k, v] of m) console.log(typeof k, v);
+console.log(new Map(Object.entries({ x: 1, y: 2 })), Object.fromEntries(new Map([["p", 1]])));
+
+// Set operations
+const A = new Set([1, 2, 3]), B = new Set([2, 3, 4]);
+console.log([...A].filter(x => B.has(x)), [...new Set([...A, ...B])]);
+console.log(A.intersection?.(B), A.union?.(B));       // newer built-ins
+
+// WeakMap: keys held weakly (no memory leaks) – attach private data to objects
+const priv = new WeakMap(); const o = {}; priv.set(o, { secret: 1 }); console.log(priv.get(o));
+</textarea>
+<p>Use <code>Map</code> instead of objects when keys aren't known strings, when you add/remove often, or need <code>.size</code>.</p>
+
+<h2>Iterators and generators</h2>
+<p>Anything usable in <code>for…of</code> (arrays, strings, Maps, Sets) is <strong>iterable</strong>. A <strong>generator</strong> function (<code>function*</code>) produces values lazily with <code>yield</code> and can pause between them.</p>
+<textarea class="code" data-lang="js" data-run>
+function* count(from, to) {
+  for (let i = from; i <= to; i++) { console.log("producing", i); yield i; }
+}
+for (const n of count(1, 3)) console.log("consumed", n);    // interleaved: lazy!
+
+function* naturals() { let n = 1; while (true) yield n++; }   // infinite is fine
+function* take(it, n) { let i = 0; for (const v of it) { if (i++ >= n) return; yield v; } }
+console.log([...take(naturals(), 5)]);
+
+class Range {
+  constructor(a, b) { this.a = a; this.b = b; }
+  *[Symbol.iterator]() { for (let i = this.a; i <= this.b; i++) yield i; }
+}
+console.log([...new Range(1, 5)], Math.max(...new Range(1, 9)));
+
+// Async iteration: for await (const chunk of stream) { ... }
+async function* ticker() { for (let i = 0; i < 3; i++) { await new Promise(r => setTimeout(r, 50)); yield i; } }
+for await (const t of ticker()) console.log("tick", t);
+</textarea>
+
+<h2>Functional patterns</h2>
+<textarea class="code" data-lang="js" data-run>
+// Pipe / compose
+const pipe = (...fns) => x => fns.reduce((v, f) => f(v), x);
+const slugify = pipe(s => s.trim(), s => s.toLowerCase(), s => s.replace(/[^a-z0-9]+/g, "-"), s => s.replace(/^-|-$/g, ""));
+console.log(slugify("  Hello, World! JS 101  "));
+
+// Currying & partial application
+const curry = fn => function c(...a) { return a.length >= fn.length ? fn(...a) : (...b) => c(...a, ...b); };
+const add3 = curry((a, b, c) => a + b + c);
+console.log(add3(1)(2)(3), add3(1, 2)(3));
+
+// Immutability helpers
+const user = Object.freeze({ name: "Ada", langs: Object.freeze(["js"]) });
+const updated = { ...user, langs: [...user.langs, "ts"] };
+console.log(user, updated);
+
+// Memoization
+const memo = fn => { const c = new Map(); return n => c.has(n) ? c.get(n) : (c.set(n, fn(n)), c.get(n)); };
+const fib = memo(n => (n < 2 ? n : fib(n - 1) + fib(n - 2)));
+console.log(fib(50));
+
+// Declarative data transformation
+const orders = [{ u: "a", t: 10 }, { u: "b", t: 5 }, { u: "a", t: 7 }];
+const totals = Object.entries(orders.reduce((acc, { u, t }) => ({ ...acc, [u]: (acc[u] ?? 0) + t }), {}))
+  .map(([user, total]) => ({ user, total })).sort((x, y) => y.total - x.total);
+console.log(totals);
+</textarea>
+
+<h2>Regular expressions</h2>
+<textarea class="code" data-lang="js" data-run>
+const text = "Contact: ada@example.com, grace@navy.mil on 2026-03-15";
+console.log(text.match(/\b[\w.]+@[\w.]+\.\w+\b/g));                  // all emails
+const m = text.match(/(?<y>\d{4})-(?<mo>\d{2})-(?<d>\d{2})/);       // named groups
+console.log(m.groups);
+console.log("a1b22c333".replace(/\d+/g, n => `[${n.length}]`));
+console.log(/^[A-Z][a-z]+$/.test("Hello"), "one  two   three".split(/\s+/));
+for (const hit of text.matchAll(/\w+@/g)) console.log(hit[0], hit.index);
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Write a <code>LRUCache</code> class using <code>Map</code> (a Map remembers insertion order).</li>
+<li>Write a generator <code>fibonacci()</code> and use <code>take</code> to print the first 15 terms.</li>
+<li>Find the duplicate values in an array using a <code>Set</code> in O(n).</li>
+<li>Write <code>groupBy(arr, keyFn)</code> returning a Map of arrays.</li>
+<li>Validate a password (≥8 chars, a digit, an uppercase letter) with one regex using lookaheads.</li>
+<li>Implement <code>zip</code>, <code>range</code> and <code>chunk</code> as lazy generator utilities.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>When prefer Map over a plain object?</summary>Non-string keys, frequent adds/removes, guaranteed order, need for .size, and no prototype-key collisions.</details>
+<details><summary>What does lazy evaluation buy you?</summary>Work happens only when a value is demanded, enabling infinite sequences and avoiding needless computation.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

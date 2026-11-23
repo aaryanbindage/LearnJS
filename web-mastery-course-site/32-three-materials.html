@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 32 — Geometry, Materials & Lights</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="32-three-materials">
+<main><article>
+<h1>Lesson 32 — Geometry, materials &amp; lights</h1>
+<p class="lede">Shape, surface and illumination: the three ingredients of every 3D look.</p>
+
+<h2>Geometry</h2>
+<p>A geometry is a bundle of arrays (<em>attributes</em>): <code>position</code> (vertices), <code>normal</code> (surface direction for lighting), <code>uv</code> (texture coordinates), and an optional <code>index</code> of triangles.</p>
+<textarea class="code" data-lang="js">
+new THREE.BoxGeometry(w, h, d, wSeg, hSeg, dSeg);
+new THREE.SphereGeometry(radius, widthSegments = 32, heightSegments = 16);
+new THREE.PlaneGeometry(w, h, wSeg, hSeg);           // faces +Z; rotate -PI/2 on X to make a floor
+new THREE.CylinderGeometry(rTop, rBottom, h, radialSeg);
+new THREE.TorusGeometry(r, tube, radialSeg, tubularSeg);
+new THREE.TorusKnotGeometry(1, 0.35, 128, 24);
+new THREE.IcosahedronGeometry(1, detail);
+new THREE.ExtrudeGeometry(shape, { depth: 0.3, bevelEnabled: true });  // 2D Shape → 3D
+new THREE.TubeGeometry(curve, 64, 0.1, 8);            // along a CatmullRomCurve3
+
+// Custom geometry from raw data
+const geo = new THREE.BufferGeometry();
+const verts = new Float32Array([ -1,-1,0,   1,-1,0,   0,1,0 ]);   // one triangle
+geo.setAttribute("position", new THREE.BufferAttribute(verts, 3));
+geo.computeVertexNormals();
+</textarea>
+<p>More segments = smoother and heavier. Triangles count against your performance budget.</p>
+
+<h2>Materials</h2>
+<table>
+<tr><th>Material</th><th>Lit?</th><th>Use</th></tr>
+<tr><td><code>MeshBasicMaterial</code></td><td>no</td><td>flat color/texture, UI, wireframes, debug</td></tr>
+<tr><td><code>MeshNormalMaterial</code></td><td>no</td><td>debug: color by normal</td></tr>
+<tr><td><code>MeshLambertMaterial</code></td><td>yes (cheap)</td><td>matte, fast</td></tr>
+<tr><td><code>MeshPhongMaterial</code></td><td>yes</td><td>shiny, older style</td></tr>
+<tr><td><code>MeshStandardMaterial</code></td><td>yes (PBR)</td><td>default for realistic: <code>roughness</code>, <code>metalness</code></td></tr>
+<tr><td><code>MeshPhysicalMaterial</code></td><td>yes (PBR+)</td><td>glass (<code>transmission</code>), clearcoat, sheen, iridescence</td></tr>
+<tr><td><code>MeshToonMaterial</code></td><td>yes</td><td>cel shading</td></tr>
+<tr><td><code>ShaderMaterial</code></td><td>custom</td><td>your own GLSL (Lesson 36)</td></tr>
+</table>
+<textarea class="code" data-lang="js">
+const mat = new THREE.MeshStandardMaterial({
+  color: "#7c5cff",        // base color (accepts hex, css strings, THREE.Color)
+  roughness: 0.4,          // 0 mirror … 1 matte
+  metalness: 0.0,          // 0 plastic/wood … 1 metal
+  emissive: "#000000",     // self-lit color
+  side: THREE.FrontSide,   // BackSide | DoubleSide
+  transparent: false, opacity: 1,
+  wireframe: false,
+  flatShading: false,
+});
+mat.color.set("#ff0066");  // change at runtime; mat.needsUpdate = true only for structural changes
+// map, normalMap, roughnessMap, metalnessMap, aoMap, envMap … → Lesson 34
+</textarea>
+
+<h2>Lights</h2>
+<table>
+<tr><th>Light</th><th>Behaves like</th><th>Casts shadows</th></tr>
+<tr><td><code>AmbientLight</code></td><td>flat fill from everywhere</td><td>no</td></tr>
+<tr><td><code>HemisphereLight</code></td><td>sky color from above, ground color from below</td><td>no</td></tr>
+<tr><td><code>DirectionalLight</code></td><td>sun (parallel rays)</td><td>yes</td></tr>
+<tr><td><code>PointLight</code></td><td>light bulb</td><td>yes (costly)</td></tr>
+<tr><td><code>SpotLight</code></td><td>flashlight cone</td><td>yes</td></tr>
+<tr><td><code>RectAreaLight</code></td><td>softbox / window</td><td>no</td></tr>
+</table>
+<p>Each additional light adds per-pixel cost. Prefer one key directional light, a hemisphere/ambient fill and an environment map (Lesson 34). Light intensities in modern Three.js are physically based: point and spot lights usually need intensities in the dozens, directional around 1–4.</p>
+
+<h2>Everything together (live)</h2>
+<p>Drag to look around is added in the next lesson; here the objects move. Try changing roughness, metalness, light colors and positions.</p>
+<textarea class="code" data-lang="html" data-run data-height="400px">
+<style>html,body{margin:0;overflow:hidden;background:#111}</style>
+<script type="importmap">{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#0f0e17");
+scene.fog = new THREE.Fog("#0f0e17", 8, 22);                 // distance fade
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(0, 3, 8);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.append(renderer.domElement);
+
+// Floor
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: "#2b2840", roughness: 0.9 }));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// Objects with different materials
+const sphere = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), new THREE.MeshStandardMaterial({ color: "#ffb703", metalness: 1, roughness: 0.25 }));
+sphere.position.set(-3, 1, 0);
+const knot = new THREE.Mesh(new THREE.TorusKnotGeometry(0.7, 0.25, 160, 24), new THREE.MeshPhysicalMaterial({ color: "#7c5cff", roughness: 0.15, clearcoat: 1 }));
+knot.position.set(0, 1.3, 0);
+const box = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.6), new THREE.MeshStandardMaterial({ color: "#e0457b", roughness: 0.7 }));
+box.position.set(3, 0.8, 0);
+for (const m of [sphere, knot, box]) { m.castShadow = true; scene.add(m); }
+
+// Lights
+scene.add(new THREE.HemisphereLight("#9db4ff", "#2a1f3d", 0.6));
+
+const sun = new THREE.DirectionalLight("#ffffff", 2.5);
+sun.position.set(5, 8, 4);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: 1, far: 25 });  // tight box = sharper shadow
+sun.shadow.bias = -0.0005;
+scene.add(sun);
+
+const bulb = new THREE.PointLight("#00e5c3", 40, 12);        // color, intensity, distance
+scene.add(bulb, new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({ color: "#00e5c3" })));
+const bulbMarker = scene.children[scene.children.length - 1];
+
+renderer.setAnimationLoop((t) => {
+  t *= 0.001;
+  knot.rotation.set(t * 0.6, t * 0.9, 0);
+  box.rotation.y = t * 0.5;
+  sphere.position.y = 1 + Math.abs(Math.sin(t * 2)) * 1.2;
+  bulb.position.set(Math.cos(t) * 4, 2, Math.sin(t) * 3);
+  bulbMarker.position.copy(bulb.position);
+  renderer.render(scene, camera);
+});
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</textarea>
+
+<h2>Shadow checklist</h2>
+<ol>
+<li><code>renderer.shadowMap.enabled = true</code></li>
+<li><code>light.castShadow = true</code></li>
+<li><code>mesh.castShadow = true</code> on casters; <code>mesh.receiveShadow = true</code> on receivers</li>
+<li>Fit <code>light.shadow.camera</code> bounds tightly; raise <code>mapSize</code> for sharpness; tweak <code>bias</code>/<code>normalBias</code> for "shadow acne".</li>
+<li>Debug with <code>new THREE.CameraHelper(light.shadow.camera)</code>.</li>
+</ol>
+<div class="callout"><span class="label">Colors</span>Three.js works in linear color space and outputs sRGB by default. Hex colors you pass (<code>"#ff0066"</code>) are interpreted as sRGB automatically. Textures that hold color need <code>texture.colorSpace = THREE.SRGBColorSpace</code>; data textures (normal/roughness maps) stay linear.</div>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a row of 5 spheres with roughness 0 → 1, and another row with metalness 0 → 1.</li>
+<li>Add a <code>SpotLight</code> with a visible cone (<code>SpotLightHelper</code>) sweeping across the floor.</li>
+<li>Make glass: <code>MeshPhysicalMaterial</code> with <code>transmission: 1</code>, <code>thickness</code>, <code>ior</code>. Place colored objects behind it.</li>
+<li>Build a custom <code>BufferGeometry</code> for a flat grid and give it per-vertex colors.</li>
+<li>Build a simple low-poly "tree" by grouping a cylinder and cones (<code>THREE.Group</code>).</li>
+<li>Toggle shadows off and measure how the frame rate changes.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why is my MeshStandardMaterial object black?</summary>It's a lit material and there are no lights (and no environment map).</details>
+<details><summary>Roughness vs metalness?</summary>Roughness controls how blurred reflections are. Metalness decides whether the surface behaves like a metal (colored reflections, no diffuse) or a dielectric.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

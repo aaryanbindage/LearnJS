@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 47 — TypeScript in Depth</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="47-ts-fundamentals">
+<main><article>
+<h1>Lesson 47 — TypeScript in depth</h1>
+<p class="lede">Lesson 21 gave you a taste. Now learn TypeScript as a daily tool: how the type system thinks, how to model real data, and how to configure it for safety. Practice every snippet in the TypeScript Playground (typescriptlang.org/play) or a Vite <code>react-ts</code> project.</p>
+
+<h2>Mental model</h2>
+<ul>
+<li>TypeScript is a <strong>static analyzer</strong>: it checks code before it runs, then <strong>erases</strong> types. It adds no runtime behavior and no runtime validation.</li>
+<li>Types are <strong>structural</strong> ("duck typing"): two types are compatible if their shapes match, regardless of names.</li>
+<li>Prefer <strong>inference</strong> for local variables; <strong>annotate boundaries</strong> (function parameters, exported APIs, data from outside).</li>
+</ul>
+<textarea class="code" data-lang="js" data-file="structural.ts">
+interface Point { x: number; y: number }
+function len(p: Point) { return Math.hypot(p.x, p.y); }
+
+const v = { x: 3, y: 4, label: "extra" };
+len(v);                       // OK: v has at least x and y (structural typing)
+len({ x: 3, y: 4, label: "" });  // ✖ error: object LITERAL excess property check
+</textarea>
+
+<h2>Strict mode: turn it on</h2>
+<textarea class="code" data-lang="js" data-file="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,                       // noImplicitAny, strictNullChecks, strictFunctionTypes, ...
+    "noUncheckedIndexedAccess": true,     // arr[i] is T | undefined: catches real bugs
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,         // use `import type` for types
+    "skipLibCheck": true,
+    "noEmit": true                        // a bundler emits JS; tsc only type-checks
+  },
+  "include": ["src"]
+}
+</textarea>
+
+<h2>The core building blocks</h2>
+<textarea class="code" data-lang="js" data-file="basics.ts">
+// Primitives and arrays
+let n: number = 1; let s: string = "a"; let b: boolean = true;
+const ids: number[] = [1, 2];  const ro: readonly string[] = ["a"];
+const pair: [string, number] = ["age", 36];                // tuple
+const named: [x: number, y: number] = [1, 2];
+
+// Special types
+let a: any;        // opts out of checking. Avoid.
+let u: unknown;    // "something, but check before using": the safe any
+u.toString();      // ✖ must narrow first
+if (typeof u === "string") u.toUpperCase();   // ✔
+function fail(msg: string): never { throw new Error(msg); }   // never returns
+function log(): void { console.log("hi"); }
+
+// Object types
+type User = {
+  readonly id: number;
+  name: string;
+  email?: string;                    // optional: string | undefined
+  tags: string[];
+};
+interface Admin extends User { permissions: Set<string> }      // interfaces extend; types intersect
+
+// Union and literal types: model "one of"
+type Status = "idle" | "loading" | "error" | "success";
+type ID = number | string;
+type Dict = { [key: string]: number };      // index signature; or Record<string, number>
+
+// Functions
+function add(a: number, b = 1): number { return a + b; }
+const greet = (name: string, ...rest: string[]): string => `Hi ${name}`;
+type Handler = (event: MouseEvent) => void;
+function overloaded(x: string): string;
+function overloaded(x: number): number;
+function overloaded(x: any) { return x; }
+
+// Enums: prefer union types or `as const` objects
+const Role = { Admin: "admin", User: "user" } as const;
+type Role = typeof Role[keyof typeof Role];      // "admin" | "user"
+</textarea>
+
+<h2>type vs interface</h2>
+<table>
+<tr><th></th><th><code>interface</code></th><th><code>type</code></th></tr>
+<tr><td>Object shapes</td><td>yes</td><td>yes</td></tr>
+<tr><td>Unions, tuples, primitives, mapped/conditional types</td><td>no</td><td>yes</td></tr>
+<tr><td>Extending</td><td><code>extends</code>, declaration merging</td><td>intersection <code>&amp;</code></td></tr>
+<tr><td>Guideline</td><td>public object contracts (components props, classes)</td><td>everything else; pick one convention per codebase</td></tr>
+</table>
+
+<h2>Narrowing: the compiler follows your checks</h2>
+<textarea class="code" data-lang="js" data-file="narrowing.ts">
+function pad(x: string | number | null) {
+  if (x === null) return "";                       // equality
+  if (typeof x === "number") return x.toFixed(2);  // typeof
+  return x.trim();                                 // x is string here
+}
+
+if ("radius" in shape) { /* in operator */ }
+if (value instanceof Date) { /* instanceof */ }
+
+// Custom type guard
+function isString(x: unknown): x is string { return typeof x === "string"; }
+// Assertion function
+function assertDefined<T>(x: T | undefined, msg = "missing"): asserts x is T { if (x === undefined) throw new Error(msg); }
+
+// Discriminated unions: THE pattern for state
+type Result<T> =
+  | { status: "loading" }
+  | { status: "error"; error: Error }
+  | { status: "success"; data: T };
+
+function render(r: Result<User[]>) {
+  switch (r.status) {
+    case "loading": return "…";
+    case "error":   return r.error.message;        // r.error exists only here
+    case "success": return r.data.length + " users";
+    default: { const _exhaustive: never = r; return _exhaustive; }   // compile error if a case is added later
+  }
+}
+</textarea>
+
+<h2>Generics: types that take parameters</h2>
+<textarea class="code" data-lang="js" data-file="generics.ts">
+function first<T>(xs: readonly T[]): T | undefined { return xs[0]; }
+const n = first([1, 2, 3]);         // T inferred as number
+
+function pluck<T, K extends keyof T>(obj: T, key: K): T[K] { return obj[key]; }   // constraint
+pluck({ id: 1, name: "a" }, "name");   // string;   pluck(..., "nope") is an error
+
+interface Box<T = string> { value: T }               // default type parameter
+class Stack<T> { private items: T[] = []; push(x: T) { this.items.push(x); } pop(): T | undefined { return this.items.pop(); } }
+
+async function getJSON<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  return res.json() as Promise<T>;       // WARNING: this is an assertion; the server may lie
+}
+</textarea>
+
+<h2>Utility types you'll use daily</h2>
+<textarea class="code" data-lang="js" data-file="utility.ts">
+type U = { id: number; name: string; email: string; password: string };
+type Public   = Omit<U, "password">;            // remove keys
+type Preview  = Pick<U, "id" | "name">;         // keep keys
+type Draft    = Partial<U>;                     // all optional
+type Complete = Required<Draft>;                // all required
+type Frozen   = Readonly<U>;
+type ById     = Record<number, U>;
+type Fn       = (a: number, b: string) => boolean;
+type R = ReturnType<Fn>;                        // boolean
+type P = Parameters<Fn>;                        // [a: number, b: string]
+type Resolved = Awaited<Promise<string>>;       // string
+type NoNull = NonNullable<string | null>;       // string
+</textarea>
+
+<h2>Types at the boundaries: runtime validation</h2>
+<div class="callout warn"><span class="label">Key insight</span>Types vanish at runtime. Data from <code>fetch</code>, <code>localStorage</code>, form input and <code>JSON.parse</code> is <code>unknown</code> no matter what you claim. Validate it with a schema library, and <em>derive</em> the static type from the schema so they can't drift.</div>
+<textarea class="code" data-lang="js" data-file="schema.ts">
+import { z } from "zod";
+
+const UserSchema = z.object({
+  id: z.number().int().positive(),
+  name: z.string().min(1),
+  email: z.string().email(),
+  role: z.enum(["admin", "user"]).default("user"),
+});
+type User = z.infer<typeof UserSchema>;       // static type derived from the schema
+
+async function loadUser(id: number): Promise<User> {
+  const res = await fetch(`/api/users/${id}`);
+  return UserSchema.parse(await res.json());   // throws a descriptive error if the shape is wrong
+  // or .safeParse() returns { success, data | error } without throwing
+}
+</textarea>
+
+<h2>TypeScript with React</h2>
+<textarea class="code" data-lang="jsx" data-file="Card.tsx">
+import { useState, type ReactNode, type ComponentProps } from "react";
+
+type CardProps = {
+  title: string;
+  children: ReactNode;
+  onSelect?: (id: string) => void;
+} & Omit<ComponentProps<"section">, "title">;        // inherit all <section> props
+
+export function Card({ title, children, onSelect, ...rest }: CardProps) {
+  const [open, setOpen] = useState(false);            // inferred boolean
+  const [user, setUser] = useState<User | null>(null);   // annotate when initial value isn't enough
+  return <section {...rest}><h2>{title}</h2>{children}</section>;
+}
+
+const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => console.log(e.target.value);
+const ref = useRef<HTMLDivElement>(null);
+</textarea>
+<textarea class="code" data-lang="js" data-file="three.ts">
+import * as THREE from "three";
+const mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial> = new THREE.Mesh(geo, mat);
+// R3F: useRef<THREE.Mesh>(null!)   |   useFrame((state, delta) => { ref.current.rotation.y += delta })
+</textarea>
+
+<h2>Practical rules</h2>
+<ol>
+<li>Avoid <code>any</code>. Use <code>unknown</code> + narrowing or generics.</li>
+<li>Avoid type assertions (<code>as</code>) and non-null assertions (<code>!</code>); each is a promise you can break. Prefer guards and validation.</li>
+<li>Model states with discriminated unions, not bags of optional booleans.</li>
+<li>Let inference work; don't annotate what the compiler already knows.</li>
+<li>Don't fight the compiler with clever types. If a type takes 20 minutes to write, the design is probably too clever.</li>
+<li>Use <code>satisfies</code> to check a value matches a type while keeping its narrow inferred type: <code>const cfg = { port: 3000 } satisfies Config;</code></li>
+</ol>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Convert your Project 2 (vanilla app) to TypeScript with <code>strict</code> and <code>noUncheckedIndexedAccess</code>. Fix every error properly, without <code>any</code>.</li>
+<li>Model an <code>AsyncState&lt;T&gt;</code> discriminated union and write an exhaustive <code>switch</code> renderer.</li>
+<li>Write a generic typed <code>fetchJson&lt;T&gt;(url, schema)</code> that validates with Zod and returns a <code>Result</code> instead of throwing.</li>
+<li>Write a type-safe <code>EventEmitter&lt;Events&gt;</code> where <code>on("login", payload =&gt; …)</code> infers the payload type from an event map.</li>
+<li>Type a polymorphic React <code>Button</code> that renders as a <code>button</code> or an <code>a</code> based on <code>href</code>.</li>
+<li>Use <code>tsc --noEmit</code> in CI so type errors fail the build.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>any vs unknown?</summary>any disables checking. unknown accepts any value but forces you to narrow before use, so it keeps safety.</details>
+<details><summary>Why validate API data if I have a type?</summary>Types are erased and can't verify runtime data. A schema parser confirms the shape and gives you a trustworthy typed value.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

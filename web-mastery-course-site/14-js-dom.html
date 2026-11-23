@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 14 — The DOM</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="14-js-dom">
+<main><article>
+<h1>Lesson 14 — The DOM</h1>
+<p class="lede">The Document Object Model is the browser's live tree of your page. JavaScript reads and changes it; the browser re-renders. From here on, demos are full HTML pages.</p>
+
+<h2>Selecting elements</h2>
+<textarea class="code" data-lang="html" data-run>
+<h1 id="title">Hello</h1>
+<ul class="list"><li>One</li><li class="hot">Two</li><li>Three</li></ul>
+<pre id="log"></pre>
+<script>
+const log = (...a) => document.getElementById("log").textContent += a.join(" ") + "\n";
+
+const title = document.getElementById("title");
+const first = document.querySelector(".list li");        // first match
+const all   = document.querySelectorAll(".list li");     // NodeList (static)
+log(title.textContent, "|", first.textContent, "|", all.length);
+
+log([...all].map(li => li.textContent).join(","));       // convert to real array
+log(first.nextElementSibling.className, first.parentElement.tagName);
+log(title.closest("body").tagName);
+</script>
+</textarea>
+
+<h2>Changing content, attributes, classes, styles</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>.on{background:gold;padding:4px 8px;border-radius:6px}</style>
+<p id="p">Change me</p>
+<a id="a" href="#">link</a>
+<script>
+const p = document.getElementById("p"), a = document.getElementById("a");
+
+p.textContent = "Safe text (no HTML parsing)";
+// p.innerHTML = userInput;   // DANGER: XSS if the string is untrusted!
+
+a.setAttribute("href", "https://example.com");
+a.target = "_blank";
+a.dataset.id = "42";            // data-id="42"
+
+p.classList.add("on");          // remove, toggle, contains, replace
+p.style.color = "crimson";      // inline style (prefer classes)
+p.style.setProperty("--x", "1");
+console.log(a.outerHTML);
+</script>
+</textarea>
+<div class="callout warn"><span class="label">Security</span>Never put untrusted text into <code>innerHTML</code>. Use <code>textContent</code>, or build elements with <code>createElement</code>. This is how XSS attacks happen.</div>
+
+<h2>Creating and removing elements</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>body{font-family:system-ui} li{margin:4px 0}</style>
+<ul id="list"></ul>
+<button id="add">Add item</button>
+<script>
+const list = document.getElementById("list");
+let n = 0;
+document.getElementById("add").addEventListener("click", () => {
+  const li = document.createElement("li");
+  li.textContent = "Item " + (++n) + " ";
+  const del = document.createElement("button");
+  del.textContent = "✕";
+  del.onclick = () => li.remove();
+  li.append(del);                // also: prepend, before, after, replaceWith
+  list.append(li);
+});
+</script>
+</textarea>
+<p>Other tools: <code>cloneNode(true)</code>, <code>insertAdjacentHTML</code>, <code>&lt;template&gt;</code> elements, and <code>DocumentFragment</code> for batching many inserts.</p>
+
+<h2>Reading size and position</h2>
+<textarea class="code" data-lang="js">
+const r = el.getBoundingClientRect();    // x, y, width, height relative to viewport
+el.offsetWidth; el.scrollHeight;         // layout metrics (force layout: don't read/write in a loop!)
+window.innerWidth; window.scrollY;
+el.scrollIntoView({ behavior: "smooth" });
+</textarea>
+
+<h2>Observers (modern, efficient)</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>body{font-family:system-ui} .box{height:120px;margin:12px 0;background:#ddd;display:grid;place-items:center;transition:.4s}
+.box.seen{background:#7c5cff;color:#fff;transform:scale(1.03)}</style>
+<div class="box">1</div><div class="box">2</div><div class="box">3</div><div class="box">4</div><div class="box">5</div>
+<script>
+const io = new IntersectionObserver((entries) => {
+  for (const e of entries) e.target.classList.toggle("seen", e.isIntersecting);
+}, { threshold: 0.6 });
+document.querySelectorAll(".box").forEach(b => io.observe(b));
+</script>
+</textarea>
+<p>Scroll the preview. <code>IntersectionObserver</code> tells you when elements enter the viewport (lazy loading, scroll animations). Also see <code>ResizeObserver</code> and <code>MutationObserver</code>.</p>
+
+<h2>Performance habits</h2>
+<ul>
+<li>Batch DOM writes; avoid alternating reads and writes of layout properties.</li>
+<li>Prefer toggling classes over many inline style assignments.</li>
+<li>Cache selections you reuse in variables.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a counter: a number and +/− buttons that update the text.</li>
+<li>Build a "tag list": an input and Add button that appends items with a delete button each.</li>
+<li>Toggle a dark theme by toggling a class on <code>document.documentElement</code>.</li>
+<li>Generate a table from an array of objects using <code>createElement</code> (no <code>innerHTML</code>).</li>
+<li>Use <code>IntersectionObserver</code> to fade in sections as you scroll.</li>
+<li>Build a character counter for a textarea that turns red past 100.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>textContent vs innerHTML?</summary>textContent treats the string as plain text; innerHTML parses it as HTML (powerful but an XSS risk with untrusted input).</details>
+<details><summary>querySelectorAll vs getElementsByClassName?</summary>querySelectorAll returns a static NodeList; getElementsBy* returns a live HTMLCollection that updates as the DOM changes.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 1 — HTML Document Structure & Text</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="01-html-text">
+<main><article>
+<h1>Lesson 1 — Document structure &amp; text</h1>
+<p class="lede">HTML describes the meaning of content. Learn the skeleton every page needs and the elements for text.</p>
+
+<h2>Elements</h2>
+<p>HTML is made of <strong>elements</strong>: <code>&lt;tag attribute="value"&gt;content&lt;/tag&gt;</code>. Some are <em>void</em> (no closing tag): <code>img</code>, <code>br</code>, <code>hr</code>, <code>input</code>, <code>meta</code>. Elements nest into a tree: the <strong>DOM</strong>.</p>
+
+<h2>The skeleton</h2>
+<textarea class="code" data-lang="html" data-file="index.html">
+<!DOCTYPE html>               <!-- standards mode -->
+<html lang="en">              <!-- language: screen readers, translation -->
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tab title and search result title</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <!-- everything visible goes here -->
+</body>
+</html>
+</textarea>
+<div class="callout"><span class="label">Rule</span>Always add <code>defer</code> (or <code>type="module"</code>) to scripts so they run after the HTML is parsed.</div>
+
+<h2>Text elements</h2>
+<textarea class="code" data-lang="html" data-run>
+<h1>Main title (one per page)</h1>
+<h2>Section</h2>
+<h3>Subsection</h3>
+
+<p>A paragraph with <strong>important</strong>, <em>emphasized</em>,
+   <code>inline code</code>, <mark>highlighted</mark> text and a<br>line break.</p>
+
+<blockquote>A quote from someone wise.</blockquote>
+<pre><code>preformatted
+    code block</code></pre>
+<hr>
+<ul><li>Unordered</li><li>List</li></ul>
+<ol start="3"><li>Third</li><li>Fourth</li></ol>
+<dl><dt>Term</dt><dd>Definition</dd></dl>
+</textarea>
+<p>Try it: add a fourth heading level, nest a list inside a list item, and wrap a word in <code>&lt;mark&gt;</code>.</p>
+
+<h2>Key ideas</h2>
+<ul>
+<li><strong>Semantics over looks.</strong> <code>&lt;strong&gt;</code> means "important"; <code>&lt;b&gt;</code> is just bold. Choose by meaning and style with CSS.</li>
+<li><strong>Block vs inline.</strong> Block elements (<code>p</code>, <code>div</code>, <code>h1</code>, <code>ul</code>) start new lines. Inline ones (<code>span</code>, <code>a</code>, <code>strong</code>) flow within text.</li>
+<li><strong>Generic containers</strong>: <code>div</code> (block) and <code>span</code> (inline). Use only when nothing semantic fits.</li>
+<li><strong>Attributes</strong>: <code>id</code> (unique), <code>class</code> (reusable), <code>lang</code>, <code>title</code>, <code>hidden</code>, <code>data-*</code> (custom data).</li>
+<li><strong>Entities</strong> show reserved characters: <code>&amp;lt; &amp;gt; &amp;amp; &amp;quot; &amp;copy;</code>.</li>
+<li>Whitespace collapses: many spaces and newlines render as one space. Comments: <code>&lt;!-- not shown --&gt;</code>.</li>
+</ul>
+
+<h2>The browser fixes your mistakes</h2>
+<p>Delete a closing tag below and open the Elements panel in DevTools on your own copy. The browser silently repairs invalid HTML, which hides bugs, so validate at <em>validator.w3.org</em>.</p>
+<textarea class="code" data-lang="html" data-run>
+<p>First paragraph
+<p>Second paragraph (no closing tags above!)
+<ul><li>One<li>Two</ul>
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Write an "About me" page: one <code>h1</code>, three <code>h2</code> sections, a paragraph in each, a hobbies list and a quote.</li>
+<li>Show the literal text <code>&lt;p&gt;Hello&lt;/p&gt;</code> on the page using entities.</li>
+<li>Add <code>data-mood="happy"</code> to a paragraph, then in the Console (element selected in Elements) run <code>$0.dataset.mood</code>.</li>
+<li>Validate your page and fix every error.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why only one h1, and why the lang attribute?</summary>One h1 gives the page a single clear topic for outlines, screen readers and search. <code>lang</code> lets screen readers choose pronunciation and lets browsers offer translation and spell-check.</details>
+<details><summary>When <code>&lt;em&gt;</code> vs <code>&lt;i&gt;</code>?</summary><code>em</code> = stress emphasis (changes meaning); <code>i</code> = alternate voice (a ship name, a foreign phrase) with no added emphasis.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

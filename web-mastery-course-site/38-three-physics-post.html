@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 38 — Physics, Particles & Post-processing</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="38-three-physics-post">
+<main><article>
+<h1>Lesson 38 — Physics, particles &amp; post-processing</h1>
+<p class="lede">Make the world behave, fill it with thousands of things cheaply, and finish it with a cinematic look.</p>
+
+<h2>Physics</h2>
+<p>Three.js draws; it doesn't simulate. Pair it with a physics engine that keeps its own world of invisible bodies, then <strong>copy each body's position and rotation to its mesh every frame</strong>.</p>
+<ul>
+<li><strong>cannon-es</strong>: simple, pure JS. <strong>Rapier</strong> (<code>@dimforge/rapier3d-compat</code>): fast WebAssembly, more features. In R3F use <code>@react-three/rapier</code> (declarative <code>&lt;RigidBody&gt;</code>).</li>
+<li>Concepts: <em>world</em> + gravity, <em>rigid bodies</em> (dynamic, static, kinematic), <em>colliders/shapes</em>, <em>materials</em> (friction, restitution), forces/impulses, collision events.</li>
+<li>Step the simulation with a <strong>fixed time step</strong> for stability: <code>world.step(1/60, dt, 3)</code>.</li>
+</ul>
+<p>Live demo with cannon-es: click to drop boxes and spheres onto a ground.</p>
+<textarea class="code" data-lang="html" data-run data-height="440px">
+<style>html,body{margin:0;overflow:hidden;background:#111;color:#fff;font:13px system-ui}#hud{position:fixed;left:10px;top:8px;pointer-events:none}</style>
+<div id="hud">Click anywhere to drop shapes</div>
+<script type="importmap">{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+  "cannon-es":"https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"}}</script>
+<script type="module">
+import * as THREE from "three";
+import * as CANNON from "cannon-es";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+document.body.append(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color("#14121f");
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(6, 6, 10);
+const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight("#fff", "#334", 1));
+const sun = new THREE.DirectionalLight("#fff", 2.5); sun.position.set(5, 10, 5); sun.castShadow = true;
+Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10 }); scene.add(sun);
+
+// ---- Physics world (separate from the visual scene) ----
+const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
+const mat = new CANNON.Material("default");
+world.addContactMaterial(new CANNON.ContactMaterial(mat, mat, { friction: 0.3, restitution: 0.5 }));
+
+const groundBody = new CANNON.Body({ mass: 0, material: mat, shape: new CANNON.Plane() });   // mass 0 = static
+groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+world.addBody(groundBody);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: "#2b2840" }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+
+// ---- Pairs of (mesh, body) kept in sync ----
+const things = [];
+const boxGeo = new THREE.BoxGeometry(1, 1, 1), sphGeo = new THREE.SphereGeometry(0.5, 24, 16);   // reuse geometry!
+function spawn() {
+  const isBox = Math.random() < 0.5;
+  const mesh = new THREE.Mesh(isBox ? boxGeo : sphGeo,
+    new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(Math.random(), 0.7, 0.55) }));
+  mesh.castShadow = true; scene.add(mesh);
+  const body = new CANNON.Body({
+    mass: 1, material: mat,
+    shape: isBox ? new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)) : new CANNON.Sphere(0.5),
+    position: new CANNON.Vec3((Math.random() - 0.5) * 3, 6 + Math.random() * 3, (Math.random() - 0.5) * 3),
+  });
+  body.angularVelocity.set(Math.random() * 4, Math.random() * 4, Math.random() * 4);
+  world.addBody(body);
+  things.push({ mesh, body });
+  if (things.length > 120) {                                 // keep it bounded: remove + dispose the oldest
+    const old = things.shift(); world.removeBody(old.body); scene.remove(old.mesh); old.mesh.material.dispose();
+  }
+}
+addEventListener("pointerdown", spawn);
+for (let i = 0; i < 6; i++) spawn();
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  world.step(1 / 60, Math.min(clock.getDelta(), 0.1), 3);   // fixed step + catch-up substeps
+  for (const { mesh, body } of things) { mesh.position.copy(body.position); mesh.quaternion.copy(body.quaternion); }
+  controls.update(); renderer.render(scene, camera);
+});
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+</script>
+</textarea>
+
+<h2>Particles and instancing</h2>
+<ul>
+<li><strong><code>THREE.Points</code></strong>: each vertex becomes a square/sprite. Great for stars, dust, smoke, data viz with 100k+ points. Animate in the vertex shader (cheap) rather than in JS.</li>
+<li><strong><code>InstancedMesh</code></strong>: draw N copies of one mesh in a <em>single draw call</em>, each with its own transform/color. Use it for forests, crowds, bricks, grass: thousands of meshes at the cost of one.</li>
+<li><strong>Draw calls</strong> (one per mesh+material) are usually the first bottleneck, not triangles.</li>
+</ul>
+<textarea class="code" data-lang="js">
+// 10,000 cubes, one draw call
+const count = 10000;
+const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshStandardMaterial(), count);
+const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+const c = new THREE.Color();
+for (let i = 0; i < count; i++) {
+  p.set((Math.random() - 0.5) * 40, (Math.random() - 0.5) * 40, (Math.random() - 0.5) * 40);
+  m.compose(p, q, s);
+  inst.setMatrixAt(i, m);
+  inst.setColorAt(i, c.setHSL(Math.random(), 0.7, 0.6));
+}
+inst.instanceMatrix.needsUpdate = true;       // required after changing instances
+inst.instanceColor.needsUpdate = true;
+scene.add(inst);
+</textarea>
+
+<h2>Post-processing with bloom (live)</h2>
+<p>Post-processing renders the scene to a texture, then applies full-screen effects (bloom glow, depth of field, SSAO, color grading, film grain, outlines). With the <code>EffectComposer</code>, passes run in order. Glowing pixels must be brighter than the bloom <code>threshold</code>.</p>
+<textarea class="code" data-lang="html" data-run data-height="440px">
+<style>html,body{margin:0;overflow:hidden;background:#000}</style>
+<script type="importmap">{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+const renderer = new THREE.WebGLRenderer({ antialias: false });   // MSAA doesn't apply through composer targets
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.append(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color("#05040a");
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(0, 0, 14);
+const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.autoRotate = true;
+
+// A galaxy of 40,000 points
+const N = 40000, pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+const inner = new THREE.Color("#ffb347"), outer = new THREE.Color("#5b6cff"), tmp = new THREE.Color();
+for (let i = 0; i < N; i++) {
+  const r = Math.pow(Math.random(), 0.6) * 8;
+  const arm = (i % 3) * (Math.PI * 2 / 3);
+  const a = r * 0.9 + arm;
+  const spread = Math.pow(Math.random(), 3) * (Math.random() < 0.5 ? 1 : -1) * 0.8 * (1 + r * 0.2);
+  pos[i * 3]     = Math.cos(a) * r + spread;
+  pos[i * 3 + 1] = (Math.random() - 0.5) * 0.4 * (1 - r / 10);
+  pos[i * 3 + 2] = Math.sin(a) * r + spread;
+  tmp.copy(inner).lerp(outer, r / 8); col.set([tmp.r, tmp.g, tmp.b], i * 3);
+}
+const geo = new THREE.BufferGeometry();
+geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+const points = new THREE.Points(geo, new THREE.PointsMaterial({
+  size: 0.05, sizeAttenuation: true, vertexColors: true,
+  blending: THREE.AdditiveBlending, depthWrite: false, transparent: true,
+}));
+scene.add(points);
+
+// Post-processing chain
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.1 /*strength*/, 0.6 /*radius*/, 0.1 /*threshold*/));
+composer.addPass(new OutputPass());                    // tone mapping + sRGB conversion at the end
+
+renderer.setAnimationLoop((t) => {
+  points.rotation.y = t * 0.00005;
+  controls.update();
+  composer.render();                                   // NOT renderer.render
+});
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
+});
+</script>
+</textarea>
+<p>In R3F use <code>@react-three/postprocessing</code>: <code>&lt;EffectComposer&gt;&lt;Bloom luminanceThreshold={1} mipmapBlur /&gt;&lt;DepthOfField /&gt;&lt;Vignette /&gt;&lt;/EffectComposer&gt;</code>. Each pass costs fill-rate: budget them, and test on phones.</p>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Add a static wall of boxes and shoot spheres at it by clicking (apply an impulse from the camera direction with <code>body.applyImpulse</code>).</li>
+<li>Build a Plinko / marble run with static pegs and dynamic balls.</li>
+<li>Replace the 120 individual meshes in the physics demo with one <code>InstancedMesh</code>.</li>
+<li>Animate the galaxy in its vertex shader (swirl by radius and time) instead of rotating on the CPU.</li>
+<li>Add <code>BokehPass</code> or an outline pass for the hovered object (from Lesson 35).</li>
+<li>Build a particle fountain: spawn, update and recycle 5,000 points using a typed array and <code>needsUpdate</code>.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why a fixed physics time step?</summary>Variable steps make simulations unstable and non-deterministic. A fixed step with accumulated sub-steps keeps behavior consistent across frame rates.</details>
+<details><summary>Why is instancing faster?</summary>It issues one draw call for all copies; each draw call has CPU overhead, so thousands of separate meshes bottleneck on the CPU.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

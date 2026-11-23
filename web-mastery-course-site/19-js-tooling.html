@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 19 — Errors, Debugging, Storage & Tooling</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="19-js-tooling">
+<main><article>
+<h1>Lesson 19 — Errors, debugging, storage &amp; tooling</h1>
+<p class="lede">Real programs fail. Learn to handle errors, find bugs fast, persist data, and use the Node/npm ecosystem.</p>
+
+<h2>Errors</h2>
+<textarea class="code" data-lang="js" data-run>
+try {
+  JSON.parse("{ bad json");
+} catch (err) {
+  console.log(err.name, "-", err.message);
+} finally {
+  console.log("always runs");
+}
+
+class ValidationError extends Error {
+  constructor(field, message) { super(message); this.name = "ValidationError"; this.field = field; }
+}
+function validate(user) {
+  if (!user.email?.includes("@")) throw new ValidationError("email", "Invalid email");
+  return true;
+}
+try { validate({ email: "nope" }); }
+catch (e) {
+  if (e instanceof ValidationError) console.log("fix field:", e.field);
+  else throw e;                          // don't swallow unknown errors
+}
+
+const err = new Error("outer", { cause: new Error("inner") });   // error chaining
+console.log(err.cause.message);
+</textarea>
+<p>Common types: <code>TypeError</code> (undefined is not a function, reading property of undefined), <code>ReferenceError</code>, <code>SyntaxError</code>, <code>RangeError</code>. Global nets: <code>window.onerror</code> and <code>unhandledrejection</code> for logging.</p>
+
+<h2>Debugging like a professional</h2>
+<ol>
+<li><strong>Read the error and the stack trace</strong>: first line = what, first stack frame in your code = where.</li>
+<li><strong><code>console</code> beyond log</strong>: <code>console.table(array)</code>, <code>console.dir(obj)</code>, <code>console.group</code>, <code>console.time</code>, <code>console.assert</code>, <code>console.trace</code>.</li>
+<li><strong><code>debugger;</code> / breakpoints</strong>: Sources panel → click a line number. Inspect scope variables, watch expressions, step over (<kbd>F10</kbd>), step into (<kbd>F11</kbd>), call stack.</li>
+<li><strong>Conditional breakpoints</strong> and <em>logpoints</em> (right-click a line number).</li>
+<li><strong>Network panel</strong> for API bugs: status, request payload, response.</li>
+<li><strong>Binary search the bug</strong>: disable half the code. Make the smallest reproduction.</li>
+<li>Ask: "what did I assume that isn't true?" Then print the assumption.</li>
+</ol>
+<textarea class="code" data-lang="js" data-run>
+const rows = [{ id: 1, name: "Ada", langs: ["js", "c"] }, { id: 2, name: "Linus", langs: ["c"] }];
+console.log(rows);                          // in real DevTools console.table(rows) is great
+console.log(rows.map(r => `${r.id}:${r.langs.length}`).join(" "));
+console.assert(rows.length === 3, "expected 3 rows");
+</textarea>
+
+<h2>Browser storage</h2>
+<table>
+<tr><th>API</th><th>Size</th><th>Lifetime</th><th>Use for</th></tr>
+<tr><td><code>localStorage</code></td><td>~5 MB</td><td>until cleared</td><td>settings, small data</td></tr>
+<tr><td><code>sessionStorage</code></td><td>~5 MB</td><td>per tab</td><td>temporary state</td></tr>
+<tr><td>Cookies</td><td>4 KB</td><td>configurable</td><td>sessions sent to server (use <code>HttpOnly</code>)</td></tr>
+<tr><td>IndexedDB</td><td>large</td><td>until cleared</td><td>structured offline data</td></tr>
+<tr><td>Cache API / Service Worker</td><td>large</td><td>—</td><td>offline apps (PWAs)</td></tr>
+</table>
+<textarea class="code" data-lang="js" data-file="storage.js">
+// Strings only → JSON.stringify/parse. Always guard: it can throw (private mode, quota).
+export const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+export const load = (k, fallback = null) => {
+  try { const s = localStorage.getItem(k); return s === null ? fallback : JSON.parse(s); }
+  catch { return fallback; }
+};
+save("todos", [{ id: 1, text: "learn", done: false }]);
+console.log(load("todos", []));
+</textarea>
+<div class="callout warn"><span class="label">Security</span>Never store passwords or tokens you can't afford to leak in localStorage; any XSS bug can read it.</div>
+
+<h2>Node &amp; npm</h2>
+<textarea class="code" data-lang="bash">
+node -v && npm -v
+
+mkdir myapp && cd myapp
+npm init -y                      # creates package.json
+npm install canvas-confetti      # dependency -> node_modules + package-lock.json
+npm install -D vite eslint prettier   # dev dependencies
+npx vite                         # run a locally installed tool
+
+# package.json "scripts" are your project's commands:
+#   "dev": "vite", "build": "vite build", "lint": "eslint ."
+npm run dev
+</textarea>
+<ul>
+<li><code>package.json</code>: metadata, dependencies, scripts. <code>package-lock.json</code>: exact versions (commit it). <code>node_modules</code>: never commit (add to <code>.gitignore</code>).</li>
+<li>Semver: <code>^1.2.3</code> accepts minor/patch updates; <code>~1.2.3</code> only patches.</li>
+<li><strong>Vite</strong> gives a dev server with instant reload and an optimized production build. Quick start: <code>npm create vite@latest myapp -- --template vanilla</code>.</li>
+<li><strong>ESLint</strong> finds bugs; <strong>Prettier</strong> formats code. Run both in your editor.</li>
+<li>Be careful with dependencies: fewer is safer. Check <code>npm audit</code>.</li>
+</ul>
+
+<h2>Git in 6 commands</h2>
+<textarea class="code" data-lang="bash">
+git init
+git add -A && git commit -m "Add feature"
+git switch -c feature/nav          # branch
+git switch main && git merge feature/nav
+git remote add origin https://github.com/you/repo.git && git push -u origin main
+git log --oneline --graph
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Add a bug to your to-do app and find it using only breakpoints (no <code>console.log</code>).</li>
+<li>Make the to-do app persist to <code>localStorage</code> and survive reloads.</li>
+<li>Create a custom <code>HttpError</code> class with a <code>status</code> and use it in a <code>fetchJson</code> helper.</li>
+<li>Scaffold a Vite vanilla project, install a package, import it, and run <code>npm run build</code>. Inspect <code>dist/</code>.</li>
+<li>Set up ESLint and Prettier, and make them run on save.</li>
+<li>Push a project to GitHub and enable GitHub Pages.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why rethrow unknown errors?</summary>Swallowing hides real bugs. Handle what you expect and let the rest propagate to be logged.</details>
+<details><summary>Should package-lock.json be committed?</summary>Yes, for reproducible installs. node_modules should not.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project 5 — Production Full-Stack App</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="p5-fullstack">
+<main><article>
+<h1>Project 5 — A production full-stack application</h1>
+<p class="lede">Build, test, secure and deploy a complete multi-user product with a database, authentication, real-time features and a polished front end. The goal is an app you'd be comfortable showing to an employer or giving to real users.</p>
+
+<h2>Pick a product</h2>
+<ul>
+<li><strong>Team task board</strong>: workspaces, invitations and roles, boards/columns/cards, drag-and-drop, comments, live updates, activity feed.</li>
+<li><strong>Booking platform</strong>: providers publish availability; customers book slots; double-booking prevention with transactions; email confirmations; calendar view.</li>
+<li><strong>Mini store</strong>: catalog, search, cart, checkout with Stripe test mode, order history, admin dashboard, inventory.</li>
+<li><strong>Collaborative notes/whiteboard</strong>: documents, sharing permissions, real-time cursors and CRDT sync, version history.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Product</h3>
+<ol>
+<li>At least <strong>6 user stories</strong> written down with acceptance criteria before coding; a README "product spec".</li>
+<li>Multi-user with <strong>sign up / login / logout / password reset</strong> (or passkeys/OAuth) and <strong>roles + ownership-based authorization</strong>.</li>
+<li>At least <strong>one real-time feature</strong> (live updates, presence, or notifications).</li>
+<li>At least <strong>one background job</strong> (email, image processing, report generation, webhook handling) with retries.</li>
+</ol>
+<h3>Architecture</h3>
+<ol>
+<li>Next.js (or React + Fastify/Hono) with TypeScript strict; PostgreSQL with migrations and seed data; Prisma or Drizzle.</li>
+<li>Zod schemas shared for validation and types. Consistent error format. Pagination everywhere lists can grow.</li>
+<li>Clear layering: UI → actions/routes → services → repositories. No business logic in components.</li>
+<li>Environment config validated at startup; no secrets in the repo.</li>
+</ol>
+<h3>Quality</h3>
+<ol>
+<li><strong>Security</strong>: parameterized queries, output encoding, CSP (report-only is the minimum), secure cookies, CSRF protection, rate limiting, per-resource authorization tests, dependency audit passing.</li>
+<li><strong>Testing</strong>: unit tests for services, API integration tests with a real test database, component tests, and 3+ Playwright end-to-end flows (including auth and a permission failure).</li>
+<li><strong>Accessibility</strong>: Lighthouse a11y ≥ 95, axe tests, keyboard-only walkthrough documented.</li>
+<li><strong>Performance</strong>: indexes justified by <code>EXPLAIN</code>; no N+1; Lighthouse mobile ≥ 85; bundle analysis noted.</li>
+<li><strong>Observability</strong>: structured logs with request ids, error tracking (Sentry or similar), a <code>/health</code> endpoint.</li>
+</ol>
+<h3>Delivery</h3>
+<ol>
+<li><strong>CI</strong> (GitHub Actions): lint, typecheck, test, build on every PR; migrations applied automatically on deploy.</li>
+<li><strong>Deployed</strong> to a public URL with a managed Postgres, HTTPS, environment variables and backups configured.</li>
+<li>README: architecture diagram, ERD, setup in under 5 minutes (<code>docker compose up</code>), decisions and trade-offs, known limitations.</li>
+</ol>
+
+<h2>Milestones (≈ 2 weeks)</h2>
+<ol>
+<li><strong>Days 1–2</strong>: spec, wireframes, ERD, repo, CI skeleton, database + migrations, auth.</li>
+<li><strong>Days 3–5</strong>: core CRUD with authorization, validation and tests; seed data.</li>
+<li><strong>Days 6–7</strong>: real-time feature and background job.</li>
+<li><strong>Days 8–9</strong>: UI polish, responsive design, accessibility, empty/loading/error states.</li>
+<li><strong>Days 10–11</strong>: security hardening pass, performance pass, E2E tests.</li>
+<li><strong>Days 12–14</strong>: deployment, monitoring, documentation, demo recording, fixes from a peer review.</li>
+</ol>
+
+<h2>Starter commands</h2>
+<textarea class="code" data-lang="bash">
+npx create-next-app@latest taskboard --typescript --tailwind --app --src-dir
+cd taskboard
+npm i @prisma/client zod argon2 pino
+npm i -D prisma vitest @playwright/test @testing-library/react
+npx prisma init
+docker compose up -d db          # a local Postgres (see Lesson 72 for the compose file)
+</textarea>
+
+<section class="checkpoint"><h2>Self-review</h2>
+<details><summary>Questions a senior reviewer would ask</summary>
+<ul><li>Show me the test proving user A can't touch user B's data.</li>
+<li>What happens if two users do X at the same moment? (transactions, constraints, version checks)</li>
+<li>Where would this break first at 100× the traffic, and how would you know?</li>
+<li>How do I run, migrate, back up and restore this app?</li>
+<li>What did you consciously leave out, and why?</li></ul></details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 79 — Mastery Review: The Self-Assessment</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="79-mastery-review">
+<main><article>
+<h1>Lesson 79 — Mastery review: the self-assessment</h1>
+<p class="lede">Before the final capstone, check honestly where you stand. For each area, you should be able to do the "Can you…" items <em>without looking anything up</em> (or at most skimming MDN). Gaps are normal; the list tells you exactly what to revisit.</p>
+
+<h2>How to use this page</h2>
+<ol>
+<li>Tick items you can genuinely do <em>and explain</em> (checkboxes save in your browser).</li>
+<li>For every unticked item, open the linked lesson, redo its exercises, then come back.</li>
+<li>Aim for at least 85% in each area before starting the capstone, and 100% of the "Core" items.</li>
+</ol>
+<div id="score" class="callout"><span class="label">Your score</span><span id="scoreText">0 / 0</span></div>
+
+<div id="areas"></div>
+
+<script>
+  // Self-assessment data lives here so it stays easy to edit. Each item: [text, lesson slug, core?]
+  const AREAS = {
+    "HTML": [
+      ["Write a fully semantic page (landmarks, headings, lists, tables, figures) with no div soup", "01-html-text", 1],
+      ["Build an accessible form with labels, validation, error messaging and correct input types", "03-html-forms-a11y", 1],
+      ["Choose between <img>, <picture>, srcset/sizes and loading hints for responsive, fast images", "02-html-media-semantics", 1],
+      ["Use <dialog>, popover, details/summary appropriately with keyboard support", "44-a11y-deep", 0],
+    ],
+    "CSS": [
+      ["Explain specificity, the cascade, inheritance and layers; debug a style that won't apply", "04-css-selectors", 1],
+      ["Lay out a responsive page with Flexbox and Grid without media-query hacks", "07-css-grid", 1],
+      ["Use custom properties for theming (light/dark) and design tokens", "41-css-architecture", 1],
+      ["Use container queries, :has(), clamp() and logical properties", "43-css-advanced", 0],
+      ["Animate with transitions/keyframes using only transform/opacity; honor prefers-reduced-motion", "09-css-motion", 1],
+    ],
+    "JavaScript": [
+      ["Explain closures, this, prototypes and the event loop with a correct predicted output", "49-js-runtime", 1],
+      ["Write async code with promises/async-await including error handling, cancellation and concurrency control", "17-js-async", 1],
+      ["Use modules, destructuring, spreading, iterators/generators and Map/Set fluently", "12-js-functions", 1],
+      ["Manipulate the DOM safely, with event delegation, and avoid layout thrashing", "15-js-events", 1],
+      ["Find and fix a memory leak using DevTools heap snapshots", "49-js-runtime", 0],
+      ["Pick the right data structure/algorithm and state its complexity", "51-algorithms", 1],
+    ],
+    "TypeScript": [
+      ["Model state with discriminated unions and exhaustive checks", "47-ts-fundamentals", 1],
+      ["Write generics with constraints; use utility types; validate unknown data at runtime", "47-ts-fundamentals", 1],
+      ["Read and write mapped/conditional types at a practical level", "48-ts-advanced", 0],
+    ],
+    "React": [
+      ["Design component hierarchies and decide where state should live", "24-react-state", 1],
+      ["Use effects correctly (and know when NOT to use one); clean up properly", "26-react-effects", 1],
+      ["Build custom hooks and context without causing re-render storms", "27-react-hooks", 1],
+      ["Fetch and cache server data with TanStack Query incl. optimistic updates", "61-react-architecture", 1],
+      ["Profile and fix a slow render; use transitions/deferred values appropriately", "60-react19", 0],
+      ["Explain Server vs Client Components and build a Next.js page using both", "57-nextjs", 0],
+      ["Write component tests with Testing Library and an E2E test with Playwright", "63-react-delivery", 1],
+    ],
+    "Three.js": [
+      ["Set up scene, camera, renderer, lights, resize handling and a clean render loop", "31-three-basics", 1],
+      ["Explain the scene graph, transforms (local vs world), and matrices at a working level", "33-three-animation", 1],
+      ["Use PBR materials, environment lighting, shadows and tone mapping correctly", "32-three-materials", 1],
+      ["Load and optimize glTF assets (Draco/KTX2) and manage disposal", "68-3d-pipeline", 1],
+      ["Write a custom shader and patch a built-in material", "66-shaders-advanced", 0],
+      ["Build a performant scene: instancing, LOD, draw-call budget, adaptive quality", "68-3d-pipeline", 1],
+      ["Structure an R3F app: state outside the render loop, shared geometries, Suspense loading", "64-r3f-architecture", 1],
+      ["Implement a fixed-timestep game loop with physics and input abstraction", "69-game-architecture", 0],
+    ],
+    "Web platform & performance": [
+      ["Diagnose LCP/INP/CLS problems and fix them with measurements", "45-web-vitals", 1],
+      ["Move work to a Worker; cache offline with a service worker", "52-web-apis", 0],
+      ["Pass an accessibility audit (axe + keyboard + screen reader smoke test)", "44-a11y-deep", 1],
+    ],
+    "Backend, data & security": [
+      ["Build a validated REST API with auth, errors, pagination and tests", "54-node-apis", 1],
+      ["Write joins, grouping and window queries; design a normalized schema with indexes", "55-databases-sql", 1],
+      ["Explain and prevent XSS, CSRF, SQL injection, broken access control", "53-security", 1],
+      ["Implement sessions/OAuth correctly and test per-resource authorization", "56-api-design-auth", 1],
+    ],
+    "Professional practice": [
+      ["Use Git fluently (rebase, bisect, reflog) and write reviewable PRs", "71-git-teams", 1],
+      ["Containerize an app and set up CI/CD with safe rollbacks", "72-cicd-deploy", 1],
+      ["Add logging, metrics, error tracking and alerts; run a blameless postmortem", "73-observability", 0],
+      ["Integrate an LLM feature safely (backend proxy, streaming, validation, evals)", "74-ai-apps", 0],
+      ["Refactor legacy code under test coverage", "75-clean-code", 1],
+      ["Run a front-end system design discussion with trade-offs", "76-frontend-system-design", 0],
+    ],
+  };
+
+  (function () {
+    const KEY = "wmc-review";
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+    const host = document.getElementById("areas");
+    const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const boxes = [];
+    for (const [area, items] of Object.entries(AREAS)) {
+      const h = document.createElement("h2"); h.textContent = area; host.append(h);
+      const ul = document.createElement("ul"); ul.style.listStyle = "none"; ul.style.paddingLeft = "0";
+      items.forEach(([text, slug, core], i) => {
+        const id = area + ":" + i;
+        const li = document.createElement("li"); li.style.margin = ".45rem 0";
+        const lab = document.createElement("label"); lab.style.cursor = "pointer";
+        const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!saved[id]; cb.dataset.id = id; cb.dataset.core = core;
+        cb.style.marginRight = ".5rem";
+        cb.addEventListener("change", () => { saved[id] = cb.checked; try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} update(); });
+        lab.append(cb);
+        lab.insertAdjacentHTML("beforeend", esc(text) + (core ? ' <strong title="Core">★</strong>' : "") + ' &nbsp;<a href="' + slug + '.html">review</a>');
+        li.append(lab); ul.append(li); boxes.push(cb);
+      });
+      host.append(ul);
+    }
+    function update() {
+      const done = boxes.filter((b) => b.checked).length;
+      const core = boxes.filter((b) => b.dataset.core === "1"), coreDone = core.filter((b) => b.checked).length;
+      const pct = Math.round((done / boxes.length) * 100);
+      document.getElementById("scoreText").textContent = ` ${done} / ${boxes.length} (${pct}%) · Core ★ ${coreDone} / ${core.length}` +
+        (pct >= 85 && coreDone === core.length ? " — ready for the capstone!" : "");
+    }
+    update();
+  })();
+</script>
+
+<h2>The 10 questions you should answer out loud</h2>
+<p>Explain each to an imaginary colleague in under two minutes, with an example. If you stumble, that's your study list.</p>
+<ol>
+<li>What happens between typing a URL and seeing a page, including the critical rendering path?</li>
+<li>How does the browser compute layout, and what triggers reflow vs repaint vs composite?</li>
+<li>Walk through the event loop with promises, timers, rAF and rendering.</li>
+<li>What makes a React render happen, what does reconciliation do, and how do you stop wasted work?</li>
+<li>Where should each kind of state live in a large React app, and why?</li>
+<li>How does a frame get from <code>renderer.render()</code> to pixels? What are draw calls, and what limits performance?</li>
+<li>How do you secure a web app against XSS, CSRF and broken access control?</li>
+<li>How would you design the data model, API and caching for a product like Trello?</li>
+<li>How do you deploy a change safely with zero downtime, and how would you know it broke something?</li>
+<li>Describe a hard bug you found by debugging systematically, and what you changed to prevent it.</li>
+</ol>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Complete the checklist honestly. For every gap, schedule a focused session: reread the lesson, redo the exercises, and build one small project that forces the skill.</li>
+<li>Record yourself answering three of the ten questions. Watch it back, and note unclear explanations and filler.</li>
+<li>Pair with someone (or a rubber duck) and teach one hard topic: teaching exposes gaps faster than rereading.</li>
+<li>Take a past project and do a "ruthless review" with the rubric from Lesson 75 and 63: list ten concrete improvements and make five.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>How do you know you've mastered something?</summary>You can build it from scratch without references, explain why it works and when it fails, debug it when it breaks, and teach it to someone else.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

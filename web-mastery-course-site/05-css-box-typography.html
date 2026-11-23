@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 5 — Box Model, Units, Color & Typography</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="05-css-box-typography">
+<main><article>
+<h1>Lesson 5 — Box model, units, color &amp; typography</h1>
+<p class="lede">Every element is a rectangle. Understand its layers, how sizes are measured, and how to make text look good.</p>
+
+<h2>The box model</h2>
+<p>Each element is a box: <strong>content → padding → border → margin</strong>.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }  /* try commenting this out! */
+  body { font-family: system-ui; background: #f4f1ea; }
+  .card {
+    width: 16rem;
+    padding: 1rem 1.5rem;         /* vertical horizontal */
+    border: 6px solid rebeccapurple;
+    border-radius: 14px;
+    margin: 1rem auto;            /* centers a block with a set width */
+    background: white;
+    box-shadow: 0 10px 30px rgb(0 0 0 / .15);
+  }
+</style>
+<div class="card"><h3 style="margin:0">Box</h3><p>Width is 16rem including padding and border thanks to border-box.</p></div>
+</textarea>
+<ul>
+<li><strong><code>box-sizing: border-box</code></strong> makes <code>width</code> include padding and border. Always set it globally.</li>
+<li><strong>Margin collapsing</strong>: vertical margins between adjacent blocks merge into the larger one. Padding never collapses.</li>
+<li><code>display</code>: <code>block | inline | inline-block | none | flex | grid | contents</code>. Inline elements ignore width, height and vertical margins.</li>
+<li><code>overflow: visible | hidden | auto | scroll</code>.</li>
+<li>Padding shorthand order: top, right, bottom, left (clockwise). Logical versions: <code>margin-inline</code>, <code>padding-block</code>.</li>
+</ul>
+
+<h2>Units</h2>
+<table>
+<tr><th>Unit</th><th>Meaning</th><th>Use for</th></tr>
+<tr><td><code>px</code></td><td>CSS pixel</td><td>borders, hairlines</td></tr>
+<tr><td><code>rem</code></td><td>root font-size (16px by default)</td><td>font sizes, spacing</td></tr>
+<tr><td><code>em</code></td><td>element's own / parent's font-size</td><td>padding that scales with text</td></tr>
+<tr><td><code>%</code></td><td>of parent</td><td>widths</td></tr>
+<tr><td><code>vw vh dvh</code></td><td>viewport units</td><td>full-screen sections (<code>dvh</code> on mobile)</td></tr>
+<tr><td><code>ch</code></td><td>width of the "0" glyph</td><td>readable line length</td></tr>
+<tr><td><code>fr</code></td><td>grid fraction</td><td>grid tracks</td></tr>
+</table>
+<p>Math functions: <code>calc(100% - 2rem)</code>, <code>min()</code>, <code>max()</code>, and the star of fluid design, <code>clamp(min, preferred, max)</code>.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body { font-family: system-ui; margin: 1rem; }
+  h1 { font-size: clamp(1.5rem, 6vw, 3.5rem); line-height: 1.1; letter-spacing: -.02em; }
+  p  { max-width: 45ch; line-height: 1.6; }
+</style>
+<h1>Resize the window: I scale fluidly</h1>
+<p>This paragraph never grows wider than about forty-five characters, which keeps lines comfortable to read. Drag the divider or resize your browser.</p>
+</textarea>
+
+<h2>Color</h2>
+<textarea class="code" data-lang="css">
+color: rebeccapurple;                    /* named */
+color: #1e90ff;                          /* hex */
+color: rgb(30 144 255 / 0.5);            /* with alpha */
+color: hsl(210 100% 56%);                /* hue sat light: easy to tweak */
+color: oklch(70% 0.15 250);              /* modern, perceptually uniform */
+background: linear-gradient(135deg, #7c3aed, #06b6d4);
+color-scheme: light dark;                /* opt in to dark UI defaults */
+</textarea>
+<p>Keep text contrast at 4.5:1 or better. DevTools shows the ratio in the color picker.</p>
+
+<h2>Typography</h2>
+<textarea class="code" data-lang="css">
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 1rem;     /* respect the user's browser setting */
+  line-height: 1.6;    /* unitless */
+}
+h1 { text-wrap: balance; }
+
+@font-face {
+  font-family: "Inter";
+  src: url("inter.woff2") format("woff2");
+  font-display: swap;      /* show fallback text immediately */
+  font-weight: 100 900;    /* variable font range */
+}
+</textarea>
+<p>Useful properties: <code>font-weight</code>, <code>font-style</code>, <code>text-align</code>, <code>text-decoration</code>, <code>text-transform</code>, <code>white-space</code>, <code>text-overflow: ellipsis</code>. Also <code>aspect-ratio: 16 / 9</code> and <code>object-fit: cover</code> for media.</p>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a profile card: circular avatar (<code>border-radius: 50%</code>), name, bio and a button; centered, with a shadow and a hover lift.</li>
+<li>In DevTools, hover the box-model diagram and find which margins collapse in a stack of paragraphs.</li>
+<li>Make all type scale fluidly between 360px and 1200px viewports using <code>clamp()</code>.</li>
+<li>Replicate a favorite site's header typography by inspecting it.</li>
+<li>Compare <code>em</code> and <code>rem</code> by nesting three lists with <code>font-size: 0.9em</code> and then <code>0.9rem</code>.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why border-box?</summary>With content-box, adding padding or border enlarges the element past its declared width, which makes layout math painful. Border-box keeps the declared width as the total.</details>
+<details><summary>rem vs em?</summary>rem is relative to the root font size (predictable). em is relative to the element's (or parent's) font size, so it compounds when nested.</details>
+<details><summary>What does 65ch do?</summary>Limits line length to roughly 65 characters, which is the readable range.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

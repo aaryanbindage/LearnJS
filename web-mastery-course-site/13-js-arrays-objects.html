@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 13 — Arrays & Objects</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="13-js-arrays-objects">
+<main><article>
+<h1>Lesson 13 — Arrays &amp; objects</h1>
+<p class="lede">Almost all real data is arrays of objects. Master these two and the array methods and you can transform any data.</p>
+
+<h2>Arrays</h2>
+<textarea class="code" data-lang="js" data-run>
+const fruits = ["apple", "banana", "cherry"];
+console.log(fruits.length, fruits[0], fruits.at(-1));
+
+fruits.push("date");        // add end   (mutates)
+fruits.unshift("avocado");  // add start (mutates)
+console.log(fruits.pop(), fruits.shift(), fruits);
+
+console.log(fruits.indexOf("banana"), fruits.includes("kiwi"));
+console.log(fruits.slice(1, 3), fruits);        // slice: copy a part (no mutation)
+const removed = fruits.splice(1, 1, "blueberry", "blackberry");   // splice mutates
+console.log(removed, fruits);
+
+console.log([3, 1, 10, 2].sort());                 // ["1","10","2","3"] strings!
+console.log([3, 1, 10, 2].sort((a, b) => a - b));  // numeric sort
+console.log([1, 2, 3].reverse(), [[1, 2], [3]].flat(), "a,b".split(","));
+console.log(Array.from({ length: 5 }, (_, i) => i * i));
+</textarea>
+
+<h2>The big five: map, filter, reduce, find, and friends</h2>
+<textarea class="code" data-lang="js" data-run>
+const people = [
+  { name: "Ada",   age: 36, team: "eng" },
+  { name: "Linus", age: 28, team: "eng" },
+  { name: "Grace", age: 45, team: "ops" },
+  { name: "Alan",  age: 41, team: "ops" },
+];
+
+console.log(people.map(p => p.name));                          // transform each
+console.log(people.filter(p => p.age > 40).map(p => p.name));  // keep some
+console.log(people.find(p => p.team === "ops"));               // first match
+console.log(people.findIndex(p => p.name === "Linus"));
+console.log(people.some(p => p.age > 44), people.every(p => p.age > 30));
+
+const totalAge = people.reduce((sum, p) => sum + p.age, 0);
+console.log(totalAge / people.length);
+
+// group by team using reduce
+const byTeam = people.reduce((acc, p) => {
+  (acc[p.team] ??= []).push(p.name);
+  return acc;
+}, {});
+console.log(byTeam);
+
+// non-mutating sort (copy first or use toSorted)
+console.log(people.toSorted((a, b) => b.age - a.age).map(p => p.name));
+people.forEach(p => console.log(`${p.name} is ${p.age}`));
+</textarea>
+<div class="callout"><span class="label">Mutating vs not</span>Mutate: <code>push pop shift unshift splice sort reverse</code>. Return new: <code>map filter slice concat flat toSorted toReversed with</code>. In React you'll almost always want the non-mutating kind.</div>
+
+<h2>Objects</h2>
+<textarea class="code" data-lang="js" data-run>
+const user = {
+  name: "Ada",
+  "favorite color": "blue",        // quoted key
+  address: { city: "London" },
+  greet() { return `Hi, I'm ${this.name}`; },   // method
+};
+console.log(user.name, user["favorite color"], user.address.city, user.greet());
+
+user.age = 36;                 // add
+delete user["favorite color"]; // remove
+console.log("age" in user, user.hasOwnProperty("name"), Object.hasOwn(user, "zip"));
+
+console.log(Object.keys(user), Object.values(user).length);
+console.log(Object.entries({ a: 1, b: 2 }));
+console.log(Object.fromEntries([["x", 1], ["y", 2]]));
+
+const key = "dynamic";
+const o = { [key]: 1, [`${key}2`]: 2 };      // computed keys
+console.log(o);
+const x = 1, y = 2;
+console.log({ x, y });                        // shorthand properties
+</textarea>
+
+<h2>Copying and references</h2>
+<textarea class="code" data-lang="js" data-run>
+const a = { n: 1, nested: { v: 10 } };
+const b = a;                       // same object! (reference)
+b.n = 99; console.log(a.n);
+
+const shallow = { ...a };          // new top-level object
+shallow.nested.v = 555;            // but nested is STILL shared
+console.log(a.nested.v);
+
+const deep = structuredClone(a);   // real deep copy
+deep.nested.v = 1; console.log(a.nested.v);
+
+console.log({} === {}, [1] === [1]);   // objects compare by reference, not content
+console.log(JSON.stringify({ a: 1, b: [1, 2] }), JSON.parse('{"x":[1,2]}'));
+</textarea>
+
+<h2>Immutable updates (the React way)</h2>
+<textarea class="code" data-lang="js" data-run>
+const state = { user: { name: "Ada", tags: ["a"] }, count: 1 };
+
+const next = {
+  ...state,
+  count: state.count + 1,
+  user: { ...state.user, tags: [...state.user.tags, "b"] },
+};
+console.log(state, next);
+
+const list = [1, 2, 3, 4];
+console.log(list.filter(n => n !== 3));                  // remove
+console.log(list.map(n => (n === 2 ? 20 : n)));          // update
+console.log([...list.slice(0, 2), 99, ...list.slice(2)]); // insert
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Given the <code>people</code> array, return the average age of each team as an object.</li>
+<li>Write <code>unique(arr)</code> (use <code>Set</code> or <code>filter</code> with <code>indexOf</code>).</li>
+<li>Write <code>countWords(text)</code> returning an object of word → count.</li>
+<li>Write <code>deepEqual(a, b)</code> for nested objects/arrays.</li>
+<li>Write <code>chunk(arr, size)</code>: <code>chunk([1,2,3,4,5], 2)</code> → <code>[[1,2],[3,4],[5]]</code>.</li>
+<li>Implement an immutable <code>updateById(list, id, patch)</code>.</li>
+<li>Sort people by team, then by age descending.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why does <code>[10, 9, 1].sort()</code> give [1, 10, 9]?</summary>Default sort converts to strings and compares lexicographically. Pass a comparator: <code>(a, b) =&gt; a - b</code>.</details>
+<details><summary>Shallow vs deep copy?</summary>Shallow copies the top level; nested objects remain shared references. <code>structuredClone</code> copies the whole structure.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

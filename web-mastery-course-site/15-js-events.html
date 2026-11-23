@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 15 — Events</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="15-js-events">
+<main><article>
+<h1>Lesson 15 — Events</h1>
+<p class="lede">Events are how the page responds to the user: clicks, keys, input, scrolling, timers, and more.</p>
+
+<h2>Listening</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>body{font-family:system-ui} button{font:inherit;padding:.5em 1em}</style>
+<button id="b">Click me</button> <pre id="out"></pre>
+<script>
+const out = document.getElementById("out");
+const b = document.getElementById("b");
+
+function onClick(event) {
+  out.textContent = [
+    "type: " + event.type,
+    "target: " + event.target.tagName,
+    "x,y: " + event.clientX + "," + event.clientY,
+    "shift held: " + event.shiftKey,
+  ].join("\n");
+}
+b.addEventListener("click", onClick);
+// b.removeEventListener("click", onClick);   // needs the same function reference
+// b.addEventListener("click", fn, { once: true });
+</script>
+</textarea>
+<p>Use <code>addEventListener</code> (not <code>onclick=</code> attributes): it allows multiple listeners and options like <code>once</code>, <code>passive</code>, <code>signal</code>.</p>
+
+<h2>Common events</h2>
+<table>
+<tr><th>Group</th><th>Events</th></tr>
+<tr><td>Mouse/pointer</td><td><code>click dblclick pointerdown pointermove pointerup pointerenter pointerleave contextmenu wheel</code></td></tr>
+<tr><td>Keyboard</td><td><code>keydown keyup</code> (use <code>event.key</code>, <code>event.code</code>)</td></tr>
+<tr><td>Forms</td><td><code>input change submit focus blur invalid reset</code></td></tr>
+<tr><td>Page</td><td><code>DOMContentLoaded load resize scroll visibilitychange beforeunload</code></td></tr>
+<tr><td>Touch/drag</td><td><code>touchstart touchmove dragstart dragover drop</code></td></tr>
+</table>
+<p>Prefer <strong>pointer events</strong> over separate mouse + touch handlers.</p>
+
+<h2>Forms</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>body{font-family:system-ui} input,button{font:inherit;padding:.4em}</style>
+<form id="f">
+  <input name="name" placeholder="Your name" required>
+  <button>Greet</button>
+</form>
+<p id="msg"></p>
+<script>
+const f = document.getElementById("f");
+f.addEventListener("input", e => { msg.textContent = "typing: " + e.target.value; });
+f.addEventListener("submit", e => {
+  e.preventDefault();                       // stop page navigation
+  const data = Object.fromEntries(new FormData(f));
+  msg.textContent = "Hello, " + data.name + "!";
+});
+</script>
+</textarea>
+
+<h2>Bubbling &amp; event delegation</h2>
+<p>Most events <strong>bubble</strong>: they fire on the target, then on each ancestor. So one listener on a parent can handle all children, including ones added later. This is called <em>delegation</em>.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>body{font-family:system-ui} li{cursor:pointer;margin:4px 0} .done{text-decoration:line-through;opacity:.5}</style>
+<ul id="todos"><li>Learn HTML</li><li>Learn CSS</li><li>Learn JS</li></ul>
+<button id="add">Add dynamic item</button>
+<script>
+const ul = document.getElementById("todos");
+ul.addEventListener("click", (e) => {
+  const li = e.target.closest("li");            // which item was clicked?
+  if (li && ul.contains(li)) li.classList.toggle("done");
+});
+let n = 0;
+add.onclick = () => { const li = document.createElement("li"); li.textContent = "New " + (++n); ul.append(li); };
+</script>
+</textarea>
+<p><code>event.target</code> = where it happened; <code>event.currentTarget</code> = where the listener is attached. <code>event.stopPropagation()</code> stops bubbling (use rarely). Capture phase: pass <code>{ capture: true }</code>.</p>
+
+<h2>Keyboard &amp; pointer</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>body{margin:0;font-family:system-ui} #pad{height:200px;background:#eee;position:relative;touch-action:none}
+#dot{position:absolute;width:24px;height:24px;border-radius:50%;background:#7c5cff;transform:translate(-50%,-50%);pointer-events:none}</style>
+<div id="pad" tabindex="0">Move the pointer here, press keys (click first to focus)</div><pre id="k"></pre>
+<script>
+const pad = document.getElementById("pad");
+const dot = document.createElement("div"); dot.id = "dot"; pad.append(dot);
+pad.addEventListener("pointermove", e => {
+  const r = pad.getBoundingClientRect();
+  dot.style.left = e.clientX - r.left + "px"; dot.style.top = e.clientY - r.top + "px";
+});
+pad.addEventListener("keydown", e => {
+  k.textContent = "key=" + e.key + " code=" + e.code;
+  if (e.key === "Escape") dot.style.background = "crimson";
+  if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); k.textContent = "Cmd/Ctrl+K!"; }
+});
+</script>
+</textarea>
+
+<h2>Timers, throttle, debounce</h2>
+<textarea class="code" data-lang="js" data-run>
+const t = setTimeout(() => console.log("once, after 100ms"), 100);
+// clearTimeout(t);
+let n = 0;
+const id = setInterval(() => {
+  console.log("tick", ++n);
+  if (n === 3) clearInterval(id);
+}, 100);
+
+function debounce(fn, ms) {            // run after the user STOPS for ms
+  let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+}
+const search = debounce(q => console.log("search for", q), 200);
+search("a"); search("ab"); search("abc");        // only "abc" runs
+
+// For animation use requestAnimationFrame(cb), called before each paint.
+</textarea>
+
+<h2>Custom events</h2>
+<textarea class="code" data-lang="js" data-run>
+const bus = new EventTarget();
+bus.addEventListener("login", e => console.log("welcome", e.detail.name));
+bus.dispatchEvent(new CustomEvent("login", { detail: { name: "Ada" } }));
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a to-do list with add, complete-toggle and delete, using <strong>one</strong> delegated click listener.</li>
+<li>Live-filter a list of 20 names as you type (debounced).</li>
+<li>Make a draggable box using <code>pointerdown/move/up</code> and <code>setPointerCapture</code>.</li>
+<li>Build keyboard shortcuts: <kbd>/</kbd> focuses search, <kbd>Esc</kbd> clears it.</li>
+<li>Build a modal using <code>&lt;dialog&gt;</code> with <code>showModal()</code> and close on backdrop click.</li>
+<li>Validate a form with custom messages via <code>setCustomValidity</code>.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why is delegation useful?</summary>One listener handles many (even future) children, saving memory and avoiding re-attaching handlers after DOM changes.</details>
+<details><summary>target vs currentTarget?</summary>target is the innermost element that triggered the event; currentTarget is the element whose listener is running.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 59 — Real-Time: WebSockets & Multiplayer State</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="59-realtime">
+<main><article>
+<h1>Lesson 59 — Real-time: WebSockets &amp; multiplayer state</h1>
+<p class="lede">Chat, live cursors, collaborative editing, multiplayer 3D worlds. HTTP is request/response; real-time apps need the server to push. Learn the transports and, more importantly, how to keep distributed state consistent.</p>
+
+<h2>Choosing a transport</h2>
+<table>
+<tr><th>Option</th><th>Direction</th><th>Use when</th></tr>
+<tr><td><strong>Polling</strong></td><td>client pulls repeatedly</td><td>Simple, low frequency updates (every 10–60 s); easy to scale</td></tr>
+<tr><td><strong>Server-Sent Events (SSE)</strong></td><td>server → client, over plain HTTP</td><td>Live feeds, notifications, streaming LLM tokens; auto-reconnect built in</td></tr>
+<tr><td><strong>WebSocket</strong></td><td>full duplex, persistent</td><td>Chat, games, collaboration, anything needing low-latency two-way messages</td></tr>
+<tr><td><strong>WebRTC</strong></td><td>peer-to-peer (needs signaling)</td><td>Video/audio calls, low-latency data channels, file transfer</td></tr>
+<tr><td><strong>WebTransport</strong></td><td>QUIC-based streams/datagrams</td><td>Emerging; low-latency games (check support)</td></tr>
+</table>
+<p>Managed options when you don't want to run socket servers: <strong>Pusher</strong>, <strong>Ably</strong>, <strong>Supabase Realtime</strong>, <strong>Firebase</strong>, <strong>PartyKit</strong>/Cloudflare Durable Objects, <strong>Liveblocks</strong>, <strong>Socket.IO</strong> (library with fallbacks and rooms).</p>
+
+<h2>SSE in 20 lines</h2>
+<textarea class="code" data-lang="js" data-file="sse-server.js">
+import { createServer } from "node:http";
+createServer((req, res) => {
+  if (req.url !== "/events") { res.writeHead(404).end(); return; }
+  res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+  let n = 0;
+  const t = setInterval(() => res.write(`id: ${++n}\ndata: ${JSON.stringify({ tick: n })}\n\n`), 1000);
+  req.on("close", () => clearInterval(t));                  // always clean up when the client disconnects
+}).listen(3000);
+</textarea>
+<textarea class="code" data-lang="js" data-file="sse-client.js">
+const es = new EventSource("/events");                       // reconnects automatically, resumes with Last-Event-ID
+es.onmessage = (e) => console.log(JSON.parse(e.data));
+es.onerror = () => console.log("connection lost; browser retries");
+// es.close() when done
+</textarea>
+
+<h2>WebSockets: a chat room</h2>
+<textarea class="code" data-lang="bash">
+npm i ws
+</textarea>
+<textarea class="code" data-lang="js" data-file="ws-server.js">
+import { WebSocketServer } from "ws";
+const wss = new WebSocketServer({ port: 8080, maxPayload: 16 * 1024 });   // limit message size
+
+wss.on("connection", (socket, req) => {
+  socket.isAlive = true;
+  socket.on("pong", () => (socket.isAlive = true));
+  socket.on("message", (raw) => {
+    let msg;
+    try { msg = JSON.parse(raw.toString()); } catch { return socket.close(1003, "bad json"); }   // validate EVERYTHING
+    if (msg.type === "chat" && typeof msg.text === "string" && msg.text.length <= 500) {
+      const out = JSON.stringify({ type: "chat", text: msg.text, at: Date.now() });
+      for (const c of wss.clients) if (c.readyState === 1) c.send(out);       // broadcast
+    }
+  });
+});
+
+// Heartbeat: detect dead connections (mobile networks drop silently)
+setInterval(() => {
+  for (const s of wss.clients) { if (!s.isAlive) { s.terminate(); continue; } s.isAlive = false; s.ping(); }
+}, 30000);
+</textarea>
+<textarea class="code" data-lang="js" data-file="ws-client.js">
+function connect(url, onMessage) {
+  let ws, tries = 0, closed = false;
+  const open = () => {
+    ws = new WebSocket(url);
+    ws.onopen = () => { tries = 0; };
+    ws.onmessage = (e) => onMessage(JSON.parse(e.data));
+    ws.onclose = () => {                                           // reconnect with exponential backoff + jitter
+      if (closed) return;
+      const delay = Math.min(30000, 500 * 2 ** tries++) * (0.5 + Math.random() / 2);
+      setTimeout(open, delay);
+    };
+  };
+  open();
+  return { send: (m) => ws.readyState === 1 && ws.send(JSON.stringify(m)), close: () => { closed = true; ws.close(); } };
+}
+</textarea>
+<ul>
+<li><strong>Authenticate</strong> the connection (cookie on upgrade or a short-lived ticket in the first message). Authorize each message; check <code>Origin</code> to prevent cross-site WebSocket hijacking.</li>
+<li><strong>Scaling</strong>: sockets are stateful. With multiple servers, broadcast through a pub/sub backplane (Redis Pub/Sub, NATS) and use sticky sessions or a shard-by-room design.</li>
+<li><strong>Backpressure</strong>: slow clients must not exhaust memory; drop or coalesce updates when <code>bufferedAmount</code> grows.</li>
+</ul>
+
+<h2>Multiplayer state: the hard part</h2>
+<p>Networks have latency, jitter, loss and reordering. Two players acting at the same time must end up with the same world. Common models:</p>
+<table>
+<tr><th>Model</th><th>How</th><th>Suitable for</th></tr>
+<tr><td><strong>Authoritative server</strong></td><td>Clients send <em>inputs</em>; server simulates and broadcasts <em>state</em>. Clients render it.</td><td>Games, anti-cheat, anything where the server owns truth</td></tr>
+<tr><td><strong>Client prediction + reconciliation</strong></td><td>Client applies its own input immediately; when authoritative state arrives, rewind and replay unacknowledged inputs</td><td>Responsive character movement</td></tr>
+<tr><td><strong>Interpolation</strong></td><td>Render remote entities ~100 ms in the past, blending between received snapshots</td><td>Smooth other players</td></tr>
+<tr><td><strong>Last-writer-wins</strong></td><td>Latest timestamp overwrites</td><td>Simple fields (cursor position, a status)</td></tr>
+<tr><td><strong>Operational Transform / CRDTs</strong></td><td>Merge concurrent edits deterministically (Yjs, Automerge, Loro)</td><td>Collaborative documents, whiteboards, offline-first sync</td></tr>
+</table>
+<textarea class="code" data-lang="html" data-run data-height="360px">
+<style>body{margin:0;font-family:system-ui;background:#16151d;color:#ddd}canvas{display:block;width:100%;height:300px;background:#0e0d14}
+#info{padding:8px 12px;font-size:13px}</style>
+<div id="info">Simulated network: <b>150 ms</b> latency. Move the mouse. White = your raw cursor, red = what a remote player would see without interpolation, green = interpolated.</div>
+<canvas id="c"></canvas>
+<script>
+  const c = document.getElementById("c"), ctx = c.getContext("2d");
+  c.width = 700; c.height = 300;
+  const LATENCY = 150, SEND_HZ = 10;
+  let mouse = { x: 350, y: 150 }, snapshots = [], rawRemote = { x: 350, y: 150 };
+  c.addEventListener("pointermove", e => { const r = c.getBoundingClientRect(); mouse = { x: (e.clientX - r.left) * c.width / r.width, y: (e.clientY - r.top) * c.height / r.height }; });
+
+  setInterval(() => {                                          // "server" sends position 10×/second after a delay
+    const snap = { t: performance.now(), x: mouse.x, y: mouse.y };
+    setTimeout(() => { snapshots.push(snap); rawRemote = { x: snap.x, y: snap.y }; if (snapshots.length > 20) snapshots.shift(); }, LATENCY);
+  }, 1000 / SEND_HZ);
+
+  function interpolated(now) {                                 // render 2 snapshots behind real time and blend
+    const renderTime = now - LATENCY - 1000 / SEND_HZ;
+    for (let i = snapshots.length - 1; i > 0; i--) {
+      const a = snapshots[i - 1], b = snapshots[i];
+      if (a.t <= renderTime && renderTime <= b.t) {
+        const k = (renderTime - a.t) / (b.t - a.t);
+        return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k };
+      }
+    }
+    return snapshots.at(-1) ?? rawRemote;
+  }
+  function dot(p, color, r = 8) { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill(); }
+  (function frame(now) {
+    ctx.clearRect(0, 0, c.width, c.height);
+    dot(rawRemote, "#e0457b", 10); dot(interpolated(now), "#14e0a3", 8); dot(mouse, "#fff", 4);
+    requestAnimationFrame(frame);
+  })(performance.now());
+</script>
+</textarea>
+
+<h2>Multiplayer 3D (Three.js / R3F) in practice</h2>
+<ul>
+<li>Send <strong>inputs and small state deltas</strong>, not whole scenes. Quantize numbers (positions to 2 decimals or int16), use binary formats (MessagePack, Protobuf, FlatBuffers) as you scale.</li>
+<li>Tick the simulation at a fixed rate (20–60 Hz) separate from render FPS; render with interpolation.</li>
+<li>Use <strong>rooms</strong> to limit who receives what (area-of-interest filtering).</li>
+<li>Frameworks: <strong>Colyseus</strong> (authoritative rooms), <strong>PartyKit</strong>, <strong>Liveblocks</strong>, <strong>Socket.IO</strong>, <strong>Yjs</strong> with <code>y-websocket</code> for shared documents and presence (live cursors).</li>
+</ul>
+
+<h2>Collaborative editing with a CRDT (Yjs)</h2>
+<textarea class="code" data-lang="js" data-file="collab.js">
+import * as Y from "yjs";
+import { WebsocketProvider } from "y-websocket";
+
+const doc = new Y.Doc();
+const provider = new WebsocketProvider("wss://demos.yjs.dev", "my-room-name", doc);   // use your own server in production
+const todos = doc.getArray("todos");                  // shared array: concurrent edits merge automatically
+todos.observe(() => render(todos.toArray()));
+todos.push([{ id: crypto.randomUUID(), text: "Write lesson", done: false }]);
+
+provider.awareness.setLocalStateField("user", { name: "Ada", color: "#7c5cff" });   // presence: who's here, cursors
+provider.awareness.on("change", () => console.log([...provider.awareness.getStates().values()]));
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a chat room with the <code>ws</code> server above: usernames, history of the last 50 messages, typing indicators, and reconnection with backoff.</li>
+<li>Add authentication to the socket (session cookie) and per-user rate limiting (messages/second); test with a malicious client script.</li>
+<li>Stream a fake LLM response token by token with SSE and render it progressively in React.</li>
+<li>Add live cursors to your Project 3 app using PartyKit or Liveblocks presence.</li>
+<li>Build a 3D "lobby": each connected player is a cube in a shared Three.js scene; send input at 20 Hz; interpolate remote players; add client-side prediction for your own cube.</li>
+<li>Make a collaborative to-do list with Yjs and verify it merges offline edits from two tabs.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>SSE vs WebSocket?</summary>SSE is one-way server→client over HTTP with built-in reconnection, ideal for feeds and streaming. WebSocket is a full-duplex persistent channel for two-way, low-latency messaging.</details>
+<details><summary>Why interpolate remote players?</summary>Updates arrive discretely and late. Rendering slightly in the past and blending between snapshots hides jitter and gives smooth motion.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

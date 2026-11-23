@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 22 — Why React, Vite & JSX</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="22-react-intro">
+<main><article>
+<h1>Lesson 22 — Why React, Vite &amp; JSX</h1>
+<p class="lede">React lets you describe <em>what the UI should look like for the current data</em> and handles updating the DOM for you.</p>
+
+<h2>The problem React solves</h2>
+<p>In Project 2 you kept a <code>state</code> object and wrote <code>render(state)</code> by hand, carefully updating the DOM. As apps grow, keeping the DOM and data in sync becomes the main source of bugs. React makes it declarative:</p>
+<div class="callout"><span class="label">Core idea</span><strong>UI = f(state).</strong> You write a function that returns what the screen should look like. When state changes, React calls it again, compares the result with the previous one (<em>reconciliation</em>), and makes the minimal DOM changes.</div>
+<ul>
+<li><strong>Components</strong>: reusable, self-contained pieces of UI.</li>
+<li><strong>One-way data flow</strong>: data goes down via props; events go up via callbacks.</li>
+<li><strong>Ecosystem</strong>: Next.js/Remix for full-stack, React Router, TanStack Query, React Three Fiber.</li>
+</ul>
+
+<h2>Your first component (live)</h2>
+<p>In these live demos, React hooks are pre-imported and your component must be named <code>App</code>. In real projects you write <code>import { useState } from "react"</code>.</p>
+<textarea class="code" data-lang="jsx" data-run>
+function App() {
+  const name = "world";
+  return (
+    <div>
+      <h1>Hello, {name}!</h1>
+      <p>2 + 2 = {2 + 2}</p>
+    </div>
+  );
+}
+</textarea>
+
+<h2>JSX rules</h2>
+<p>JSX is syntax sugar: <code>&lt;h1 className="x"&gt;Hi&lt;/h1&gt;</code> compiles to <code>React.createElement("h1", { className: "x" }, "Hi")</code>. It's JavaScript, not HTML.</p>
+<textarea class="code" data-lang="jsx" data-run>
+function App() {
+  const user = { name: "Ada", avatar: "data:image/gif;base64,R0lGODlhAQABAAAAACw=" };
+  const isAdmin = true;
+  const style = { color: "rebeccapurple", fontSize: "1.5rem" };   // style takes an object, camelCased
+
+  return (
+    <>                                       {/* 1. Return ONE root (a Fragment <></> is fine) */}
+      <h1 style={style}>{user.name}</h1>     {/* 2. {} embeds any JS expression */}
+      <img src={user.avatar} alt="" width="40" height="40" />   {/* 3. Self-close empty tags */}
+      <label htmlFor="n" className="label">  {/* 4. className, htmlFor (not class, for) */}
+        Name
+      </label>
+      <input id="n" defaultValue="Ada" tabIndex={0} />   {/* 5. camelCase attributes */}
+      {isAdmin && <p>You are an admin.</p>}              {/* 6. Conditionals via expressions */}
+      <ul>{["a", "b"].map(x => <li key={x}>{x}</li>)}</ul> {/* 7. Lists via map + key */}
+    </>
+  );
+}
+</textarea>
+<ul>
+<li>Components are functions whose names <strong>start with a capital letter</strong> (<code>&lt;Card /&gt;</code>); lowercase means a DOM tag.</li>
+<li>Only <em>expressions</em> go inside <code>{}</code>. No <code>if</code>/<code>for</code> statements; use ternaries, <code>&amp;&amp;</code>, and <code>map</code>.</li>
+<li>React escapes strings in <code>{}</code> automatically, which protects against XSS.</li>
+</ul>
+
+<h2>Set up a real project with Vite</h2>
+<textarea class="code" data-lang="bash">
+npm create vite@latest my-react-app -- --template react      # or react-ts
+cd my-react-app
+npm install
+npm run dev          # http://localhost:5173 with instant hot reload
+</textarea>
+<textarea class="code" data-lang="bash">
+my-react-app/
+  index.html          # has <div id="root"></div> and <script type="module" src="/src/main.jsx">
+  package.json
+  vite.config.js
+  src/
+    main.jsx          # entry: mounts <App /> into #root
+    App.jsx           # your root component
+    index.css
+    assets/
+</textarea>
+<textarea class="code" data-lang="jsx" data-file="src/main.jsx">
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App.jsx";
+import "./index.css";
+
+createRoot(document.getElementById("root")).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);
+</textarea>
+<p><code>StrictMode</code> intentionally runs some things twice in development to expose impure code. It does nothing in production. Also install the <strong>React Developer Tools</strong> browser extension.</p>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Scaffold a Vite React project and replace the starter UI with a "Hello" page about you.</li>
+<li>Recreate your Project 1 hero section as JSX with CSS imported from a file.</li>
+<li>Render a list of 5 projects from an array of objects using <code>map</code> with proper keys.</li>
+<li>Show a "Welcome back" message only when a constant <code>loggedIn</code> is true, using <code>&amp;&amp;</code> and then a ternary.</li>
+<li>Inspect the page with React DevTools and find your component in the tree.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>What does "declarative" mean here?</summary>You describe the desired UI for a given state; React figures out the DOM operations needed to get there.</details>
+<details><summary>Why capitalize component names?</summary>JSX uses capitalization to tell components (<code>&lt;Card/&gt;</code>) from HTML tags (<code>&lt;div&gt;</code>).</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

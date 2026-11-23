@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 31 — Three.js: Scene, Camera, Renderer</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="31-three-basics">
+<main><article>
+<h1>Lesson 31 — Three.js: scene, camera, renderer</h1>
+<p class="lede">Three.js wraps WebGL so you can build 3D worlds with a friendly object model. Everything starts with three objects: a <strong>scene</strong> to hold things, a <strong>camera</strong> to look from, and a <strong>renderer</strong> to draw.</p>
+<div class="callout"><span class="label">Before you start</span>These demos load Three.js from a CDN, so you need an internet connection and a browser with WebGL. If the preview is blank, check the browser console and your hardware-acceleration setting.</div>
+
+<h2>The big picture</h2>
+<ul>
+<li><strong>Scene</strong>: the root of a tree (<em>scene graph</em>) of objects.</li>
+<li><strong>Mesh</strong> = <strong>geometry</strong> (shape: vertices) + <strong>material</strong> (surface look). Other objects: lights, cameras, groups, helpers.</li>
+<li><strong>Camera</strong>: the viewpoint and projection (<code>PerspectiveCamera</code> mimics an eye; <code>OrthographicCamera</code> has no perspective).</li>
+<li><strong>Renderer</strong> (<code>WebGLRenderer</code>): draws the scene as seen by the camera onto a <code>&lt;canvas&gt;</code>, ideally 60 times per second.</li>
+</ul>
+<p><strong>Coordinates</strong>: right-handed. <code>+X</code> right, <code>+Y</code> up, <code>+Z</code> toward you. Units are arbitrary: pick a scale (1 unit = 1 meter is common) and stay consistent.</p>
+
+<h2>Your first scene (live)</h2>
+<p>Edit anything: change the geometry, color, or camera position.</p>
+<textarea class="code" data-lang="html" data-run data-height="360px">
+<style>html,body{margin:0;overflow:hidden;background:#111}</style>
+<script type="importmap">{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+
+// 1. Scene
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#14121f");
+
+// 2. Camera: field of view (deg), aspect, near, far
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(2, 2, 4);
+camera.lookAt(0, 0, 0);
+
+// 3. Renderer
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));   // cap for performance
+renderer.setSize(innerWidth, innerHeight);
+document.body.append(renderer.domElement);
+
+// 4. An object: geometry + material = mesh
+const cube = new THREE.Mesh(
+  new THREE.BoxGeometry(1, 1, 1),
+  new THREE.MeshNormalMaterial()          // colors by surface direction; needs no lights
+);
+scene.add(cube);
+scene.add(new THREE.AxesHelper(2), new THREE.GridHelper(10, 10));  // red=X green=Y blue=Z
+
+// 5. The render loop
+renderer.setAnimationLoop((timeMs) => {
+  cube.rotation.y = timeMs * 0.001;       // radians
+  cube.rotation.x = timeMs * 0.0005;
+  renderer.render(scene, camera);
+});
+
+// 6. Keep it correct when the window resizes
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();         // REQUIRED after changing camera params
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</textarea>
+
+<h2>The same thing in a real project</h2>
+<textarea class="code" data-lang="bash">
+npm create vite@latest three-intro -- --template vanilla
+cd three-intro && npm install three
+npm run dev
+</textarea>
+<textarea class="code" data-lang="js" data-file="src/main.js">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+// ...same code as the live demo, with the canvas placed in your own page layout
+</textarea>
+<p>Instead of appending the canvas to <code>body</code>, create your own <code>&lt;canvas id="scene"&gt;</code> and pass it: <code>new THREE.WebGLRenderer({ canvas, antialias: true })</code>. Style it with CSS like any element (<code>width:100%; height:100dvh; display:block</code>).</p>
+
+<h2>Cameras in detail</h2>
+<table>
+<tr><th>Parameter</th><th>Meaning</th></tr>
+<tr><td><code>fov</code></td><td>Vertical field of view in degrees. 35–75 typical; lower = flatter/zoomed, higher = wide-angle distortion.</td></tr>
+<tr><td><code>aspect</code></td><td>width / height of the canvas.</td></tr>
+<tr><td><code>near</code>, <code>far</code></td><td>Clipping planes. Anything closer or farther isn't drawn. Keep the ratio modest (not 0.0001 to 100000) or you'll get z-fighting flicker.</td></tr>
+</table>
+<textarea class="code" data-lang="js">
+const frustum = 5;
+const aspect = innerWidth / innerHeight;
+const ortho = new THREE.OrthographicCamera(-frustum * aspect, frustum * aspect, frustum, -frustum, 0.1, 100);
+// Great for 2D-ish games, isometric views, CAD-style scenes.
+</textarea>
+
+<h2>Common beginner problems</h2>
+<ul>
+<li><strong>Black screen</strong>: camera inside the object or pointing away; forgot <code>renderer.render</code>; a lit material with no lights; object outside near/far.</li>
+<li><strong>Stretched image</strong> after resize: forgot <code>camera.aspect</code> + <code>updateProjectionMatrix()</code>.</li>
+<li><strong>Blurry on retina</strong>: forgot <code>setPixelRatio</code>.</li>
+<li>Always open the Console; Three.js logs helpful warnings.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Replace the box with a sphere, cone, torus and cylinder. Find the constructor arguments in the docs (threejs.org/docs).</li>
+<li>Add three cubes at different positions, each a different <code>MeshBasicMaterial</code> color.</li>
+<li>Move the camera so you look straight down on the grid (<code>camera.position.set(0, 8, 0)</code> + <code>lookAt</code>).</li>
+<li>Change <code>fov</code> from 20 to 120 and describe the effect.</li>
+<li>Swap to an <code>OrthographicCamera</code> and note what disappears.</li>
+<li>Make the cube's rotation speed depend on mouse X using a <code>pointermove</code> listener.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>What do you need to render?</summary>A scene, a camera, a renderer, and something visible in the scene.</details>
+<details><summary>Why call updateProjectionMatrix()?</summary>The camera caches its projection math. After changing fov, aspect, near or far you must recompute it.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

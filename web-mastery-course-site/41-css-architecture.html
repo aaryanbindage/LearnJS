@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 41 — CSS Architecture</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="41-css-architecture">
+<main><article>
+<h1>Lesson 41 — CSS architecture: BEM, layers &amp; modules</h1>
+<p class="lede">CSS is easy to write and hard to maintain. At scale the problems are specificity wars, global leakage and dead code. Architecture is how you prevent them.</p>
+
+<h2>The three problems</h2>
+<ol>
+<li><strong>Global scope</strong>: every selector can affect every element.</li>
+<li><strong>Specificity</strong>: later changes need ever more specific selectors or <code>!important</code>.</li>
+<li><strong>Dead code</strong>: nobody dares delete a rule because they can't tell who uses it.</li>
+</ol>
+<p>Every strategy below trades off these three.</p>
+
+<h2>Strategy 1: naming conventions (BEM)</h2>
+<p><strong>Block__Element--Modifier</strong>. A <em>block</em> is a standalone component, an <em>element</em> is a part of it, a <em>modifier</em> is a variation. One class per rule keeps specificity flat (0-1-0).</p>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body{font-family:system-ui;padding:1rem}
+  .card{border:1px solid #ccc;border-radius:12px;padding:1rem;max-width:18rem}
+  .card__title{margin:0 0 .5rem;font-size:1.2rem}
+  .card__body{margin:0;color:#555}
+  .card--featured{border-color:#7c5cff;box-shadow:0 6px 20px #7c5cff33}
+  .card--featured .card__title{color:#7c5cff}   /* avoid: nesting raises specificity */
+</style>
+<article class="card card--featured">
+  <h2 class="card__title">Featured</h2>
+  <p class="card__body">Flat selectors, predictable overrides.</p>
+</article>
+</textarea>
+<ul>
+<li>Never style an element by its tag inside a block (<code>.card h2</code>); give it a class.</li>
+<li>Don't chain blocks: <code>.card__header__title</code> is wrong; use <code>.card__title</code>.</li>
+<li>Pros: no tooling, readable HTML. Cons: long names, discipline required.</li>
+</ul>
+
+<h2>Strategy 2: cascade layers</h2>
+<p><code>@layer</code> lets you declare priority <em>order</em> up front, independent of specificity or source order. A rule in a later layer beats an earlier layer, even if the earlier selector is more specific. Unlayered styles beat all layers.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  @layer reset, base, components, utilities;        /* order = priority, lowest to highest */
+
+  @layer reset      { *{box-sizing:border-box;margin:0} }
+  @layer base       { body{font-family:system-ui;padding:1rem} a{color:#5b3df5} }
+  @layer components { #app .btn{background:#222;color:#fff;padding:.6em 1.2em;border:0;border-radius:8px} }  /* high specificity */
+  @layer utilities  { .bg-brand{background:#7c5cff} .rounded-full{border-radius:99px} }  /* wins anyway! */
+</style>
+<div id="app"><button class="btn bg-brand rounded-full">I'm purple and round</button></div>
+</textarea>
+<p>Use layers to tame third-party CSS: <code>@import url(lib.css) layer(vendor);</code> puts a library in the lowest layer so your own CSS always wins.</p>
+
+<h2>Strategy 3: scoping (CSS Modules, CSS-in-JS, @scope)</h2>
+<textarea class="code" data-lang="js" data-file="Button.module.css">
+.button { padding: .6em 1.2em; border-radius: 8px; }
+.primary { background: var(--brand); color: white; }
+</textarea>
+<textarea class="code" data-lang="jsx" data-file="Button.jsx">
+import styles from "./Button.module.css";   // class names become unique hashes: Button_button__x7Qa2
+import clsx from "clsx";
+
+export function Button({ variant = "primary", className, ...props }) {
+  return <button className={clsx(styles.button, styles[variant], className)} {...props} />;
+}
+</textarea>
+<ul>
+<li><strong>CSS Modules</strong>: build-time scoping, plain CSS, zero runtime. Built into Vite/Next.js. Excellent default for React.</li>
+<li><strong>CSS-in-JS</strong> (styled-components, Emotion): dynamic styles from props, but runtime cost and trouble with Server Components. Zero-runtime options: <strong>vanilla-extract</strong>, <strong>Panda CSS</strong>, <strong>Linaria</strong>.</li>
+<li><strong>Native <code>@scope</code></strong>: <code>@scope (.card) to (.card__content) { img { border-radius: 8px } }</code> styles only inside a boundary. Check browser support before relying on it.</li>
+<li><strong>Utility-first</strong> (Tailwind): next lesson.</li>
+</ul>
+
+<h2>Design tokens</h2>
+<p>Put every design decision in custom properties once; components only reference tokens. Use two tiers: <em>primitive</em> (<code>--blue-500</code>) and <em>semantic</em> (<code>--color-action</code>). Re-theming changes only the semantic mapping.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  :root{
+    /* primitives */
+    --violet-500:#7c5cff; --violet-700:#5b3df5; --gray-100:#f4f2fa; --gray-900:#16151d;
+    --space-1:.25rem; --space-2:.5rem; --space-4:1rem; --radius-2:10px;
+    /* semantic */
+    --color-bg:var(--gray-100); --color-text:var(--gray-900);
+    --color-action:var(--violet-500); --color-action-hover:var(--violet-700);
+  }
+  @media (prefers-color-scheme:dark){ :root{ --color-bg:var(--gray-900); --color-text:var(--gray-100); } }
+  body{background:var(--color-bg);color:var(--color-text);font-family:system-ui;padding:var(--space-4)}
+  .btn{background:var(--color-action);color:#fff;border:0;border-radius:var(--radius-2);padding:var(--space-2) var(--space-4)}
+  .btn:hover{background:var(--color-action-hover)}
+</style>
+<button class="btn">Token-driven button</button>
+</textarea>
+<p>Typed custom properties: <code>@property --angle { syntax: "&lt;angle&gt;"; inherits: false; initial-value: 0deg; }</code> makes custom properties animatable.</p>
+
+<h2>Organizing files</h2>
+<textarea class="code" data-lang="bash">
+styles/
+  tokens.css        # custom properties
+  reset.css         # layer: reset
+  base.css          # layer: element defaults (typography, links, forms)
+  utilities.css     # layer: small helpers (.sr-only, .flow, .cluster)
+components/
+  Card/Card.module.css   # co-located, scoped
+</textarea>
+<p>Useful tiny layout primitives (from "Every Layout"): <code>.stack</code> (vertical rhythm via <code>&gt; * + * { margin-block-start: var(--space) }</code>), <code>.cluster</code> (wrapping flex row), <code>.sidebar</code>, <code>.grid-auto</code>. They replace hundreds of one-off rules.</p>
+
+<h2>Tooling for CSS quality</h2>
+<ul>
+<li><strong>Stylelint</strong>: lints CSS (no duplicate selectors, bad values, enforce ordering).</li>
+<li><strong>PostCSS</strong> / <strong>Lightning CSS</strong>: autoprefixing, nesting, minification (Vite uses Lightning CSS or PostCSS).</li>
+<li><strong>Coverage panel</strong> in Chrome DevTools: shows unused CSS.</li>
+<li><strong>Visual regression tests</strong> (Playwright screenshots, Chromatic) catch unintended style changes.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Refactor your Project 1 portfolio into <code>tokens.css</code>, <code>base.css</code> and component files using layers. Remove every <code>!important</code> and id selector.</li>
+<li>Write a BEM-named <code>.media-object</code> component with two modifiers, then re-implement it as a CSS Module.</li>
+<li>Build a theme switcher with three themes by changing only semantic tokens.</li>
+<li>Wrap a third-party CSS library in a low-priority layer and prove your overrides win without raising specificity.</li>
+<li>Use the DevTools Coverage tab on a real site and report what percentage of CSS is unused.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>How do layers differ from specificity?</summary>Layer order is evaluated before specificity. A low-specificity rule in a later layer beats a high-specificity rule in an earlier layer.</details>
+<details><summary>Why prefer flat, single-class selectors?</summary>Equal specificity means source order or layer order decides, making overrides predictable and refactors safe.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

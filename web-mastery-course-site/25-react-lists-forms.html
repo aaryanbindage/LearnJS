@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 25 — Lists, Conditionals & Forms</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="25-react-lists-forms">
+<main><article>
+<h1>Lesson 25 — Lists, conditionals &amp; forms</h1>
+<p class="lede">The everyday patterns of React UIs: rendering collections, showing and hiding, and handling real forms.</p>
+
+<h2>Conditional rendering</h2>
+<textarea class="code" data-lang="jsx" data-run>
+function Status({ status, items }) {
+  if (status === "loading") return <p>Loading…</p>;       // early return
+  if (status === "error") return <p role="alert">Something failed.</p>;
+  return (
+    <div>
+      {items.length === 0 ? <p>No items.</p> : <p>{items.length} items</p>}   {/* ternary */}
+      {items.length > 0 && <strong>Has items</strong>}                         {/* && */}
+      {/* Careful: {items.length && <X/>} renders "0" when empty. Use > 0. */}
+    </div>
+  );
+}
+function App() {
+  const [status, setStatus] = useState("loading");
+  return (
+    <div>
+      {["loading", "error", "empty", "ready"].map(s =>
+        <button key={s} onClick={() => setStatus(s)} style={{ marginRight: 6 }}>{s}</button>)}
+      <Status status={status} items={status === "ready" ? [1, 2] : []} />
+    </div>
+  );
+}
+</textarea>
+<p><code>null</code>, <code>undefined</code>, <code>false</code> and <code>true</code> render nothing. A lookup object is cleaner than a long chain of ternaries: <code>{ idle: &lt;Idle/&gt;, error: &lt;Err/&gt; }[status]</code>.</p>
+
+<h2>Lists and keys</h2>
+<textarea class="code" data-lang="jsx" data-run>
+const initial = [
+  { id: 1, text: "Learn JSX", done: true },
+  { id: 2, text: "Learn state", done: false },
+  { id: 3, text: "Build app", done: false },
+];
+
+function App() {
+  const [todos, setTodos] = useState(initial);
+  const [filter, setFilter] = useState("all");
+
+  const visible = todos.filter(t => filter === "all" || (filter === "done") === t.done);   // derived
+  const toggle = id => setTodos(ts => ts.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  const remove = id => setTodos(ts => ts.filter(t => t.id !== id));
+
+  return (
+    <div>
+      {["all", "done", "active"].map(f => (
+        <button key={f} onClick={() => setFilter(f)} aria-pressed={filter === f}
+          style={{ fontWeight: filter === f ? 700 : 400, marginRight: 6 }}>{f}</button>))}
+      <ul>
+        {visible.map(t => (
+          <li key={t.id}>               {/* key: stable, unique among siblings */}
+            <label style={{ textDecoration: t.done ? "line-through" : "none" }}>
+              <input type="checkbox" checked={t.done} onChange={() => toggle(t.id)} /> {t.text}
+            </label>{" "}
+            <button onClick={() => remove(t.id)} aria-label={"Delete " + t.text}>✕</button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+</textarea>
+<div class="callout warn"><span class="label">Keys</span>Use a stable unique id as the key. Don't use the array index if the list can be reordered, filtered or inserted into, or React will mix up state between items. Keys aren't passed as props; they only help React match items between renders.</div>
+
+<h2>Forms done right</h2>
+<textarea class="code" data-lang="jsx" data-run>
+function validate(v) {
+  const e = {};
+  if (!/^\S+@\S+\.\S+$/.test(v.email)) e.email = "Enter a valid email";
+  if (v.password.length < 8) e.password = "At least 8 characters";
+  if (v.password !== v.confirm) e.confirm = "Passwords don't match";
+  return e;
+}
+
+function Field({ label, error, ...inputProps }) {
+  const id = useId();                                   // unique, SSR-safe id
+  return (
+    <div style={{ margin: "10px 0" }}>
+      <label htmlFor={id} style={{ display: "block", fontWeight: 600 }}>{label}</label>
+      <input id={id} aria-invalid={!!error} aria-describedby={error ? id + "-err" : undefined} {...inputProps} />
+      {error && <div id={id + "-err"} style={{ color: "crimson", fontSize: 13 }}>{error}</div>}
+    </div>
+  );
+}
+
+function App() {
+  const [values, setValues] = useState({ email: "", password: "", confirm: "" });
+  const [touched, setTouched] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const errors = validate(values);                      // derived every render
+
+  const bind = name => ({
+    name, value: values[name],
+    onChange: e => setValues(v => ({ ...v, [name]: e.target.value })),
+    onBlur: () => setTouched(t => ({ ...t, [name]: true })),
+    error: (touched[name] || submitted) ? errors[name] : undefined,
+  });
+
+  function onSubmit(e) {
+    e.preventDefault();
+    setSubmitted(true);
+    if (Object.keys(errors).length === 0) alert("Signed up: " + values.email);
+  }
+  return (
+    <form onSubmit={onSubmit} noValidate>
+      <Field label="Email" type="email" {...bind("email")} />
+      <Field label="Password" type="password" {...bind("password")} />
+      <Field label="Confirm" type="password" {...bind("confirm")} />
+      <button>Sign up</button>
+    </form>
+  );
+}
+</textarea>
+<ul>
+<li><strong>Controlled</strong> inputs (value + onChange) give instant validation and formatting.</li>
+<li><strong>Uncontrolled</strong> inputs read values on submit: <code>new FormData(e.target)</code> or a ref. Simpler for big forms.</li>
+<li>Validate on blur and submit, not on every keystroke from the start.</li>
+<li>For large forms use libraries: <strong>React Hook Form</strong> + <strong>Zod</strong>.</li>
+<li>React 19 adds <em>form actions</em>: <code>&lt;form action={fn}&gt;</code> with <code>useActionState</code> and <code>useFormStatus</code>.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a searchable, sortable product list (text filter, category select, sort by price).</li>
+<li>Build a multi-step form wizard (3 steps) with Back/Next and a summary.</li>
+<li>Build a login form with loading, error and success states, using one <code>status</code> state.</li>
+<li>Build a dynamic form where users can add and remove rows of fields (each row has an id).</li>
+<li>Demonstrate the "index as key" bug: a list with inputs inside, where you insert at the top.</li>
+<li>Add pagination (10 per page) to a list of 100 generated items.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why can't I use Math.random() as a key?</summary>It changes every render, so React treats each item as new and destroys/recreates its DOM and state. Keys must be stable.</details>
+<details><summary>Controlled vs uncontrolled?</summary>Controlled: React state drives the input's value. Uncontrolled: the DOM holds the value and you read it when needed.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

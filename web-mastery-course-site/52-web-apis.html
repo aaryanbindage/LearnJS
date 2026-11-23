@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 52 — Workers, Service Workers, IndexedDB & PWAs</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="52-web-apis">
+<main><article>
+<h1>Lesson 52 — Workers, service workers, IndexedDB &amp; PWAs</h1>
+<p class="lede">The browser is a full application platform. These APIs let you do heavy work off the main thread, work offline, store large data, and install your app like a native one.</p>
+
+<h2>Web Workers: parallelism</h2>
+<p>JavaScript runs on one main thread, so a heavy loop freezes the UI. A <strong>Worker</strong> is a separate thread with its own global scope (no DOM) that communicates by message passing (structured clone). Use it for parsing, compression, image processing, physics, search indexing, WASM.</p>
+<textarea class="code" data-lang="html" data-run data-height="300px">
+<style>body{font-family:system-ui;padding:1rem}button{font:inherit;padding:.5em 1em;margin-right:.5rem}
+#spin{display:inline-block;animation:r 1s linear infinite}@keyframes r{to{transform:rotate(360deg)}}</style>
+<p><span id="spin">⏳</span> If this spinner freezes, the main thread is blocked.</p>
+<button id="main">Heavy work on main thread</button>
+<button id="worker">Heavy work in a Worker</button>
+<p id="out"></p>
+<script>
+  const heavy = `
+    function countPrimes(n){ let c=0; for(let i=2;i<n;i++){ let p=true; for(let j=2;j*j<=i;j++) if(i%j===0){p=false;break} if(p)c++ } return c }
+  `;
+  main.onclick = () => {
+    out.textContent = "Computing on main thread…";
+    setTimeout(() => {                                   // let the text paint first
+      const t = performance.now(); eval(heavy + "window.__r = countPrimes(2e6)");
+      out.textContent = `Primes: ${window.__r} in ${(performance.now()-t).toFixed(0)}ms (UI was frozen)`;
+    }, 30);
+  };
+  worker.onclick = () => {
+    out.textContent = "Computing in worker…";
+    const src = heavy + `onmessage = e => postMessage(countPrimes(e.data));`;
+    const w = new Worker(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
+    const t = performance.now();
+    w.onmessage = e => { out.textContent = `Primes: ${e.data} in ${(performance.now()-t).toFixed(0)}ms (UI stayed smooth)`; w.terminate(); };
+    w.postMessage(2e6);
+  };
+</script>
+</textarea>
+<textarea class="code" data-lang="js" data-file="Vite-style module worker">
+// worker.js
+self.onmessage = ({ data }) => { self.postMessage(expensive(data)); };
+
+// main.js (Vite bundles the worker for you)
+const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
+worker.postMessage(bigInput);
+worker.onmessage = (e) => render(e.data);
+
+// Avoid copying large buffers: transfer ownership
+const buf = new ArrayBuffer(1e7);
+worker.postMessage(buf, [buf]);       // buf is now detached on this side (zero-copy)
+// SharedArrayBuffer + Atomics for shared memory (requires cross-origin isolation headers)
+// Comlink library: call worker functions like normal async functions
+// OffscreenCanvas: render canvas/WebGL (Three.js!) inside a worker
+</textarea>
+<p>Other worker kinds: <strong>Shared Workers</strong> (shared across tabs), <strong>Service Workers</strong> (network proxy, below), <strong>Worklets</strong> (audio, paint).</p>
+
+<h2>Service workers: offline and caching</h2>
+<p>A service worker is a script that sits between your page and the network. It can intercept <code>fetch</code> requests, serve from cache, enable offline use, background sync and push notifications. It requires HTTPS (localhost is allowed) and has a lifecycle: <em>register → install → activate → fetch</em>.</p>
+<textarea class="code" data-lang="js" data-file="sw.js">
+const CACHE = "app-v3";                                 // bump the version on each deploy
+const PRECACHE = ["/", "/index.html", "/app.css", "/app.js", "/offline.html"];
+
+self.addEventListener("install", (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)));
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (e) => {
+  e.waitUntil(
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+  );
+  self.clients.claim();
+});
+
+self.addEventListener("fetch", (e) => {
+  const req = e.request;
+  if (req.method !== "GET") return;
+  if (req.mode === "navigate") {                        // network-first for pages, offline fallback
+    e.respondWith(fetch(req).catch(() => caches.match("/offline.html")));
+    return;
+  }
+  e.respondWith(                                        // stale-while-revalidate for assets
+    caches.match(req).then((cached) => {
+      const network = fetch(req).then((res) => {
+        if (res.ok) caches.open(CACHE).then((c) => c.put(req, res.clone()));
+        return res;
+      });
+      return cached || network;
+    })
+  );
+});
+</textarea>
+<textarea class="code" data-lang="js" data-file="main.js">
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js"));
+}
+</textarea>
+<ul>
+<li>Strategies: <strong>cache-first</strong> (static assets), <strong>network-first</strong> (HTML, fresh data), <strong>stale-while-revalidate</strong> (good default for assets/APIs), <strong>network-only</strong> (auth, payments).</li>
+<li>Stale caches are the main bug source. Version caches, delete old ones, and give users an "update available" prompt.</li>
+<li>Use <strong>Workbox</strong> (or <code>vite-plugin-pwa</code>) rather than hand-writing production service workers.</li>
+</ul>
+
+<h2>Installable PWA</h2>
+<textarea class="code" data-lang="js" data-file="manifest.webmanifest">
+{
+  "name": "Task Master",
+  "short_name": "Tasks",
+  "start_url": "/?source=pwa",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#5b3df5",
+  "icons": [
+    { "src": "/icons/192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
+</textarea>
+<p>Link it with <code>&lt;link rel="manifest" href="/manifest.webmanifest"&gt;</code> and add <code>&lt;meta name="theme-color"&gt;</code>. With a service worker and manifest, browsers offer an "install" option. Check with Lighthouse and DevTools → Application.</p>
+
+<h2>IndexedDB: a real client-side database</h2>
+<p>localStorage is synchronous, string-only and ~5 MB. <strong>IndexedDB</strong> is asynchronous, transactional, stores structured data (including Blobs and typed arrays) and handles hundreds of MB. Its raw API is clunky, so use a wrapper like <code>idb</code> or <strong>Dexie</strong>. (It's not available in the sandboxed demos here, so run these in your own project.)</p>
+<textarea class="code" data-lang="js" data-file="db.js">
+import { openDB } from "idb";
+
+const db = await openDB("notes-app", 1, {
+  upgrade(db) {                                     // runs on first open or version bump
+    const store = db.createObjectStore("notes", { keyPath: "id", autoIncrement: true });
+    store.createIndex("byUpdated", "updatedAt");
+    store.createIndex("byTag", "tags", { multiEntry: true });
+  },
+});
+
+await db.add("notes", { title: "Hello", tags: ["intro"], updatedAt: Date.now() });
+const all = await db.getAllFromIndex("notes", "byUpdated");
+const tagged = await db.getAllFromIndex("notes", "byTag", "intro");
+await db.put("notes", { id: 1, title: "Edited", tags: [], updatedAt: Date.now() });
+await db.delete("notes", 1);
+
+// Dexie (higher-level):  db.notes.where("tags").equals("intro").toArray()
+</textarea>
+<p>Storage: <code>navigator.storage.estimate()</code> shows quota; <code>navigator.storage.persist()</code> asks the browser not to evict your data. Offline-first apps sync a local DB with a server and resolve conflicts (see CRDTs, <strong>RxDB</strong>, <strong>PowerSync</strong>, <strong>Replicache</strong>).</p>
+
+<h2>More browser capabilities</h2>
+<table>
+<tr><th>API</th><th>Use</th></tr>
+<tr><td><code>fetch</code> streams, <code>ReadableStream</code>, <code>CompressionStream</code></td><td>Process large responses incrementally; stream LLM tokens</td></tr>
+<tr><td><code>BroadcastChannel</code>, <code>postMessage</code></td><td>Tab-to-tab and iframe messaging</td></tr>
+<tr><td><code>IntersectionObserver</code>, <code>ResizeObserver</code></td><td>Lazy loading, responsive components</td></tr>
+<tr><td>Web Share, Clipboard, File System Access, Drag &amp; Drop</td><td>Native-feeling file and sharing flows</td></tr>
+<tr><td>Geolocation, Notifications/Push, Media Capture (<code>getUserMedia</code>), WebRTC</td><td>Permissioned device features, video calls</td></tr>
+<tr><td>Web Audio, WebCodecs, WebGL/WebGPU, WebAssembly</td><td>Sound, media processing, graphics, near-native compute</td></tr>
+<tr><td>Web Locks, Background Sync, Page Visibility, Battery/Network Information</td><td>Coordination and adaptive behavior</td></tr>
+</table>
+<p>Always <strong>feature-detect</strong> (<code>if ("share" in navigator)</code>), request permissions in context after a user gesture, and handle denial gracefully.</p>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Move a heavy computation (image blur, big JSON parse, fuzzy search index) to a Worker; compare INP before and after. Add Comlink.</li>
+<li>Render a Three.js scene with <code>OffscreenCanvas</code> in a Worker; keep UI and canvas smooth during main-thread load.</li>
+<li>Make your Project 2 todo app a PWA: manifest, service worker (stale-while-revalidate), offline page, install prompt, and "new version available" toast. Verify with Lighthouse.</li>
+<li>Replace localStorage with IndexedDB (Dexie) for notes with tags and full-text-ish search; handle quota errors.</li>
+<li>Add background sync: queue failed POSTs while offline and replay them when connectivity returns.</li>
+<li>Use <code>BroadcastChannel</code> to keep two open tabs of your app in sync.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why can't a worker touch the DOM?</summary>The DOM isn't thread-safe. Workers have their own scope and communicate through messages; the main thread applies UI updates.</details>
+<details><summary>What's the riskiest part of service workers?</summary>Stale caches: users stuck on old code. Version your caches, clean up on activate, and plan an update flow.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

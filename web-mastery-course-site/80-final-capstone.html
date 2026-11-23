@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 80 — Final Capstone</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="80-final-capstone">
+<main><article>
+<h1>Lesson 80 — Final capstone</h1>
+<p class="lede">Everything comes together here. You'll design, build, ship and operate one substantial product that combines <strong>HTML, CSS, JavaScript/TypeScript, React, Three.js and a real backend</strong>, and defend it like an engineer. When you finish, you won't just have completed a course; you'll have a body of work that demonstrates mastery.</p>
+
+<h2>The brief</h2>
+<p>Build a <strong>web product with a meaningful 3D or visual-interactive core</strong>, backed by real data and users. Choose one (or propose your own with the same scope):</p>
+<ul>
+<li><strong>3D Design &amp; Share Studio</strong>: users create and edit simple 3D scenes/products in the browser (add shapes or import glTF, materials, lights, camera), save projects to their account, share public links with a read-only viewer, and optionally co-edit in real time.</li>
+<li><strong>Spatial Data Explorer</strong>: ingest a real dataset (energy, transit, astronomy, climate), process it on the backend, and let users explore it in an interactive 3D visualization with filters, comparisons, annotations and shareable views.</li>
+<li><strong>Multiplayer Game Platform</strong>: accounts, lobby/matchmaking, an authoritative server for a small 3D game, leaderboards, replays, anti-cheat basics.</li>
+<li><strong>3D Commerce Platform</strong>: a store with a configurator, checkout (payments in test mode), orders, admin dashboard, inventory, and AR preview.</li>
+</ul>
+
+<h2>Non-negotiable requirements</h2>
+<h3>Product &amp; UX</h3>
+<ol>
+<li>A written product brief: target user, problem, 8+ user stories with acceptance criteria, explicit non-goals.</li>
+<li>Responsive from 320 px to ultrawide; polished empty/loading/error/offline states; consistent design system with tokens, light + dark themes and a Storybook of core components.</li>
+<li>Accessible: WCAG 2.2 AA for all non-canvas UI, keyboard-operable editor/controls, text alternatives for 3D content, reduced-motion mode. Include an accessibility statement documenting known gaps.</li>
+</ol>
+<h3>Front end</h3>
+<ol>
+<li>TypeScript strict; React (Next.js or Vite) with a documented state architecture (server cache vs client store vs URL).</li>
+<li>Three.js/R3F core with a performance budget, adaptive quality, optimized assets, a custom shader or material effect, and clean resource disposal.</li>
+<li>At least one advanced platform capability: Web Worker/OffscreenCanvas, service worker + offline, WebXR, WebGPU compute, or audio.</li>
+</ol>
+<h3>Back end &amp; data</h3>
+<ol>
+<li>PostgreSQL with migrations, constraints, justified indexes; typed data layer; seed data and an ERD.</li>
+<li>Authenticated multi-user API with validation, consistent errors, pagination, rate limiting and per-resource authorization tests.</li>
+<li>One real-time or background-processing feature (WebSocket/SSE/CRDT or a job queue) with failure handling.</li>
+<li>Object storage for user assets with presigned uploads and size/type limits.</li>
+</ol>
+<h3>Quality, security &amp; operations</h3>
+<ol>
+<li>Tests at every layer: unit (logic), integration (API + real DB), component (MSW), E2E (3+ Playwright journeys), plus automated a11y checks. CI blocks merges on failures.</li>
+<li>Security review documented: threat model, CSP, cookie/session design, CSRF strategy, dependency/secret scanning, an authorization matrix.</li>
+<li>Observability: structured logs with request ids, error tracking with source maps, RUM web vitals + FPS buckets, one dashboard and two alerts tied to SLOs.</li>
+<li>Deployed with CI/CD, preview environments, zero-downtime migrations, health checks, backups with a tested restore, and a rollback you've actually performed.</li>
+<li>Performance: Lighthouse ≥ 90 on content pages; documented budgets for bundle size, draw calls, memory; before/after evidence for at least three optimizations.</li>
+</ol>
+<h3>Optional stretch (choose two for distinction)</h3>
+<ul>
+<li>An AI feature built safely (Lesson 74) with evals; WebXR mode; WebGPU/TSL compute effect; offline-first sync with conflict resolution; i18n with RTL; plugin/extension API; load test results at 500 concurrent users; accessibility test with a real assistive-technology user.</li>
+</ul>
+
+<h2>Deliverables</h2>
+<ol>
+<li><strong>Live app URL</strong> and a seeded demo account.</li>
+<li><strong>Repository</strong> with clean history, README (setup in &lt; 5 min via <code>docker compose</code>), architecture diagram, ERD, ADRs for ≥ 5 key decisions, CONTRIBUTING.</li>
+<li><strong>Case study</strong> (portfolio page): the story, trade-offs, metrics, failures and lessons.</li>
+<li><strong>5-minute demo video</strong>: product tour, one deep technical dive, and a look at monitoring/CI.</li>
+<li><strong>Postmortem-style retrospective</strong>: what went wrong, what you'd redo, what you'd build next.</li>
+</ol>
+
+<h2>Suggested 6–8 week plan</h2>
+<table>
+<tr><th>Week</th><th>Focus</th><th>Exit criteria</th></tr>
+<tr><td>1</td><td>Discovery &amp; foundations</td><td>Brief, wireframes, ERD, repo + CI skeleton, design tokens, auth working, deployed hello-world with DB</td></tr>
+<tr><td>2</td><td>Core domain &amp; API</td><td>CRUD with authorization and tests; seed data; typed client; first E2E journey</td></tr>
+<tr><td>3</td><td>3D/visual core</td><td>Greybox → real assets; interaction model; state architecture; performance budget measured</td></tr>
+<tr><td>4</td><td>Real-time / background feature</td><td>Works under failure (reconnects, retries); load-tested at small scale</td></tr>
+<tr><td>5</td><td>Polish &amp; design system</td><td>All states designed; Storybook; accessibility pass; shaders/effects; audio</td></tr>
+<tr><td>6</td><td>Hardening</td><td>Security review, observability, performance pass on a real phone, backup/restore drill</td></tr>
+<tr><td>7–8</td><td>Launch &amp; reflect</td><td>Beta users, feedback triage, fixes, docs, demo video, case study, retrospective</td></tr>
+</table>
+
+<h2>Evaluation rubric (100 points)</h2>
+<table>
+<tr><th>Area</th><th>Pts</th><th>Mastery looks like</th></tr>
+<tr><td>Product thinking &amp; UX</td><td>15</td><td>Clear user, real problem solved, delightful and understandable flows, thoughtful edge states</td></tr>
+<tr><td>Front-end engineering</td><td>20</td><td>Clean architecture, typed, accessible, responsive, performant, tested components</td></tr>
+<tr><td>3D / graphics craft</td><td>15</td><td>Cohesive visuals, custom shader/material, optimized assets, budgeted performance, adaptive quality</td></tr>
+<tr><td>Back end, data &amp; security</td><td>20</td><td>Sound schema, validated and authorized APIs, tested, secure by design, resilient real-time/jobs</td></tr>
+<tr><td>Quality &amp; delivery</td><td>15</td><td>CI/CD, tests at all layers, zero-downtime deploys, rollbacks proven, docs that work</td></tr>
+<tr><td>Operations &amp; reflection</td><td>15</td><td>Observability with real signals, SLOs/alerts, honest retrospective, evidence-based claims</td></tr>
+</table>
+<p><strong>85+</strong>: portfolio-ready professional work. <strong>70–84</strong>: solid; fix the weakest area and resubmit. <strong>&lt; 70</strong>: revisit the lessons for the gaps in your score.</p>
+
+<h2>Defend it: the final review</h2>
+<p>Present to a peer, mentor or community (or record it). Prepare to answer, with evidence:</p>
+<ul>
+<li>Walk me through the architecture. Why these choices, and what did you reject?</li>
+<li>Show me the slowest thing, how you measured it, and what you did.</li>
+<li>How does a user's data stay private? Show the authorization tests.</li>
+<li>What happens when the database, a third-party API or the WebSocket goes down?</li>
+<li>Deploy a small change live and roll it back.</li>
+<li>If traffic grew 100×, what breaks first and what's your plan?</li>
+<li>What are you least proud of, and how would you fix it?</li>
+</ul>
+
+<div class="callout"><span class="label">Finish line</span>You're done when a stranger can open your link, use the product, find it fast and accessible, and a senior engineer can open the repo and trust it. After that, keep going: ship the next thing, read the next codebase, help someone else learn. That loop <em>is</em> mastery.</div>
+
+<section class="checkpoint"><h2>Final reflection</h2>
+<details><summary>Questions to write about in your retrospective</summary>
+<ul><li>Which decision saved the most time? Which cost the most?</li>
+<li>Where did my estimates fail, and why?</li>
+<li>What would I automate or test earlier next time?</li>
+<li>What did I learn that this course didn't teach me, and what should I learn next?</li></ul></details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

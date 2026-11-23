@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 30 — React Performance, Patterns & Testing</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="30-react-performance">
+<main><article>
+<h1>Lesson 30 — React performance, patterns &amp; testing</h1>
+<p class="lede">Make apps fast, structure complex components cleanly, and test them like a user would.</p>
+
+<h2>How React renders (the mental model)</h2>
+<ol>
+<li><strong>Trigger</strong>: state change (or initial mount).</li>
+<li><strong>Render</strong>: React calls your component functions to compute the new tree (must be pure).</li>
+<li><strong>Commit</strong>: React applies the differences to the DOM; then runs effects.</li>
+</ol>
+<p>A parent re-render re-renders its children by default. Rendering ≠ DOM updating: React only touches the DOM for real differences. Most performance problems are from <em>too much work per render</em> or <em>too many renders</em>.</p>
+
+<h2>Measure first</h2>
+<ul>
+<li><strong>React DevTools Profiler</strong>: record an interaction, see which components rendered and why (enable "Record why each component rendered").</li>
+<li><strong>Chrome Performance panel</strong> and Lighthouse for load and runtime.</li>
+<li>Test with production builds and CPU throttling: dev mode is slower.</li>
+</ul>
+
+<h2>Fixes in order of preference</h2>
+<ol>
+<li><strong>Move state down</strong>: state that only one subtree uses should live there, so it doesn't re-render the whole app.</li>
+<li><strong>Lift content up / use <code>children</code></strong>: a slow subtree passed as <code>children</code> isn't re-created when the wrapper's state changes.</li>
+<li><strong>Avoid expensive work in render</strong>: <code>useMemo</code> for heavy computations.</li>
+<li><strong><code>memo</code> + stable props</strong> for large, frequently re-rendered children.</li>
+<li><strong>Virtualize long lists</strong> (render only visible rows): <code>@tanstack/react-virtual</code>, <code>react-window</code>.</li>
+<li><strong>Transitions</strong>: <code>useTransition</code> marks an update as non-urgent so typing stays responsive.</li>
+<li><strong>Code-split</strong> routes and heavy libraries (<code>lazy</code>/<code>import()</code>); analyze with <code>rollup-plugin-visualizer</code>.</li>
+<li><strong>Optimize assets</strong>: image sizes/formats, fonts, <code>loading="lazy"</code>.</li>
+</ol>
+<textarea class="code" data-lang="jsx" data-run>
+function slowFilter(items, q) {
+  const t = performance.now(); while (performance.now() - t < 2) {}   // simulate 2ms per call
+  return items.filter(i => i.toLowerCase().includes(q.toLowerCase()));
+}
+const ALL = Array.from({ length: 150 }, (_, i) => "Item " + (i + 1));
+
+function App() {
+  const [query, setQuery] = useState("");
+  const [deferred, setDeferred] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  // Typing updates `query` instantly; the expensive list update runs at lower priority.
+  function onChange(e) {
+    setQuery(e.target.value);
+    startTransition(() => setDeferred(e.target.value));
+  }
+  const results = useMemo(() => slowFilter(ALL, deferred), [deferred]);
+  return (
+    <div>
+      <input value={query} onChange={onChange} placeholder="Filter 150 items" />
+      {isPending && <span> updating…</span>}
+      <p>{results.length} results</p>
+      <ul style={{ height: 120, overflow: "auto" }}>{results.map(r => <li key={r}>{r}</li>)}</ul>
+    </div>
+  );
+}
+</textarea>
+
+<h2>Patterns worth knowing</h2>
+<textarea class="code" data-lang="jsx" data-run>
+// 1. Compound components: flexible APIs sharing implicit state via context
+const TabsCtx = createContext();
+function Tabs({ children, defaultValue }) {
+  const [value, setValue] = useState(defaultValue);
+  return <TabsCtx.Provider value={{ value, setValue }}><div>{children}</div></TabsCtx.Provider>;
+}
+Tabs.List = ({ children }) => <div role="tablist" style={{ display: "flex", gap: 6 }}>{children}</div>;
+Tabs.Tab = ({ value, children }) => {
+  const c = useContext(TabsCtx);
+  return <button role="tab" aria-selected={c.value === value} onClick={() => c.setValue(value)}
+    style={{ fontWeight: c.value === value ? 700 : 400 }}>{children}</button>;
+};
+Tabs.Panel = ({ value, children }) => useContext(TabsCtx).value === value ? <div role="tabpanel">{children}</div> : null;
+
+// 2. Render props / children as function: share logic, let the caller render
+function Mouse({ children }) {
+  const [p, setP] = useState({ x: 0, y: 0 });
+  return <div onPointerMove={e => setP({ x: e.clientX, y: e.clientY })} style={{ height: 60, background: "#eee" }}>{children(p)}</div>;
+}
+
+// 3. Controlled vs uncontrolled component API (value/onChange vs defaultValue)
+
+function App() {
+  return (
+    <div>
+      <Tabs defaultValue="a">
+        <Tabs.List><Tabs.Tab value="a">One</Tabs.Tab><Tabs.Tab value="b">Two</Tabs.Tab></Tabs.List>
+        <Tabs.Panel value="a">Panel A</Tabs.Panel>
+        <Tabs.Panel value="b">Panel B</Tabs.Panel>
+      </Tabs>
+      <Mouse>{({ x, y }) => <span>Pointer: {x}, {y}</span>}</Mouse>
+    </div>
+  );
+}
+</textarea>
+<p>Also: <strong>portals</strong> (<code>createPortal</code> for modals/tooltips), <strong>error boundaries</strong>, <strong>forwardRef</strong> (React 19: <code>ref</code> is a normal prop), <strong>headless UI</strong> libraries (Radix, React Aria) for accessible primitives.</p>
+
+<h2>Testing React</h2>
+<p>Test what users see and do, not implementation details. <strong>Vitest + React Testing Library + user-event</strong> is the standard stack.</p>
+<textarea class="code" data-lang="bash">
+npm install -D vitest jsdom @testing-library/react @testing-library/user-event @testing-library/jest-dom
+# vite.config.js → test: { environment: "jsdom", globals: true, setupFiles: "./src/setup.js" }
+# src/setup.js   → import "@testing-library/jest-dom/vitest";
+</textarea>
+<textarea class="code" data-lang="jsx" data-file="Counter.test.jsx">
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, it, expect } from "vitest";
+import Counter from "./Counter";
+
+describe("Counter", () => {
+  it("increments when the button is clicked", async () => {
+    const user = userEvent.setup();
+    render(<Counter />);
+
+    expect(screen.getByText(/count: 0/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /increment/i }));   // query by ROLE (a11y!)
+    expect(screen.getByText(/count: 1/i)).toBeInTheDocument();
+  });
+
+  it("shows an error from the API", async () => {
+    // mock the network with MSW (Mock Service Worker) for realistic tests
+    render(<UserProfile id={999} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/not found/i);
+  });
+});
+</textarea>
+<ul>
+<li>Query priority: <code>getByRole</code> → <code>getByLabelText</code> → <code>getByText</code> → <code>getByTestId</code> (last resort).</li>
+<li>Use <code>findBy*</code> for async appearance; <code>queryBy*</code> to assert absence.</li>
+<li>End-to-end: <strong>Playwright</strong> drives a real browser through full user flows.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Profile an app you built; find the most expensive re-render and fix it with state colocation before reaching for <code>memo</code>.</li>
+<li>Render a 10,000-row table; make it fast using virtualization.</li>
+<li>Build a compound <code>Accordion</code> with keyboard support and ARIA.</li>
+<li>Write tests for your todo app: add, toggle, delete, empty state, and filter.</li>
+<li>Write one Playwright test covering the full "login → add to cart → checkout" flow.</li>
+<li>Reduce your app's initial JS bundle by 30% with route-level code splitting; show before/after.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why query by role in tests?</summary>It mirrors how users and assistive tech find elements, so tests double as accessibility checks and survive refactors of markup.</details>
+<details><summary>What's the first thing to try when a component re-renders too often?</summary>Move the state closer to where it's used or restructure with children, before adding memoization.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

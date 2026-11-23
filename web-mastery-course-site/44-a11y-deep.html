@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 44 — Accessibility Deep Dive</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="44-a11y-deep">
+<main><article>
+<h1>Lesson 44 — Accessibility deep dive</h1>
+<p class="lede">Accessibility (a11y) isn't a feature; it's a quality bar and often a legal requirement. About one in six people live with a disability, and everyone has temporary and situational limits (a broken arm, bright sun, a noisy train).</p>
+
+<h2>POUR: the four principles (WCAG)</h2>
+<table>
+<tr><th>Principle</th><th>Meaning</th><th>Examples</th></tr>
+<tr><td><strong>Perceivable</strong></td><td>Users can sense the content</td><td>alt text, captions, contrast ≥ 4.5:1, don't rely on color alone, resizable text</td></tr>
+<tr><td><strong>Operable</strong></td><td>Users can operate controls</td><td>full keyboard access, no keyboard traps, enough time, no seizure-inducing flashing, 24×24px minimum targets</td></tr>
+<tr><td><strong>Understandable</strong></td><td>Content and UI behave predictably</td><td>clear labels and errors, consistent navigation, <code>lang</code></td></tr>
+<tr><td><strong>Robust</strong></td><td>Works with assistive tech</td><td>valid semantic HTML, correct roles/names/states</td></tr>
+</table>
+<p>Target <strong>WCAG 2.2 level AA</strong>. Automated tools catch roughly a third of issues; the rest needs manual testing.</p>
+
+<h2>The accessibility tree: name, role, state</h2>
+<p>Browsers build a parallel tree for assistive tech. Every interactive element needs a <strong>role</strong> (what it is), an <strong>accessible name</strong> (what it's called), and <strong>state</strong> (expanded, checked, disabled). Inspect it in DevTools → Elements → Accessibility.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>body{font-family:system-ui;padding:1rem}button{font:inherit;padding:.4em .8em}</style>
+<!-- Good: native button, accessible name from content -->
+<button>Save</button>
+<!-- Icon-only button needs a name -->
+<button aria-label="Close dialog"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2l12 12M14 2L2 14" stroke="currentColor" stroke-width="2"/></svg></button>
+<!-- BAD: no role, name, focus or keyboard support -->
+<div onclick="alert('hi')" style="display:inline-block;padding:.4em .8em;background:#ddd">Fake button</div>
+<p>Open DevTools → Accessibility and compare the three elements.</p>
+</textarea>
+
+<h2>Rules of ARIA</h2>
+<ol>
+<li><strong>Don't use ARIA if a native element does the job</strong> (<code>&lt;button&gt;</code>, <code>&lt;details&gt;</code>, <code>&lt;dialog&gt;</code>, <code>&lt;input type="checkbox"&gt;</code>).</li>
+<li>Don't change native semantics unless you really must.</li>
+<li>All interactive ARIA controls must be keyboard-operable.</li>
+<li>Don't use <code>role="presentation"</code> or <code>aria-hidden="true"</code> on focusable elements.</li>
+<li>All interactive elements need an accessible name.</li>
+</ol>
+<p>Common useful ARIA: <code>aria-label</code>, <code>aria-labelledby</code>, <code>aria-describedby</code>, <code>aria-expanded</code>, <code>aria-controls</code>, <code>aria-current="page"</code>, <code>aria-live</code>, <code>aria-invalid</code>, <code>aria-busy</code>, <code>role="alert|status|dialog|tablist|tab|tabpanel"</code>.</p>
+
+<h2>Keyboard and focus management</h2>
+<ul>
+<li>Natural tab order follows DOM order. <strong>Never use <code>tabindex</code> &gt; 0.</strong> Use <code>tabindex="0"</code> to make a custom widget focusable and <code>-1</code> for programmatic focus.</li>
+<li>Always show focus: style <code>:focus-visible</code> clearly (3:1 contrast against surroundings).</li>
+<li><strong>Move focus deliberately</strong> when content changes: open a modal → focus inside; close → return to the trigger; route change in an SPA → focus the new page's <code>h1</code> or announce it.</li>
+<li><strong>Trap focus</strong> only inside modals. Prefer native <code>&lt;dialog&gt;.showModal()</code>, which handles the trap, Escape, and inert background.</li>
+<li>Use <code>inert</code> on regions that should be unreachable.</li>
+</ul>
+<textarea class="code" data-lang="html" data-run>
+<style>body{font-family:system-ui;padding:1rem}button{font:inherit;padding:.5em 1em}
+dialog{border:0;border-radius:14px;padding:1.5rem;box-shadow:0 20px 60px #0005}dialog::backdrop{background:#0008}
+:focus-visible{outline:3px solid #5b3df5;outline-offset:3px}</style>
+<button id="openBtn">Delete account…</button>
+<dialog id="dlg" aria-labelledby="t" aria-describedby="d">
+  <h2 id="t">Delete account?</h2>
+  <p id="d">This cannot be undone.</p>
+  <form method="dialog"><button value="cancel" autofocus>Cancel</button> <button value="ok">Delete</button></form>
+</dialog>
+<p id="out" role="status"></p>
+<script>
+  openBtn.onclick = () => dlg.showModal();                 // focus trap, Esc to close, inert background: free
+  dlg.onclose = () => { out.textContent = "Result: " + dlg.returnValue; openBtn.focus(); };
+</script>
+</textarea>
+
+<h2>Live regions: announce changes</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>body{font-family:system-ui;padding:1rem}button{font:inherit;padding:.4em .8em}</style>
+<button id="add">Add to cart</button> <span>Items: <b id="n">0</b></span>
+<!-- Present in the DOM BEFORE its content changes -->
+<div id="live" aria-live="polite" role="status" style="position:absolute;left:-9999px"></div>
+<script>
+  let c = 0;
+  add.onclick = () => { c++; n.textContent = c; live.textContent = "Added. Cart has " + c + " items."; };
+</script>
+</textarea>
+<ul>
+<li><code>role="status"</code>/<code>aria-live="polite"</code> waits for the user to pause; <code>role="alert"</code>/<code>assertive</code> interrupts (errors only).</li>
+<li>The live region must exist before its text changes; injecting both at once is often not announced.</li>
+</ul>
+
+<h2>Forms that work for everyone</h2>
+<ul>
+<li>Visible <code>&lt;label&gt;</code> for every field; group radios in <code>&lt;fieldset&gt;&lt;legend&gt;</code>.</li>
+<li>Connect help and error text with <code>aria-describedby</code>; set <code>aria-invalid="true"</code> on errors; say what went wrong <em>and</em> how to fix it.</li>
+<li>Use correct <code>type</code> and <code>autocomplete</code> tokens (<code>email</code>, <code>one-time-code</code>, <code>street-address</code>).</li>
+<li>On submit errors, move focus to an error summary or the first invalid field.</li>
+<li>Don't rely on placeholder as label. Don't block paste in password fields.</li>
+</ul>
+
+<h2>Designing for diverse needs</h2>
+<ul>
+<li><strong>Zoom and reflow</strong>: usable at 400% zoom without horizontal scroll (use <code>rem</code>, flex/grid, no fixed heights).</li>
+<li><strong>Motion</strong>: respect <code>prefers-reduced-motion</code>; provide pause for auto-playing content; avoid parallax for vestibular sensitivity.</li>
+<li><strong>Color</strong>: contrast for text (4.5:1; large 3:1) and UI components (3:1). Test <code>forced-colors</code> (Windows High Contrast): <code>@media (forced-colors: active)</code>.</li>
+<li><strong>Touch</strong>: targets ≥ 24px (aim for 44px) with spacing. Provide alternatives to drag-only gestures.</li>
+<li><strong>Cognitive</strong>: plain language, consistent patterns, don't time out silently, allow undo.</li>
+<li><strong>Media</strong>: captions for video, transcripts for audio, audio descriptions where needed.</li>
+</ul>
+
+<h2>Accessible 3D and canvas</h2>
+<p>A <code>&lt;canvas&gt;</code> is a picture. For WebGL/Three.js: put essential content in real HTML, give the canvas <code>role="img"</code> with an <code>aria-label</code> (or a hidden text description), make interactive objects reachable through an HTML list or buttons that mirror them, offer keyboard controls, and provide a "pause animation" control.</p>
+
+<h2>Testing workflow</h2>
+<ol>
+<li><strong>Automated</strong>: ESLint <code>jsx-a11y</code>, <strong>axe-core</strong> (<code>vitest-axe</code>, <code>@axe-core/playwright</code>), Lighthouse, Pa11y in CI.</li>
+<li><strong>Keyboard</strong>: unplug the mouse; can you do every task? Is focus always visible and logical?</li>
+<li><strong>Screen reader</strong>: VoiceOver (macOS <kbd>Cmd</kbd>+<kbd>F5</kbd>) with Safari; NVDA (Windows, free) with Firefox/Chrome; check key flows.</li>
+<li><strong>Zoom</strong> to 200–400%, test text spacing, forced colors, reduced motion, dark mode.</li>
+<li><strong>Real users</strong> with disabilities, when possible. Nothing replaces this.</li>
+</ol>
+<textarea class="code" data-lang="js" data-file="a11y.test.js">
+import { render } from "@testing-library/react";
+import { axe, toHaveNoViolations } from "jest-axe";
+expect.extend(toHaveNoViolations);
+
+it("has no detectable accessibility violations", async () => {
+  const { container } = render(<SignupForm />);
+  expect(await axe(container)).toHaveNoViolations();
+});
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Audit one of your earlier projects with Lighthouse, axe DevTools, keyboard-only and VoiceOver. Write a prioritized list of issues, then fix them.</li>
+<li>Build an accessible disclosure (accordion), a tab set (arrow-key navigation, roving tabindex) and a menu button following the WAI-ARIA Authoring Practices patterns (w3.org/WAI/ARIA/apg).</li>
+<li>Make a form with inline validation that announces errors via a live region and moves focus to a summary on failed submit.</li>
+<li>Implement an SPA route change that updates <code>document.title</code>, moves focus to the <code>h1</code> and announces the navigation.</li>
+<li>Make a Three.js scene usable by keyboard and screen-reader users: HTML list of objects, key controls, a description, and a motion toggle.</li>
+<li>Add axe checks to your test suite and fail the build on violations.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>What's the first rule of ARIA?</summary>Don't use ARIA when a native HTML element or attribute already provides the semantics and behavior.</details>
+<details><summary>Why is a custom div-button worse than a button?</summary>It lacks the role, focusability, Enter/Space activation and disabled semantics, all of which you must rebuild (and usually get wrong).</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

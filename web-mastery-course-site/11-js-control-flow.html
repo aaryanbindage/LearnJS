@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 11 — Operators & Control Flow</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="11-js-control-flow">
+<main><article>
+<h1>Lesson 11 — Operators &amp; control flow</h1>
+<p class="lede">Make decisions and repeat work.</p>
+
+<h2>Operators</h2>
+<textarea class="code" data-lang="js" data-run>
+console.log(7 + 2, 7 - 2, 7 * 2, 7 / 2, 7 % 2, 2 ** 10);   // arithmetic
+console.log(7 > 2, 7 >= 7, 7 !== 7);                        // comparison
+console.log(true && false, true || false, !true);           // logical
+console.log(5 & 3, 5 | 3, 5 ^ 3, 1 << 4);                   // bitwise (rare)
+const age = 20;
+console.log(age >= 18 ? "adult" : "minor");                 // ternary
+
+// && and || return one of their operands (short-circuit):
+console.log("hi" && "there", "" || "fallback");
+const user = null;
+console.log(user && user.name);        // null (guard)
+</textarea>
+
+<h2>if / else</h2>
+<textarea class="code" data-lang="js" data-run>
+function grade(score) {
+  if (score >= 90) return "A";
+  else if (score >= 80) return "B";
+  else if (score >= 70) return "C";
+  return "F";
+}
+console.log(grade(95), grade(82), grade(40));
+
+// Early return (guard clauses) keeps code flat:
+function area(w, h) {
+  if (typeof w !== "number" || typeof h !== "number") return NaN;
+  if (w < 0 || h < 0) return 0;
+  return w * h;
+}
+console.log(area(3, 4), area("a", 2), area(-1, 5));
+</textarea>
+
+<h2>switch</h2>
+<textarea class="code" data-lang="js" data-run>
+function dayType(d) {
+  switch (d) {
+    case "sat":
+    case "sun": return "weekend";     // fall-through grouping
+    case "fri": return "almost!";
+    default:    return "weekday";
+  }
+}
+console.log(dayType("sun"), dayType("fri"), dayType("tue"));
+</textarea>
+<p>Don't forget <code>break</code> (or <code>return</code>) in each case or execution falls through.</p>
+
+<h2>Loops</h2>
+<textarea class="code" data-lang="js" data-run>
+for (let i = 0; i < 3; i++) console.log("for", i);
+
+let n = 3;
+while (n > 0) { console.log("while", n); n--; }
+
+let k = 0;
+do { console.log("do-while runs at least once", k); k++; } while (k < 1);
+
+for (const ch of "hey") console.log("for…of", ch);         // iterate VALUES
+const obj = { a: 1, b: 2 };
+for (const key in obj) console.log("for…in", key, obj[key]);  // iterate KEYS
+for (const [k2, v] of Object.entries(obj)) console.log(k2, v);
+
+outer: for (let i = 0; i < 3; i++) {
+  for (let j = 0; j < 3; j++) {
+    if (j === 1) continue;           // skip this iteration
+    if (i === 2) break outer;        // exit both loops
+    console.log(i, j);
+  }
+}
+</textarea>
+<div class="callout warn"><span class="label">Careful</span>Use <code>for…of</code> for arrays (values). <code>for…in</code> iterates keys including inherited ones, so use it only for plain objects, if at all.</div>
+
+<h2>Worked example: FizzBuzz</h2>
+<textarea class="code" data-lang="js" data-run>
+const out = [];
+for (let i = 1; i <= 20; i++) {
+  if (i % 15 === 0) out.push("FizzBuzz");
+  else if (i % 3 === 0) out.push("Fizz");
+  else if (i % 5 === 0) out.push("Buzz");
+  else out.push(i);
+}
+console.log(out.join(" "));
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Write <code>isLeapYear(year)</code> (divisible by 4, except centuries unless divisible by 400).</li>
+<li>Print a 5-row right triangle of <code>*</code> using nested loops or <code>"*".repeat(i)</code>.</li>
+<li>Sum all numbers from 1 to 100 with a loop. Then verify with the formula n(n+1)/2.</li>
+<li>Find all prime numbers up to 50.</li>
+<li>Write a number-guessing function that takes a guess and a secret and returns "higher", "lower" or "correct".</li>
+<li>Collatz: starting from n, if even divide by 2, else 3n+1. Count steps to reach 1 for n=27.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>What does `a && b` return when a is truthy?</summary>b. Logical operators return an operand, not necessarily a boolean.</details>
+<details><summary>for…of vs for…in?</summary>of iterates values of an iterable; in iterates enumerable property keys.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

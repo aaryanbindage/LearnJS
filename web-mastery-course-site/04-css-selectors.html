@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 4 — CSS Selectors, Cascade & Specificity</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="04-css-selectors">
+<main><article>
+<h1>Lesson 4 — Selectors, cascade &amp; specificity</h1>
+<p class="lede">CSS is a set of rules: pick elements with a selector, then set properties. Most CSS bugs are really "which rule wins?" bugs, so learn the cascade early.</p>
+
+<h2>Adding CSS</h2>
+<textarea class="code" data-lang="html">
+<link rel="stylesheet" href="styles.css">   <!-- best: cacheable, reusable -->
+<style> p { color: teal; } </style>          <!-- fine for demos -->
+<p style="color: red">inline</p>             <!-- avoid: very high priority, hard to override -->
+</textarea>
+<p>A rule looks like <code>selector { property: value; }</code>.</p>
+
+<h2>Selectors you must know</h2>
+<textarea class="code" data-lang="css">
+p { }                    /* type */
+.card { }                /* class */
+#hero { }                /* id (avoid for styling) */
+* { }                    /* universal */
+a[href^="https"] { }     /* attribute: starts with (also $= *= ~=) */
+input[type="email"] { }
+
+.card p { }              /* descendant */
+.card > p { }            /* direct child */
+h2 + p { }               /* adjacent sibling */
+h2 ~ p { }               /* any later sibling */
+h1, h2, h3 { }           /* group */
+.btn.primary { }         /* both classes on one element */
+</textarea>
+
+<h2>Live: play with selectors</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body { font-family: system-ui; }
+  li:nth-child(odd) { background: #eee; }
+  li:hover { background: gold; }
+  a[href^="http"]::after { content: " ↗"; }
+  .card:has(img) { border-color: tomato; }
+  .card { border: 2px solid #ccc; padding: .5rem 1rem; margin: .5rem 0; max-width: 20rem; }
+  input:invalid { outline: 2px solid crimson; }
+</style>
+<ul><li>One</li><li>Two</li><li>Three</li><li>Four</li></ul>
+<p><a href="https://example.com">External</a> · <a href="local.html">Local</a></p>
+<div class="card">Card with no image</div>
+<div class="card"><img alt="" width="20" height="20" src="data:image/gif;base64,R0lGODlhAQABAAAAACw="> Card with image</div>
+<input type="email" value="not-an-email">
+</textarea>
+
+<h2>Pseudo-classes and pseudo-elements</h2>
+<p><strong>Pseudo-classes</strong> select by state or position: <code>:hover :focus :focus-visible :active :checked :disabled :invalid :first-child :last-child :nth-child(2n+1) :not() :is() :where() :has()</code>.</p>
+<p><strong>Pseudo-elements</strong> create or target a part of an element: <code>::before ::after ::first-line ::first-letter ::placeholder ::selection</code>.</p>
+
+<h2>The cascade: how conflicts resolve</h2>
+<p>When several rules set the same property on one element, the browser decides in this order:</p>
+<ol>
+<li><strong>Origin &amp; importance</strong>: <code>!important</code> beats normal (avoid it).</li>
+<li><strong>Cascade layers</strong> (<code>@layer</code>): later layers beat earlier ones for normal rules.</li>
+<li><strong>Specificity</strong>: more specific selector wins.</li>
+<li><strong>Source order</strong>: last rule wins.</li>
+</ol>
+<h3>Specificity score (ids – classes – types)</h3>
+<table>
+<tr><th>Selector</th><th>Score</th></tr>
+<tr><td><code>p</code></td><td>0-0-1</td></tr>
+<tr><td><code>.card</code></td><td>0-1-0</td></tr>
+<tr><td><code>#hero</code></td><td>1-0-0</td></tr>
+<tr><td><code>.card p:hover</code></td><td>0-2-1</td></tr>
+<tr><td>inline style</td><td>beats any selector</td></tr>
+</table>
+<p>Compare left to right: one id beats any number of classes. <code>:is()</code>, <code>:not()</code> and <code>:has()</code> take their most specific argument; <code>:where()</code> always counts as zero, which is why libraries love it.</p>
+<p>Which color wins here? Predict first, then edit to check.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  p { color: gray; }
+  .note p { color: blue; }
+  .note .warn { color: orange; }
+  #box .warn { color: red; }
+  p.warn { color: green; }
+</style>
+<div class="note" id="box"><p class="warn">What color am I?</p></div>
+</textarea>
+
+<h2>Inheritance</h2>
+<p>Text properties (<code>color</code>, <code>font-*</code>, <code>line-height</code>) inherit from the parent. Box properties (<code>border</code>, <code>margin</code>, <code>padding</code>) do not. Force behavior with <code>inherit</code>, <code>initial</code>, <code>unset</code>, <code>revert</code>.</p>
+
+<h2>Good habits</h2>
+<textarea class="code" data-lang="css" data-file="reset.css">
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; }
+img, video { max-width: 100%; display: block; }
+</textarea>
+<ul>
+<li>Style with <strong>classes</strong>; keep specificity low and flat.</li>
+<li>Name by purpose (<code>.card-title</code>), not looks (<code>.red-text</code>). BEM (<code>.card__title--large</code>) is optional.</li>
+<li>Avoid <code>!important</code> and avoid ids for styling.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Without running it, find the winner among <code>#a .b p</code>, <code>.b .c .d p</code> and <code>div p.x.y</code>. Then verify in DevTools (struck-out rules in the Styles pane).</li>
+<li>Zebra-stripe a table with <code>:nth-child</code> and highlight rows on hover.</li>
+<li>Add an arrow to external links with <code>a[href^="http"]::after</code>.</li>
+<li>Use <code>:has()</code> to color a label red when its sibling input is <code>:invalid</code>.</li>
+<li>Create a specificity conflict, then resolve it without <code>!important</code>.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why is !important a smell?</summary>It escapes the normal specificity rules, so the only way to override it is another !important. Styles become an arms race.</details>
+<details><summary>What does :where() do for library authors?</summary>It adds zero specificity, so your defaults are trivially overridable by users.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

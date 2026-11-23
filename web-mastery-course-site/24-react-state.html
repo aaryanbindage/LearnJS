@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 24 — State & Events</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="24-react-state">
+<main><article>
+<h1>Lesson 24 — State &amp; events</h1>
+<p class="lede">State is data that changes over time and that the UI depends on. It's the heart of React.</p>
+
+<h2><code>useState</code></h2>
+<textarea class="code" data-lang="jsx" data-run>
+function Counter() {
+  const [count, setCount] = useState(0);        // [current value, setter]
+
+  return (
+    <div>
+      <p>Count: <strong>{count}</strong></p>
+      <button onClick={() => setCount(count + 1)}>+1</button>{" "}
+      <button onClick={() => setCount(c => c - 1)}>-1</button>{" "}
+      <button onClick={() => setCount(0)}>Reset</button>
+    </div>
+  );
+}
+function App() { return <><Counter /><Counter /></>; }   // each instance has its own state
+</textarea>
+<ul>
+<li>Calling the setter <strong>schedules a re-render</strong>; the component function runs again and <code>useState</code> returns the new value.</li>
+<li>Normal variables don't persist or trigger re-renders. State does.</li>
+<li><strong>Hooks rules</strong>: call hooks only at the top level of a component (not in loops, conditions or nested functions), and only from components or custom hooks.</li>
+</ul>
+
+<h2>State is a snapshot</h2>
+<p>Within one render, <code>count</code> never changes. Setting state queues an update for the <em>next</em> render. Predict what this prints, then click:</p>
+<textarea class="code" data-lang="jsx" data-run>
+function App() {
+  const [n, setN] = useState(0);
+  function addThreeWrong() { setN(n + 1); setN(n + 1); setN(n + 1); }          // n is 0 in all three
+  function addThreeRight() { setN(x => x + 1); setN(x => x + 1); setN(x => x + 1); }  // updater queue
+  return (
+    <div>
+      <p>n = {n}</p>
+      <button onClick={addThreeWrong}>+3 (wrong → +1)</button>{" "}
+      <button onClick={addThreeRight}>+3 (updater → +3)</button>{" "}
+      <button onClick={() => setN(0)}>reset</button>
+    </div>
+  );
+}
+</textarea>
+<div class="callout"><span class="label">Rule</span>When the next state depends on the previous, use the <strong>updater form</strong>: <code>setX(prev =&gt; …)</code>.</div>
+
+<h2>Objects and arrays: never mutate</h2>
+<p>React compares state by reference. Mutating in place means React sees "the same object" and may skip updating. Always create new objects/arrays (spread, <code>map</code>, <code>filter</code>), exactly as in Lesson 13.</p>
+<textarea class="code" data-lang="jsx" data-run>
+function App() {
+  const [form, setForm] = useState({ name: "Ada", city: "London", tags: ["js"] });
+
+  const update = (field, value) => setForm(f => ({ ...f, [field]: value }));
+  const addTag = () => setForm(f => ({ ...f, tags: [...f.tags, "tag" + (f.tags.length + 1)] }));
+  const removeTag = (t) => setForm(f => ({ ...f, tags: f.tags.filter(x => x !== t) }));
+
+  return (
+    <div>
+      <input value={form.name} onChange={e => update("name", e.target.value)} />{" "}
+      <input value={form.city} onChange={e => update("city", e.target.value)} />
+      <p>{form.name} lives in {form.city}</p>
+      <button onClick={addTag}>Add tag</button>
+      <ul>{form.tags.map(t => <li key={t}>{t} <button onClick={() => removeTag(t)}>✕</button></li>)}</ul>
+      <pre>{JSON.stringify(form)}</pre>
+    </div>
+  );
+}
+</textarea>
+
+<h2>Events</h2>
+<ul>
+<li>Handlers are camelCase props: <code>onClick</code>, <code>onChange</code>, <code>onSubmit</code>, <code>onKeyDown</code>, <code>onMouseEnter</code>…</li>
+<li>Pass a <em>function</em>, don't call it: <code>onClick={handle}</code> or <code>onClick={() =&gt; handle(id)}</code>, never <code>onClick={handle(id)}</code>.</li>
+<li>The event object is a synthetic wrapper with the usual <code>preventDefault()</code>, <code>target</code>, <code>stopPropagation()</code>.</li>
+</ul>
+
+<h2>Controlled inputs</h2>
+<p>A <em>controlled</em> input gets its value from state and updates state on every change, so React is the single source of truth.</p>
+<textarea class="code" data-lang="jsx" data-run>
+function App() {
+  const [text, setText] = useState("");
+  const [agree, setAgree] = useState(false);
+  const [color, setColor] = useState("blue");
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    alert(JSON.stringify({ text, agree, color }));
+  }
+  return (
+    <form onSubmit={handleSubmit}>
+      <input value={text} onChange={e => setText(e.target.value)} placeholder="Type…" />
+      <p>{text.length} chars · {text.toUpperCase()}</p>
+      <label><input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} /> I agree</label>
+      <select value={color} onChange={e => setColor(e.target.value)}>
+        <option>blue</option><option>red</option><option>green</option>
+      </select>{" "}
+      <button disabled={!agree}>Submit</button>
+    </form>
+  );
+}
+</textarea>
+
+<h2>Lifting state up</h2>
+<p>When two components need the same data, move the state to their closest common parent and pass it down as props (plus a setter callback).</p>
+<textarea class="code" data-lang="jsx" data-run>
+function TemperatureInput({ label, value, onChange }) {
+  return <label>{label}: <input type="number" value={value} onChange={e => onChange(e.target.value)} /></label>;
+}
+function App() {
+  const [celsius, setCelsius] = useState("20");
+  const fahrenheit = celsius === "" ? "" : String(Math.round(celsius * 9 / 5 + 32));   // DERIVED, not stored
+  return (
+    <div>
+      <TemperatureInput label="°C" value={celsius} onChange={setCelsius} /><br />
+      <TemperatureInput label="°F" value={fahrenheit} onChange={f => setCelsius(String(Math.round((f - 32) * 5 / 9)))} />
+    </div>
+  );
+}
+</textarea>
+
+<h2>Principles for state</h2>
+<ol>
+<li><strong>Minimal</strong>: store the least data; compute everything else during render (derived values like totals, filtered lists).</li>
+<li><strong>No duplication</strong>: one source of truth. Store an <code>id</code>, not a copy of the object.</li>
+<li><strong>No contradictions</strong>: prefer one <code>status</code> ("idle" | "loading" | "error" | "success") over several booleans.</li>
+<li><strong>Keep state local</strong> until multiple components need it.</li>
+<li>Lazy initial state for costly work: <code>useState(() =&gt; loadFromStorage())</code>.</li>
+<li>Reset state by changing a component's <code>key</code>.</li>
+</ol>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a toggle button that shows/hides a paragraph, and a dark mode switch.</li>
+<li>Build a like button with a count that you can't push below 0.</li>
+<li>Build a multi-field signup form (controlled) with live validation messages.</li>
+<li>Build a todo list: add, toggle and delete, with "X items left" <em>derived</em> from state.</li>
+<li>Build a shopping cart: add items and quantities, with total computed from state.</li>
+<li>Build a color mixer with three range sliders and a swatch.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why does <code>setCount(count+1)</code> called three times add only 1?</summary>count is a snapshot for that render. All three calls compute the same value. Use <code>setCount(c =&gt; c + 1)</code> to chain.</details>
+<details><summary>Should I store <code>fullName</code> in state alongside first and last?</summary>No. Compute it during render; storing derived data creates sync bugs.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

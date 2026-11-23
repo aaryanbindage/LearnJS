@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 49 — Runtime Internals: Memory, GC, Event Loop, Profiling</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="49-js-runtime">
+<main><article>
+<h1>Lesson 49 — Runtime internals: memory, GC, event loop &amp; profiling</h1>
+<p class="lede">Mastery means understanding what the engine does with your code: where values live, when memory is freed, and how work is scheduled. This lets you diagnose leaks, jank and "impossible" bugs.</p>
+
+<h2>How the engine runs your code</h2>
+<ol>
+<li><strong>Parse</strong> source into an AST (lazily for functions not yet called).</li>
+<li><strong>Interpret</strong> bytecode (V8's Ignition) and collect type feedback.</li>
+<li><strong>JIT compile</strong> hot functions into optimized machine code (TurboFan / Maglev). Optimizations assume stable types; if you break the assumption, the engine <em>deoptimizes</em>.</li>
+</ol>
+<p>Practical consequences: keep <strong>object shapes consistent</strong> (create properties in the same order in constructors/literals, don't add or <code>delete</code> properties later), keep function arguments type-stable, avoid mixing types in arrays, and prefer typed arrays for numeric data. Don't micro-optimize before measuring; the engine is smart.</p>
+
+<h2>Memory: stack, heap and references</h2>
+<ul>
+<li><strong>Primitives</strong> (numbers, booleans, small strings) are copied by value. <strong>Objects</strong> live on the heap, and variables hold references.</li>
+<li><strong>Garbage collection</strong> frees objects that are <em>unreachable</em> from "roots" (globals, the call stack, active closures). It uses generational collection: new objects in a young generation (frequent, fast sweeps), survivors promoted to the old generation (rarer, slower).</li>
+<li>You don't free memory; you <strong>stop referencing</strong> things. A "leak" is memory that is still reachable but no longer needed.</li>
+</ul>
+
+<h2>Common leaks</h2>
+<textarea class="code" data-lang="js" data-run>
+// 1. Forgotten listeners / timers hold closures (and everything they capture) alive
+const registry = [];
+function mountWidget() {
+  const hugeData = new Array(1e5).fill("x");           // captured by the closure below
+  const onResize = () => hugeData.length;
+  window.addEventListener("resize", onResize);
+  return () => window.removeEventListener("resize", onResize);   // cleanup!
+}
+const unmount = mountWidget();
+unmount();                                              // without this, hugeData can never be collected
+
+// 2. Unbounded caches and global arrays
+const cache = new Map();
+// cache.set(key, value) forever → use an LRU with a max size, or WeakMap keyed by objects
+
+// 3. Detached DOM nodes still referenced from JS
+let saved = document.createElement("div");
+document.body.append(saved); saved.remove();            // gone from the page, but `saved` keeps it alive
+saved = null;                                           // now collectable
+
+// WeakMap / WeakRef / FinalizationRegistry: references that don't keep objects alive
+const meta = new WeakMap();
+let el = { id: 1 }; meta.set(el, { clicks: 0 });
+el = null;                                              // the WeakMap entry disappears with it
+console.log("Leak patterns explained in comments above; see DevTools → Memory to find them in real apps.");
+</textarea>
+
+<h2>Finding leaks with DevTools</h2>
+<ol>
+<li>Memory panel → <strong>Heap snapshot</strong>. Take one, perform the suspect action (open and close a modal) 10 times, force GC (trash icon), take another.</li>
+<li>Compare snapshots (<em>Comparison</em> view): look for objects whose count keeps growing (<code>Detached HTMLDivElement</code>, closures, arrays).</li>
+<li>Click an object → <strong>Retainers</strong> panel shows the chain keeping it alive. The first non-weak path from a GC root is your bug.</li>
+<li>Performance panel with "Memory" checked shows a sawtooth for healthy usage; a rising baseline suggests a leak.</li>
+<li><code>performance.memory</code> (Chrome-only, coarse) and <code>performance.measureUserAgentSpecificMemory()</code> for rough in-code checks.</li>
+</ol>
+
+<h2>The event loop in full</h2>
+<p>One thread runs JavaScript. The loop repeats: run one <strong>macrotask</strong> (script, event callback, <code>setTimeout</code>), then drain the <strong>microtask queue</strong> (promise reactions, <code>queueMicrotask</code>, MutationObserver), then possibly <strong>render</strong> (style → layout → paint, with <code>requestAnimationFrame</code> callbacks first), then the next task.</p>
+<textarea class="code" data-lang="js" data-run>
+console.log("1 script start");
+setTimeout(() => console.log("7 setTimeout 0 (macrotask)"), 0);
+Promise.resolve()
+  .then(() => console.log("4 promise 1 (microtask)"))
+  .then(() => console.log("5 promise 2 (microtask, queued by promise 1)"));
+queueMicrotask(() => console.log("6 queueMicrotask"));
+(async () => {
+  console.log("2 async fn starts (runs synchronously until first await)");
+  await null;
+  console.log("5b after await (microtask)");
+})();
+console.log("3 script end");
+// Predict the order BEFORE running. Microtasks always finish before the next macrotask.
+</textarea>
+<div class="callout warn"><span class="label">Starvation</span>A microtask that keeps queuing microtasks (<code>function f(){ Promise.resolve().then(f) }</code>) never lets the browser render or handle input, freezing the page just like an infinite loop.</div>
+<ul>
+<li><strong>rAF</strong> runs before paint, once per frame: use it for visual updates. <strong>Idle callbacks</strong> run when the browser has spare time.</li>
+<li><code>setTimeout(fn, 0)</code> isn't instant: nested timers clamp to ≥ 4 ms and background tabs throttle to ≥ 1 s.</li>
+<li>Long tasks (&gt;50 ms) hurt INP. Break them up, yield with <code>scheduler.yield()</code>, or move to a Worker.</li>
+</ul>
+
+<h2>Layout thrashing (forced synchronous layout)</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>body{font-family:system-ui;padding:1rem}.box{width:100px;height:10px;background:#7c5cff;margin:1px 0}</style>
+<button id="a">Thrash (read/write interleaved)</button> <button id="b">Batched (read all, then write all)</button>
+<p id="o"></p><div id="host"></div>
+<script>
+  const N = 1500;
+  host.innerHTML = '<div class="box"></div>'.repeat(N);
+  const boxes = [...host.children];
+  a.onclick = () => {
+    const t = performance.now();
+    for (const el of boxes) { const w = el.offsetWidth; el.style.width = (w + 1) + "px"; }   // each read forces layout
+    o.textContent = "Interleaved: " + (performance.now() - t).toFixed(1) + " ms";
+  };
+  b.onclick = () => {
+    const t = performance.now();
+    const widths = boxes.map(el => el.offsetWidth);                       // all reads: one layout
+    boxes.forEach((el, i) => el.style.width = (widths[i] + 1) + "px");    // all writes
+    o.textContent = "Batched: " + (performance.now() - t).toFixed(1) + " ms";
+  };
+</script>
+</textarea>
+
+<h2>Profiling workflow</h2>
+<ol>
+<li><strong>Reproduce</strong> the slowness reliably; throttle CPU (4–6×) to exaggerate.</li>
+<li>DevTools → <strong>Performance</strong> → record. Read the flame chart: wide bars are expensive, red corners are long tasks. Bottom-up and Call tree tabs show where time goes.</li>
+<li>Identify the category: scripting, layout (forced reflows), paint, GC, or network.</li>
+<li>Fix the biggest cost first. Re-measure. Stop when you hit the goal.</li>
+<li><code>performance.mark/measure</code> and <code>console.time</code> instrument your own code; the User Timing track shows them in the trace.</li>
+</ol>
+<textarea class="code" data-lang="js" data-run>
+function work(n) { let s = 0; for (let i = 0; i < n; i++) s += Math.sqrt(i); return s; }
+performance.mark("start");
+work(5e6);
+performance.mark("end");
+const m = performance.measure("work", "start", "end");
+console.log(m.name, m.duration.toFixed(1) + " ms");
+
+// Microbenchmarks lie: warm up, repeat, and compare medians (use mitata/tinybench), never one run.
+const samples = Array.from({ length: 7 }, () => { const t = performance.now(); work(1e6); return performance.now() - t; });
+samples.sort((a, b) => a - b);
+console.log("median ms:", samples[3].toFixed(2));
+</textarea>
+
+<h2>Data structures and memory in practice</h2>
+<ul>
+<li>Typed arrays (<code>Float32Array</code>) are compact and fast for numeric data (and required by WebGL/Three.js buffers).</li>
+<li>Avoid creating millions of tiny objects per frame; reuse objects (object pools) in loops, games and animation.</li>
+<li>Strings: concatenation in loops is fine in modern engines; very large strings and repeated <code>slice</code> can retain big parents. Use arrays + <code>join</code> for huge builds.</li>
+<li><code>structuredClone</code> deep-copies; <strong>Transferable objects</strong> (<code>ArrayBuffer</code>, <code>OffscreenCanvas</code>) move to Workers without copying.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Write a component that leaks (listener never removed). Reproduce it, find it in a heap snapshot via Retainers, then fix it.</li>
+<li>Predict then verify the output order of a script mixing <code>async/await</code>, promises, <code>setTimeout</code>, <code>queueMicrotask</code> and <code>requestAnimationFrame</code>.</li>
+<li>Find and fix layout thrashing in a deliberately bad script; report ms before and after.</li>
+<li>Implement an LRU cache and an object pool; benchmark allocation churn with and without the pool in a particle loop.</li>
+<li>Record a Performance trace of your Project 3 app during a slow interaction and write down the top three costs.</li>
+<li>Show how adding a property after construction (changing object shape) affects a hot loop using a proper benchmark harness.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>What makes memory "leak" in a GC language?</summary>Objects that remain reachable through some reference (listener, cache, closure, global) although the program no longer needs them.</details>
+<details><summary>Order: sync code, microtasks, macrotasks?</summary>The running script (sync) finishes, then all microtasks drain, then the browser may render, then the next macrotask runs.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

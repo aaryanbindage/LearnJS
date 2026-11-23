@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 10 — JavaScript Values, Variables & Types</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="10-js-values">
+<main><article>
+<h1>Lesson 10 — Values, variables &amp; types</h1>
+<p class="lede">JavaScript is the language of the browser. In these lessons every JS example is runnable: edit it, and the output panel (right) updates. Use <code>console.log()</code> to see values.</p>
+
+<h2>Where JavaScript runs</h2>
+<textarea class="code" data-lang="html">
+<script src="main.js" defer></script>      <!-- external file (best) -->
+<script type="module" src="main.js"></script>  <!-- ES module: deferred by default -->
+</textarea>
+<p>You can also experiment in the browser DevTools Console, or with Node: <code>node file.js</code>.</p>
+
+<h2>Variables</h2>
+<textarea class="code" data-lang="js" data-run>
+const name = "Ada";        // cannot be reassigned: your default choice
+let score = 0;             // can be reassigned
+score = score + 10;
+score += 5;                // shorthand
+score++;                   // increment
+
+// var is the old way: function-scoped and hoisted. Avoid it.
+
+console.log(name, score);
+
+const user = { id: 1 };
+user.id = 2;               // allowed! const protects the binding, not the contents
+console.log(user);
+// user = {};              // TypeError: Assignment to constant variable
+</textarea>
+<p>Names: <code>camelCase</code> for variables and functions, <code>PascalCase</code> for classes/components, <code>UPPER_SNAKE</code> for true constants. Names can't start with a digit.</p>
+
+<h2>The 8 data types</h2>
+<table>
+<tr><th>Type</th><th>Example</th><th>Notes</th></tr>
+<tr><td>number</td><td><code>42, 3.14, NaN, Infinity</code></td><td>One floating-point type (64-bit)</td></tr>
+<tr><td>bigint</td><td><code>9007199254740993n</code></td><td>Arbitrary-size integers</td></tr>
+<tr><td>string</td><td><code>"hi", 'hi', `hi`</code></td><td>Immutable text</td></tr>
+<tr><td>boolean</td><td><code>true, false</code></td><td></td></tr>
+<tr><td>undefined</td><td><code>undefined</code></td><td>"No value assigned yet"</td></tr>
+<tr><td>null</td><td><code>null</code></td><td>"Intentionally empty"</td></tr>
+<tr><td>symbol</td><td><code>Symbol("id")</code></td><td>Unique keys</td></tr>
+<tr><td>object</td><td><code>{}, [], function, Date…</code></td><td>Everything else</td></tr>
+</table>
+<textarea class="code" data-lang="js" data-run>
+console.log(typeof 42, typeof "hi", typeof true, typeof undefined);
+console.log(typeof null);          // "object"  (a famous historic bug)
+console.log(typeof [], Array.isArray([]));
+console.log(typeof (() => {}));    // "function"
+
+console.log(0.1 + 0.2);            // 0.30000000000000004 (floating point!)
+console.log((0.1 + 0.2).toFixed(2), Number.EPSILON > 0);
+console.log(Number.MAX_SAFE_INTEGER, 10 / 0, "a" * 2);
+</textarea>
+
+<h2>Strings</h2>
+<textarea class="code" data-lang="js" data-run>
+const who = "world";
+console.log(`Hello, ${who}! 2 + 2 = ${2 + 2}`);   // template literal
+
+const s = "JavaScript";
+console.log(s.length, s[0], s.at(-1));
+console.log(s.toUpperCase(), s.slice(0, 4), s.includes("Script"));
+console.log(s.indexOf("S"), s.replace("Java", "Type"), s.split(""));
+console.log("  pad ".trim(), "7".padStart(3, "0"), "ha".repeat(3));
+console.log(`line 1
+line 2`);   // multiline
+</textarea>
+
+<h2>Type conversion &amp; truthiness</h2>
+<textarea class="code" data-lang="js" data-run>
+console.log(Number("42"), Number("4x2"), parseInt("42px"), parseFloat("3.5kg"));
+console.log(String(123), (123).toString(), 1 + "2", "3" * "4");
+
+// Falsy values (everything else is truthy):
+const falsy = [false, 0, -0, 0n, "", null, undefined, NaN];
+console.log(falsy.map(Boolean));
+console.log(Boolean("0"), Boolean([]), Boolean({}));   // all true!
+
+console.log(1 == "1", 1 === "1");   // loose vs strict equality
+console.log(null == undefined, null === undefined);
+console.log(NaN === NaN, Number.isNaN(NaN));
+</textarea>
+<div class="callout"><span class="label">Rule</span>Always use <code>===</code> and <code>!==</code>. The loose <code>==</code> performs surprising conversions.</div>
+
+<h2>Null-handling operators</h2>
+<textarea class="code" data-lang="js" data-run>
+const config = { retries: 0, nested: null };
+console.log(config.retries || 3);      // 3  (|| treats 0 as missing: bug!)
+console.log(config.retries ?? 3);      // 0  (?? only replaces null/undefined)
+console.log(config.nested?.value);     // undefined (optional chaining, no crash)
+let cache; cache ??= "default"; console.log(cache);
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Predict then check: <code>[] + []</code>, <code>[] + {}</code>, <code>"5" - 2</code>, <code>"5" + 2</code>, <code>true + true</code>.</li>
+<li>Write a program that stores a name and age in variables and logs a sentence using a template literal.</li>
+<li>Convert the string <code>"  42.5px "</code> to the number 42.5.</li>
+<li>Explain why <code>0.1 + 0.2 !== 0.3</code> and write a safe comparison using <code>Math.abs(a-b) &lt; Number.EPSILON</code>.</li>
+<li>Given <code>const s = "Hello, World"</code>, produce <code>"dlroW ,olleH"</code> (hint: split, reverse, join).</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>const vs let?</summary>Both are block-scoped. const can't be rebound; let can. Default to const.</details>
+<details><summary>|| vs ??</summary>|| falls back for any falsy value (0, "", false). ?? only for null and undefined.</details>
+<details><summary>Is "0" truthy?</summary>Yes. Only the empty string is falsy.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 68 — The 3D Asset Pipeline & Optimization</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="68-3d-pipeline">
+<main><article>
+<h1>Lesson 68 — The 3D asset pipeline &amp; optimization</h1>
+<p class="lede">Real 3D projects live or die on assets: how models are made, exported, compressed, loaded and budgeted. A 40 MB model that renders at 15 fps on a phone is a failed project, no matter how good the code is.</p>
+
+<h2>The pipeline</h2>
+<ol>
+<li><strong>Author</strong> in Blender (free) or another DCC tool: model, UV unwrap, texture (Substance Painter, Blender baking), rig and animate.</li>
+<li><strong>Export</strong> as <strong>glTF 2.0</strong> (<code>.glb</code> binary), "the JPEG of 3D". Apply transforms, use PBR materials (base color, metallic-roughness, normal, occlusion, emissive).</li>
+<li><strong>Optimize</strong>: reduce polygons, merge meshes/materials, compress geometry and textures, prune unused data.</li>
+<li><strong>Inspect</strong> in a glTF viewer (gltf.report, Don McCurdy's viewer, Blender re-import) and verify size, materials and animations.</li>
+<li><strong>Load</strong> in Three.js/R3F with the right decoders, lazy-load, cache and dispose.</li>
+</ol>
+
+<h2>Blender export checklist</h2>
+<ul>
+<li>Units and scale: 1 unit = 1 meter; <strong>apply scale/rotation</strong> (Ctrl+A) before export so objects aren't oddly transformed.</li>
+<li>One material per distinct look; fewer materials = fewer draw calls. Name everything meaningfully (you'll target nodes by name in code).</li>
+<li>Delete hidden/unused geometry; keep tris reasonable; normals facing outward (turn on Face Orientation overlay).</li>
+<li>Bake lighting and ambient occlusion into textures for static scenes; use lightmaps for large environments.</li>
+<li>Export glTF Binary (<code>.glb</code>), "+Y Up", include only what you need (skip cameras/lights unless used), and enable "Compression" only if you'll serve the decoder; otherwise compress afterwards with gltf-transform.</li>
+</ul>
+
+<h2>Budgets (rules of thumb, not law)</h2>
+<table>
+<tr><th>Target</th><th>Triangles on screen</th><th>Draw calls</th><th>Texture memory</th><th>Download</th></tr>
+<tr><td>Mobile-first web</td><td>100k–300k</td><td>&lt; 100</td><td>&lt; 100–150 MB GPU</td><td>&lt; 3–5 MB initial</td></tr>
+<tr><td>Desktop web</td><td>1–3M</td><td>&lt; 300–500</td><td>&lt; 500 MB GPU</td><td>&lt; 10–15 MB initial</td></tr>
+</table>
+<p>Texture <em>GPU memory</em> is width × height × 4 bytes × 1.33 (mipmaps), regardless of JPEG/PNG file size. A single 4096² texture is ≈ 90 MB uncompressed. Use GPU-compressed formats (KTX2/Basis) to cut that 4–8×.</p>
+
+<h2>Compression with gltf-transform</h2>
+<textarea class="code" data-lang="bash">
+npm i -g @gltf-transform/cli
+
+gltf-transform inspect model.glb                         # tris, materials, textures, sizes: find the heavy parts
+gltf-transform optimize model.glb out.glb \
+   --compress draco \                                    # or meshopt: smaller geometry (+ animation) with fast decode
+   --texture-compress ktx2 \                             # GPU-compressed textures (needs the KTX2 transcoder when loading)
+   --texture-size 2048                                   # downscale oversized textures
+
+# Individual steps for control:
+gltf-transform dedup in.glb out.glb && gltf-transform prune out.glb out.glb && gltf-transform weld out.glb out.glb
+gltf-transform simplify in.glb out.glb --ratio 0.5 --error 0.001     # reduce triangles
+gltf-transform resize in.glb out.glb --width 1024 --height 1024
+# R3F convenience:  npx gltfjsx model.glb --transform
+</textarea>
+<table>
+<tr><th>Format</th><th>What for</th><th>Notes</th></tr>
+<tr><td><strong>Draco</strong></td><td>Geometry compression</td><td>Great ratios; slower decode (WASM); no animation compression</td></tr>
+<tr><td><strong>Meshopt</strong></td><td>Geometry + animation compression</td><td>Fast decode, good with gzip/brotli</td></tr>
+<tr><td><strong>KTX2 / Basis Universal</strong></td><td>GPU texture compression</td><td>Stays compressed in VRAM; transcodes per device (ETC/ASTC/BCn)</td></tr>
+<tr><td><strong>WebP / AVIF</strong></td><td>Smaller downloads for textures</td><td>Decompressed to full size in VRAM, so doesn't reduce GPU memory</td></tr>
+<tr><td><strong>HDR / EXR → PMREM</strong></td><td>Environment lighting</td><td>Use small <code>.hdr</code> or <code>.exr</code> (1–2k); drei's <code>Environment</code> prefilters it</td></tr>
+</table>
+
+<h2>Loading in Three.js with decoders</h2>
+<textarea class="code" data-lang="js" data-file="loader.js">
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+
+const draco = new DRACOLoader().setDecoderPath("/draco/");                 // copy decoder files into /public
+const ktx2 = new KTX2Loader().setTranscoderPath("/basis/").detectSupport(renderer);
+
+const loader = new GLTFLoader()
+  .setDRACOLoader(draco)
+  .setKTX2Loader(ktx2)
+  .setMeshoptDecoder(MeshoptDecoder);
+
+const gltf = await loader.loadAsync("/models/robot.glb", (e) => progress(e.loaded / e.total));
+scene.add(gltf.scene);
+const mixer = new THREE.AnimationMixer(gltf.scene);
+const action = mixer.clipAction(gltf.animations.find(a => a.name === "Walk"));
+action.play();                                                              // update: mixer.update(delta) each frame
+</textarea>
+
+<h2>Runtime optimization toolkit</h2>
+<table>
+<tr><th>Problem</th><th>Fix</th></tr>
+<tr><td>Too many draw calls</td><td>Merge static meshes (<code>BufferGeometryUtils.mergeGeometries</code>), <code>InstancedMesh</code>/<code>BatchedMesh</code>, share materials, texture atlases</td></tr>
+<tr><td>Too many triangles</td><td><strong>LOD</strong> (<code>THREE.LOD</code>), simplify, normal maps instead of geometry detail, impostors/billboards for distant objects</td></tr>
+<tr><td>Fill-rate bound (big transparent overlays, post FX, high DPR)</td><td>Cap DPR (<code>Math.min(devicePixelRatio, 2)</code>), reduce post passes, avoid overdraw, smaller shadow maps, alpha-test instead of blend</td></tr>
+<tr><td>Raycasting slow on dense meshes</td><td><code>three-mesh-bvh</code> (BVH acceleration), raycast against simplified proxies</td></tr>
+<tr><td>Loading hitches</td><td>Compress, stream/lazy-load by distance or scene, preload, <code>renderer.compileAsync</code>, upload textures during a loading screen (<code>renderer.initTexture</code>)</td></tr>
+<tr><td>Memory leaks</td><td><code>geometry.dispose()</code>, <code>material.dispose()</code>, <code>texture.dispose()</code> for things you remove; watch <code>renderer.info.memory</code></td></tr>
+<tr><td>Shadows expensive</td><td>One shadow-casting light, tight shadow camera frustum, baked shadows for static objects, contact shadows</td></tr>
+<tr><td>Skinned mesh cost</td><td>Limit bones, share skeletons, use vertex animation textures for crowds</td></tr>
+</table>
+<textarea class="code" data-lang="js" data-file="lod-dispose.js">
+// LOD
+const lod = new THREE.LOD();
+lod.addLevel(highDetailMesh, 0);
+lod.addLevel(midDetailMesh, 30);
+lod.addLevel(billboardMesh, 100);
+scene.add(lod);                                           // switches by camera distance automatically
+
+// Proper cleanup
+function disposeObject(obj) {
+  obj.traverse((o) => {
+    if (!o.isMesh) return;
+    o.geometry.dispose();
+    for (const m of [].concat(o.material)) {
+      for (const v of Object.values(m)) if (v?.isTexture) v.dispose();
+      m.dispose();
+    }
+  });
+}
+console.log(renderer.info.render.calls, renderer.info.render.triangles, renderer.info.memory);
+</textarea>
+
+<h2>Measuring</h2>
+<ul>
+<li><strong>Stats panels</strong> (<code>stats.js</code>, drei <code>Stats</code>, <code>r3f-perf</code>) show FPS/frame ms; <code>renderer.info</code> shows calls, triangles and GPU memory counts.</li>
+<li><strong>Chrome DevTools</strong> Performance with the GPU track; <strong>Spector.js</strong> to inspect individual draw calls; test on a real mid-range phone, not just your laptop.</li>
+<li>Know whether you're <strong>CPU-bound</strong> (JS/draw-call overhead: frame time drops when you hide objects) or <strong>GPU-bound</strong> (frame time scales with resolution: lower DPR and see). Optimize the actual bottleneck.</li>
+</ul>
+
+<h2>Licensing and sourcing assets</h2>
+<ul>
+<li>Check licenses: CC0 (free for anything), CC-BY (credit required), no-derivatives and non-commercial restrictions exist. Keep an <code>ASSETS.md</code> with sources and licenses.</li>
+<li>Sources: Poly Haven (CC0 models, HDRIs, textures), Sketchfab (varied licenses), Quaternius, Kenney (CC0 game assets), ambientCG, Mixamo (rigs and animations).</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Download a 20+ MB glTF, run <code>gltf-transform inspect</code>, then optimize it (Draco/Meshopt + KTX2 + resize). Report size, load time and visual differences before and after.</li>
+<li>Model a simple prop in Blender (UV unwrapped, PBR textured), export <code>.glb</code>, and load it with decoders configured in Three.js.</li>
+<li>Build a scene with 200 separate meshes of 50 materials, then reduce it to &lt; 30 draw calls by merging, atlasing and instancing. Record <code>renderer.info</code> before and after.</li>
+<li>Add LOD to a forest of 2,000 trees (3 levels incl. billboard) and show triangle count drop at distance.</li>
+<li>Write a <code>disposeObject</code> and a test scene that adds/removes models 100 times; prove with <code>renderer.info.memory</code> that nothing leaks.</li>
+<li>Profile the same scene on a phone via remote debugging; identify CPU vs GPU bound and fix the top bottleneck.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why doesn't a smaller JPEG reduce GPU memory?</summary>The GPU stores textures decompressed (width × height × 4 bytes plus mipmaps). Only GPU-compressed formats like KTX2/Basis stay compressed in VRAM.</details>
+<details><summary>How do you tell CPU-bound from GPU-bound?</summary>Lower the canvas resolution: if FPS improves a lot, you're GPU/fill-rate bound. If not, reduce draw calls or JS work: if that helps, you're CPU-bound.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

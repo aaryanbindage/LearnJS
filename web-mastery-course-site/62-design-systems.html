@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 62 — Design Systems & Component Libraries</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="62-design-systems">
+<main><article>
+<h1>Lesson 62 — Design systems &amp; component libraries</h1>
+<p class="lede">A design system is shared language between design and engineering: tokens, components, patterns and rules that make products consistent and fast to build. As a developer you'll consume one, and eventually build one.</p>
+
+<h2>Layers of a design system</h2>
+<ol>
+<li><strong>Foundations / tokens</strong>: color, typography, spacing, radius, shadow, motion, breakpoints. Single source of truth (JSON → CSS variables / Tailwind theme / iOS / Android).</li>
+<li><strong>Primitives</strong>: unstyled or minimally styled accessible building blocks (Dialog, Popover, Tabs, Menu).</li>
+<li><strong>Components</strong>: Button, Input, Select, Card, Toast, Table, with variants, sizes and states.</li>
+<li><strong>Patterns</strong>: forms, empty states, navigation, data tables, onboarding flows.</li>
+<li><strong>Guidelines &amp; docs</strong>: usage, do/don't, accessibility notes, content style.</li>
+</ol>
+
+<h2>Tokens that scale: theming with semantic names</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  :root{
+    --brand-500:#7c5cff; --brand-600:#6747f0; --neutral-0:#fff; --neutral-100:#f4f2fa; --neutral-900:#16151d; --danger-500:#e5484d;
+    --space-2:.5rem; --space-3:.75rem; --space-4:1rem; --radius-md:10px; --font:system-ui,sans-serif;
+    /* semantic layer: components reference only these */
+    --surface:var(--neutral-0); --surface-muted:var(--neutral-100); --text:var(--neutral-900);
+    --action:var(--brand-500); --action-hover:var(--brand-600); --on-action:#fff; --focus:var(--brand-500);
+  }
+  [data-theme="dark"]{ --surface:#1d1b27; --surface-muted:#262434; --text:#f1f0f6; --action:#9b86ff; --action-hover:#b4a2ff; --on-action:#14121f; }
+  [data-theme="ocean"]{ --action:#0b7285; --action-hover:#095c6b; --surface-muted:#e3f6f9; }
+  body{font-family:var(--font);background:var(--surface);color:var(--text);padding:var(--space-4);transition:.2s}
+  .btn{--_bg:var(--action);background:var(--_bg);color:var(--on-action);border:0;border-radius:var(--radius-md);padding:var(--space-2) var(--space-4);font:inherit;cursor:pointer}
+  .btn:hover{--_bg:var(--action-hover)} .btn:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+  .btn[data-variant="ghost"]{background:transparent;color:var(--action);box-shadow:inset 0 0 0 1.5px var(--action)}
+  .card{background:var(--surface-muted);padding:var(--space-4);border-radius:var(--radius-md);margin-top:var(--space-3)}
+</style>
+<div>
+  <button class="btn" onclick="document.body.dataset.theme='light'">Light</button>
+  <button class="btn" data-variant="ghost" onclick="document.body.dataset.theme='dark'">Dark</button>
+  <button class="btn" data-variant="ghost" onclick="document.body.dataset.theme='ocean'">Ocean</button>
+  <div class="card"><h3 style="margin-top:0">Themeable card</h3><p>Components never mention raw colors; themes remap semantic tokens.</p></div>
+</div>
+</textarea>
+<p>Tooling: <strong>Style Dictionary</strong> or <strong>Tokens Studio</strong> transform tokens to platform outputs; Figma Variables mirror them for designers. Use <strong>OKLCH</strong> to generate perceptually even color scales and check contrast automatically in CI.</p>
+
+<h2>Headless primitives: accessibility for free</h2>
+<p>Building a correct combobox, dialog or menu (focus management, keyboard, ARIA, screen readers, touch) takes weeks. Use headless libraries that implement behavior and leave styling to you: <strong>Radix UI</strong>, <strong>React Aria</strong> (Adobe), <strong>Headless UI</strong>, <strong>Ark UI</strong>, <strong>Base UI</strong>, <strong>Ariakit</strong>.</p>
+<textarea class="code" data-lang="jsx" data-file="Dialog.tsx">
+import * as Dialog from "@radix-ui/react-dialog";
+
+export function ConfirmDelete({ onConfirm }: { onConfirm: () => void }) {
+  return (
+    <Dialog.Root>
+      <Dialog.Trigger className="btn">Delete</Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="overlay" />
+        <Dialog.Content className="dialog">                   {/* focus trap, Esc, aria-modal, scroll lock: handled */}
+          <Dialog.Title>Delete project?</Dialog.Title>
+          <Dialog.Description>This cannot be undone.</Dialog.Description>
+          <Dialog.Close className="btn" data-variant="ghost">Cancel</Dialog.Close>
+          <Dialog.Close className="btn" onClick={onConfirm}>Delete</Dialog.Close>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+</textarea>
+
+<h2>Using shadcn/ui, MUI, Chakra and friends</h2>
+<table>
+<tr><th>Approach</th><th>Example</th><th>Trade-off</th></tr>
+<tr><td><strong>Copy-in components</strong></td><td>shadcn/ui (Radix + Tailwind)</td><td>You own the code and can customize deeply; you also maintain it and merge upstream changes manually</td></tr>
+<tr><td><strong>Full design systems as packages</strong></td><td>MUI, Ant Design, Mantine, Chakra, Carbon</td><td>Fast and complete; harder to make look unique; bundle size and upgrade churn</td></tr>
+<tr><td><strong>Headless + your styling</strong></td><td>Radix/React Aria + CSS/Tailwind</td><td>Maximum control; most up-front effort</td></tr>
+<tr><td><strong>Build from scratch</strong></td><td>Your own</td><td>Only for specialized needs; accessibility is hard to get right</td></tr>
+</table>
+
+<h2>Designing component APIs</h2>
+<ul>
+<li><strong>Small, composable, predictable.</strong> Prefer composition (<code>&lt;Card&gt;&lt;Card.Header/&gt;&lt;Card.Body/&gt;&lt;/Card&gt;</code>) over giant prop lists (<code>headerTitle, headerIcon, bodyText…</code>).</li>
+<li><strong>Variants as data</strong> (<code>variant</code>, <code>size</code>, <code>tone</code>) with sensible defaults; limit combinations to what design supports.</li>
+<li><strong>Forward everything native</strong>: accept <code>className</code>, <code>ref</code>, <code>...rest</code> so consumers can attach <code>aria-*</code>, <code>data-*</code>, events.</li>
+<li><strong>Controlled and uncontrolled</strong> support (<code>value/onChange</code> and <code>defaultValue</code>).</li>
+<li><strong>Polymorphism</strong> with <code>asChild</code> (Radix Slot) or <code>as</code> prop for rendering as link vs button.</li>
+<li><strong>Accessibility built in</strong>, not optional: labels required by types, focus rings, ARIA states, keyboard behavior, reduced motion.</li>
+<li><strong>Don't leak implementation</strong>: stable public API, deprecate before removing, semantic versioning, changelog (Changesets).</li>
+</ul>
+
+<h2>Documenting and testing components</h2>
+<textarea class="code" data-lang="jsx" data-file="Button.stories.tsx">
+import type { Meta, StoryObj } from "@storybook/react";
+import { expect, userEvent, within } from "@storybook/test";
+import { Button } from "./Button";
+
+const meta = { component: Button, args: { children: "Save" }, tags: ["autodocs"] } satisfies Meta<typeof Button>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const Primary: Story = {};
+export const Disabled: Story = { args: { disabled: true } };
+export const Loading: Story = { args: { loading: true } };
+
+export const ClicksOnce: Story = {                      // interaction test runs in the browser and in CI
+  args: { onClick: fn() },
+  play: async ({ canvasElement, args }) => {
+    await userEvent.click(within(canvasElement).getByRole("button", { name: /save/i }));
+    await expect(args.onClick).toHaveBeenCalledTimes(1);
+  },
+};
+</textarea>
+<ul>
+<li><strong>Storybook</strong> documents every state, enables interaction tests, accessibility checks (addon-a11y) and visual regression (Chromatic, Playwright snapshots).</li>
+<li>Test the matrix: variants × states × themes × reduced motion × RTL × zoom.</li>
+<li>Publish as an internal npm package (tsup/Vite library mode), tree-shakeable ESM, typed, with peer dependencies on React.</li>
+</ul>
+
+<h2>Design-to-code workflow</h2>
+<ol>
+<li>Designers and engineers agree on tokens and component names first.</li>
+<li>Inspect designs in Figma Dev Mode; implement with tokens, never hard-coded values.</li>
+<li>Review in Storybook with design before merging; track adoption and detach counts.</li>
+<li>Version, document, and treat the system as a product with a roadmap and support channel.</li>
+</ol>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Create a token file (primitives + semantic), generate CSS variables with Style Dictionary, and theme an app with light, dark and one brand theme.</li>
+<li>Build <code>Button</code>, <code>Input</code>, <code>Select</code> (with Radix), <code>Dialog</code>, <code>Toast</code> and <code>Tabs</code> with variants, states, full keyboard and screen reader support. Document each in Storybook with a11y addon.</li>
+<li>Add Playwright visual regression tests for every story in light and dark themes.</li>
+<li>Install shadcn/ui in a project, then customize a component deeply to match a brand. List what you had to own afterwards.</li>
+<li>Package your components as an npm library with Changesets and consume it from a second app in a monorepo.</li>
+<li>Audit a public design system (e.g., GOV.UK, Primer, Carbon) and write a short critique of its tokens and one component's API.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why have semantic tokens on top of primitive tokens?</summary>Components reference intent (<code>--action</code>), so a theme change remaps one layer without touching component code or guessing which blue to use where.</details>
+<details><summary>Why use headless primitives?</summary>They encode hard-to-get-right accessibility and interaction behavior (focus, keyboard, ARIA) once, while leaving visual design entirely to you.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

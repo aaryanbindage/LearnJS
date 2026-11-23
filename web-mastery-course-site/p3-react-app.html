@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project 3 — Full React App</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="p3-react-app">
+<main><article>
+<h1>Project 3 — A full React app</h1>
+<p class="lede">Build a real product with routing, server data, global state, forms, tests and a deployment. Pick one idea below (or propose your own of similar scope).</p>
+
+<h2>Pick a project</h2>
+<ul>
+<li><strong>Movie/Book explorer</strong>: search a public API (TMDB, Open Library), details page, favorites list, filters in the URL.</li>
+<li><strong>Kanban board</strong>: drag cards between columns, persist to <code>localStorage</code> (or a small backend), undo/redo via a reducer.</li>
+<li><strong>Budget tracker</strong>: transactions, categories, charts, monthly summaries, CSV export.</li>
+<li><strong>Recipe app</strong>: search, scale ingredient quantities, shopping list that merges duplicate items.</li>
+</ul>
+
+<h2>Requirements</h2>
+<ol>
+<li><strong>Stack</strong>: Vite + React (TypeScript encouraged) + React Router + TanStack Query. Zustand or Context+reducer for client state.</li>
+<li><strong>Screens</strong>: at least 4 routes, including a dynamic <code>:id</code> route, 404 page and an error boundary.</li>
+<li><strong>Data</strong>: loading, error, empty, and success states for every request; request cancellation; optimistic update for at least one mutation.</li>
+<li><strong>Forms</strong>: one non-trivial form with validation (React Hook Form + Zod, or hand-rolled), accessible error messages.</li>
+<li><strong>State in the URL</strong>: search term, filters and page are shareable links.</li>
+<li><strong>Accessibility</strong>: keyboard-operable everywhere, focus management on route change and modals, Lighthouse a11y ≥ 95.</li>
+<li><strong>Performance</strong>: route-level code splitting; images lazy-loaded; no needless re-render hot spots (verified in Profiler).</li>
+<li><strong>Testing</strong>: at least 10 Testing Library tests (reducer/store logic, form validation, one async data flow with mocked network). One Playwright smoke test.</li>
+<li><strong>Quality</strong>: ESLint (with hooks plugin) + Prettier clean; meaningful commit history; README with screenshots.</li>
+<li><strong>Deployment</strong>: public URL on Netlify/Vercel/Cloudflare, deep links work.</li>
+</ol>
+
+<h2>Milestones</h2>
+<ol>
+<li>Day 1: Plan screens (sketch), data model, folder structure. Scaffold, routing skeleton, layout.</li>
+<li>Day 2: Data layer (API client + queries). List and detail pages with all four states.</li>
+<li>Day 3: Client state (favorites/cart/board), persistence, forms.</li>
+<li>Day 4: Accessibility pass, performance pass, responsive polish and dark mode.</li>
+<li>Day 5: Tests, CI (GitHub Actions running lint + tests + build), deploy, README.</li>
+</ol>
+
+<h2>Starter checklist</h2>
+<textarea class="code" data-lang="bash">
+npm create vite@latest my-app -- --template react-ts
+cd my-app
+npm i react-router-dom @tanstack/react-query zustand zod react-hook-form
+npm i -D vitest jsdom @testing-library/react @testing-library/user-event @testing-library/jest-dom eslint prettier
+git init && git add -A && git commit -m "Scaffold"
+</textarea>
+
+<section class="checkpoint"><h2>Self-review</h2>
+<details><summary>Questions a reviewer would ask you</summary>
+<ul><li>Where does each piece of state live and why there?</li>
+<li>What happens when the network is slow, offline or returns an error?</li>
+<li>Is any state derived data that you stored? Any effect that should be an event handler?</li>
+<li>Can I complete every task using only a keyboard?</li>
+<li>What would break if I deleted the <code>useMemo</code>s?</li></ul></details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

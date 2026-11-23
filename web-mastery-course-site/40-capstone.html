@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 40 — Milestone: Mini-Capstone</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="40-capstone">
+<main><article>
+<h1>Lesson 40 — Milestone: mini-capstone</h1>
+<p class="lede">Your first big integration milestone. One substantial, original, deployed product that uses everything: semantic HTML, polished CSS, solid JavaScript, a well-architected React app, and a real-time 3D experience at its heart.</p>
+
+<h2>The brief</h2>
+<p>Build a <strong>3D-enhanced web application</strong> for a real or realistic problem. The 3D must serve the product, not just decorate it. Examples:</p>
+<ul>
+<li><strong>Interactive museum/gallery</strong>: walk or fly through rooms; click artworks for details (HTML overlay); search and filter exhibits; routes for each room.</li>
+<li><strong>Furniture / car / sneaker store</strong>: 3D configurator with variants, price updates, cart, checkout flow (mocked payments), saved designs.</li>
+<li><strong>Learning tool</strong>: a solar system, molecule, anatomy or physics explorer with lessons, quizzes, progress tracking, and shareable states in the URL.</li>
+<li><strong>Portfolio 2.0</strong>: scroll-driven 3D storytelling that still works well on a phone, with fully accessible content underneath.</li>
+<li><strong>Multiplayer toy</strong>: shared 3D space with WebSockets (e.g. PartyKit, Socket.IO) where visitors see each other's cursors/avatars.</li>
+</ul>
+
+<h2>Definition of done</h2>
+<table>
+<tr><th>Area</th><th>Must have</th></tr>
+<tr><td>HTML</td><td>Semantic structure, valid markup, landmarks, real content for SEO/screen readers, meaningful titles/meta/social tags</td></tr>
+<tr><td>CSS</td><td>Design tokens, responsive 320–1920px, dark/light themes, motion with reduced-motion fallback, no layout shift</td></tr>
+<tr><td>JavaScript / TS</td><td>TypeScript strict mode, pure logic separated and unit-tested, robust error handling, no console errors</td></tr>
+<tr><td>React</td><td>Routing, server-state via TanStack Query (or equivalent), global client state, forms with validation, code-splitting, error boundaries</td></tr>
+<tr><td>Three.js</td><td>R3F or vanilla; optimized glTF; lighting/environment; raycast interaction; custom shader; instancing where needed; disposal</td></tr>
+<tr><td>Performance</td><td>Lighthouse Perf ≥ 85 on mobile for the landing view; 3D budgets documented; works at ≥ 30 FPS on a mid-range phone</td></tr>
+<tr><td>Accessibility</td><td>Keyboard-operable UI, focus management, text alternatives for 3D content, pause/skip motion, contrast ≥ 4.5:1</td></tr>
+<tr><td>Quality</td><td>ESLint + Prettier, ≥ 15 automated tests (unit + component), 1 Playwright flow, CI running lint/test/build</td></tr>
+<tr><td>Delivery</td><td>Public URL, README with architecture diagram, screenshots/GIF, decisions and trade-offs, how to run and test</td></tr>
+</table>
+
+<h2>Suggested plan (3 weeks)</h2>
+<ol>
+<li><strong>Week 1 — Foundations</strong>: product brief and user stories; wireframes; data model; design tokens; app shell with routing; block-out 3D scene; CI and deployment set up on day one.</li>
+<li><strong>Week 2 — Features</strong>: 3D assets, interaction, state, forms, API/data layer, accessibility of every flow, tests alongside code.</li>
+<li><strong>Week 3 — Polish</strong>: look-dev (materials, lighting, post), performance pass, mobile pass, error/empty/loading states, docs, usability test with 3 real people, fix what they stumble on.</li>
+</ol>
+
+<h2>Skills self-assessment</h2>
+<p>Rate yourself honestly: 1 = need to look it up every time, 3 = comfortable, 5 = could teach it. Anything below 3 is your next revision target.</p>
+<table>
+<tr><th>Topic</th><th>Can you do this without tutorials?</th></tr>
+<tr><td>HTML</td><td>Build an accessible multi-page site with forms and landmarks</td></tr>
+<tr><td>CSS</td><td>Lay out any design with flex/grid; explain specificity and the cascade; animate performantly</td></tr>
+<tr><td>JS core</td><td>Explain closures, <code>this</code>, the event loop; write async code with proper error handling</td></tr>
+<tr><td>Browser APIs</td><td>DOM, events, fetch, storage, observers</td></tr>
+<tr><td>Tooling</td><td>Vite, npm, Git, ESLint, testing, debugging with DevTools</td></tr>
+<tr><td>React</td><td>State, effects, custom hooks, context, routing, performance, testing</td></tr>
+<tr><td>Three.js</td><td>Scene graph, materials/lights, loaders, raycasting, shaders, optimization</td></tr>
+<tr><td>R3F</td><td>Use hooks, drei, and shared state without re-render pitfalls</td></tr>
+</table>
+
+<h2>Where this fits</h2><p>This is a <em>milestone</em>, not the finish line. Parts 6–11 (Lessons 41–80) cover professional CSS, advanced TypeScript, backend and full-stack work, advanced React and 3D, and professional practice, ending with the final capstone in Lesson 80.</p>
+<h2>Keep mastering</h2>
+<ul>
+<li><strong>Read code daily</strong>: Three.js examples, React docs source, open-source apps.</li>
+<li><strong>Build small things constantly</strong>: one weekend project a month beats any course.</li>
+<li><strong>Teach</strong>: write a blog post or record a screencast on something that confused you.</li>
+<li><strong>Go deeper</strong>: browser internals (rendering pipeline), HTTP/caching, web security (XSS/CSRF/CSP), TypeScript advanced types, Node/databases, WebGPU, accessibility certification (IAAP).</li>
+<li><strong>Resources</strong>: MDN Web Docs, javascript.info, react.dev, web.dev, threejs.org/docs + examples, Three.js Journey, The Book of Shaders, pmndrs docs.</li>
+</ul>
+
+<div class="callout"><span class="label">Milestone reached</span>If you finish this you can already build and ship serious front-end and 3D work. Keep going: the next 40 lessons turn you from a strong front-end developer into a full-stack, production-grade engineer.</div>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 12 — Functions, Scope & Closures</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="12-js-functions">
+<main><article>
+<h1>Lesson 12 — Functions, scope &amp; closures</h1>
+<p class="lede">Functions are values: you can store them, pass them, and return them. This idea powers everything from event handlers to React.</p>
+
+<h2>Defining functions</h2>
+<textarea class="code" data-lang="js" data-run>
+function add(a, b) { return a + b; }            // declaration (hoisted)
+const mul = function (a, b) { return a * b; };  // expression
+const sub = (a, b) => a - b;                    // arrow, implicit return
+const square = x => x * x;                      // single param: no parens needed
+const makeUser = (name) => ({ name, active: true }); // returning an object: wrap in ()
+
+console.log(add(2, 3), mul(2, 3), sub(5, 1), square(4), makeUser("Ada"));
+
+// Parameters
+function greet(name = "friend", ...rest) {       // default + rest
+  return `Hi ${name}` + (rest.length ? ` (+${rest.length} more)` : "");
+}
+console.log(greet(), greet("Ada"), greet("Ada", 1, 2, 3));
+console.log(Math.max(...[3, 9, 2]));             // spread into arguments
+</textarea>
+<p>A function with no <code>return</code> returns <code>undefined</code>. Missing arguments are <code>undefined</code>. Prefer one clear purpose per function and descriptive verbs for names (<code>getUser</code>, <code>isValid</code>).</p>
+
+<h2>Scope</h2>
+<textarea class="code" data-lang="js" data-run>
+const global = "everywhere";
+function outer() {
+  const a = "outer-only";
+  if (true) {
+    let block = "block-only";      // let/const are BLOCK scoped
+    var leaky = "var ignores blocks";
+    console.log(global, a, block);
+  }
+  console.log(leaky);
+  // console.log(block);           // ReferenceError
+  function inner() { return a + " is visible to inner"; }   // lexical scope
+  return inner();
+}
+console.log(outer());
+
+// Hoisting & the temporal dead zone
+console.log(hoisted());            // works: declarations are hoisted
+function hoisted() { return "ok"; }
+try { console.log(tdz); } catch (e) { console.log(e.name); }   // ReferenceError
+let tdz = 1;
+</textarea>
+<p><strong>Lexical scope</strong>: a function can see variables from where it was <em>written</em>, searching outward through enclosing scopes (the scope chain).</p>
+
+<h2>Closures</h2>
+<p>A closure is a function that remembers the variables of the scope it was created in, even after that scope has finished.</p>
+<textarea class="code" data-lang="js" data-run>
+function makeCounter() {
+  let count = 0;                       // private state
+  return {
+    inc: () => ++count,
+    dec: () => --count,
+    get value() { return count; },
+  };
+}
+const a = makeCounter(), b = makeCounter();
+a.inc(); a.inc(); b.inc();
+console.log(a.value, b.value);         // 2 1: separate closures
+
+// Practical: function factories
+const multiplyBy = n => x => x * n;
+const double = multiplyBy(2), triple = multiplyBy(3);
+console.log(double(5), triple(5));
+
+// Classic loop gotcha
+const fnsVar = [], fnsLet = [];
+for (var i = 0; i < 3; i++) fnsVar.push(() => i);
+for (let j = 0; j < 3; j++) fnsLet.push(() => j);
+console.log(fnsVar.map(f => f()), fnsLet.map(f => f()));   // [3,3,3] vs [0,1,2]
+</textarea>
+
+<h2>Higher-order functions</h2>
+<textarea class="code" data-lang="js" data-run>
+const nums = [1, 2, 3, 4, 5, 6];
+console.log(nums.map(n => n * 2));
+console.log(nums.filter(n => n % 2 === 0));
+console.log(nums.reduce((sum, n) => sum + n, 0));
+
+// Write your own
+function repeat(times, fn) { for (let i = 0; i < times; i++) fn(i); }
+repeat(3, i => console.log("run", i));
+
+// Compose / debounce style utilities
+const compose = (...fns) => x => fns.reduceRight((v, f) => f(v), x);
+console.log(compose(x => x + 1, x => x * 2)(5));      // (5*2)+1 = 11
+
+function once(fn) { let done = false, r; return (...a) => done ? r : (done = true, r = fn(...a)); }
+const init = once(() => { console.log("initialized!"); return 42; });
+console.log(init(), init());
+</textarea>
+
+<h2>Pure functions &amp; side effects</h2>
+<p>A <strong>pure</strong> function returns the same output for the same input and changes nothing outside itself. Pure functions are easy to test and are central to React. Mutating arguments, writing to globals, or reading the clock are <em>side effects</em>.</p>
+<textarea class="code" data-lang="js" data-run>
+const impure = (arr) => { arr.push(99); return arr; };   // mutates input
+const pure   = (arr) => [...arr, 99];                    // returns a new array
+const original = [1, 2];
+pure(original); console.log(original);
+impure(original); console.log(original);
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Write <code>makeCounter(start, step)</code> with <code>inc</code>, <code>reset</code>, and <code>value</code>.</li>
+<li>Implement your own <code>map</code>, <code>filter</code> and <code>reduce</code> as plain functions taking an array and a callback.</li>
+<li>Implement <code>memoize(fn)</code>: cache results by argument. Test with a slow Fibonacci.</li>
+<li>Implement <code>debounce(fn, ms)</code> (use <code>setTimeout</code>/<code>clearTimeout</code>).</li>
+<li>Implement <code>curry(fn)</code> so <code>curry((a,b,c)=>a+b+c)(1)(2)(3) === 6</code>.</li>
+<li>Explain the output of the <code>var</code> loop closure example in your own words.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>What is a closure, in one sentence?</summary>A function bundled with references to the variables of the scope where it was defined, so it keeps access to them later.</details>
+<details><summary>Declaration vs arrow functions?</summary>Declarations are hoisted and have their own <code>this</code>/<code>arguments</code>; arrows are expressions, have no own <code>this</code> or <code>arguments</code>, and can't be constructors (more in Lesson 18).</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

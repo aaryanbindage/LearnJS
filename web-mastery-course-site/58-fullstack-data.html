@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 58 — Full-Stack Data: ORMs, Server Actions, Caching</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="58-fullstack-data">
+<main><article>
+<h1>Lesson 58 — Full-stack data: ORMs, Server Actions &amp; caching</h1>
+<p class="lede">Connect the database to your UI safely and ergonomically: typed queries, mutations from forms, cache invalidation and uploads.</p>
+
+<h2>ORMs and query builders</h2>
+<table>
+<tr><th>Tool</th><th>Style</th><th>Notes</th></tr>
+<tr><td><strong>Prisma</strong></td><td>Schema file → generated typed client</td><td>Great DX, migrations, Studio GUI; its own query language</td></tr>
+<tr><td><strong>Drizzle ORM</strong></td><td>SQL-like TypeScript schema and queries</td><td>Lightweight, close to SQL, great for edge/serverless</td></tr>
+<tr><td><strong>Kysely</strong></td><td>Type-safe SQL query builder</td><td>No schema magic; you write the SQL structure</td></tr>
+<tr><td>Raw SQL (<code>pg</code>, <code>postgres.js</code>)</td><td>Full control</td><td>Fastest to reason about performance; manual typing</td></tr>
+</table>
+<p>ORMs remove boilerplate and give types, but they can generate poor queries. Learn SQL first (Lesson 55) and inspect the SQL your ORM emits.</p>
+<textarea class="code" data-lang="js" data-file="prisma/schema.prisma">
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  posts     Post[]
+  createdAt DateTime @default(now())
+}
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  published Boolean  @default(false)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId  String
+  tags      Tag[]
+  createdAt DateTime @default(now())
+  @@index([authorId, createdAt])
+}
+model Tag { id Int @id @default(autoincrement()); name String @unique; posts Post[] }
+</textarea>
+<textarea class="code" data-lang="bash">
+npx prisma migrate dev --name init     # create + apply a migration, regenerate the client
+npx prisma studio                      # browse data in a GUI
+npx prisma migrate deploy              # apply migrations in production (CI/CD)
+</textarea>
+<textarea class="code" data-lang="js" data-file="queries.ts">
+import { prisma } from "@/lib/prisma";   // one shared client instance (avoid creating many in dev hot reload)
+
+// Read: select only what you need; fetch relations in ONE query to avoid N+1
+const posts = await prisma.post.findMany({
+  where: { published: true, author: { email: { endsWith: "@example.com" } } },
+  select: { id: true, title: true, author: { select: { name: true } }, tags: true },
+  orderBy: { createdAt: "desc" },
+  take: 20,
+});
+
+// Write with a transaction: everything succeeds or nothing does
+await prisma.$transaction(async (tx) => {
+  const post = await tx.post.create({ data: { title, body, authorId } });
+  await tx.auditLog.create({ data: { action: "post.create", entityId: post.id, userId: authorId } });
+});
+
+// Drizzle equivalent shape:
+// const rows = await db.select().from(posts).where(eq(posts.published, true)).orderBy(desc(posts.createdAt)).limit(20);
+</textarea>
+
+<h2>Server Actions: mutations without writing an API</h2>
+<p>A Server Action is an async function marked <code>"use server"</code> that you can call from forms and client components. Under the hood it's an HTTP POST endpoint, so <strong>treat it as a public API</strong>: authenticate, authorize and validate inside every action.</p>
+<textarea class="code" data-lang="jsx" data-file="src/app/actions.ts">
+"use server";
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+const CreatePost = z.object({ title: z.string().trim().min(3).max(120), body: z.string().min(1) });
+
+export type FormState = { ok: boolean; errors?: Record<string, string[]> };
+
+export async function createPost(prev: FormState, formData: FormData): Promise<FormState> {
+  const session = await auth();                                  // 1. authenticate
+  if (!session?.user) throw new Error("Unauthorized");
+
+  const parsed = CreatePost.safeParse(Object.fromEntries(formData));   // 2. validate (never trust FormData)
+  if (!parsed.success) return { ok: false, errors: parsed.error.flatten().fieldErrors };
+
+  const post = await prisma.post.create({                         // 3. authorize by construction: author = session user
+    data: { ...parsed.data, authorId: session.user.id },
+  });
+
+  revalidatePath("/posts");                                       // 4. refresh cached pages that list posts
+  redirect(`/posts/${post.id}`);
+}
+</textarea>
+<textarea class="code" data-lang="jsx" data-file="src/app/posts/new/NewPostForm.tsx">
+"use client";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
+import { createPost, type FormState } from "@/app/actions";
+
+function Submit() {
+  const { pending } = useFormStatus();                            // knows about the parent form's submission
+  return <button disabled={pending}>{pending ? "Saving…" : "Publish"}</button>;
+}
+
+export function NewPostForm() {
+  const [state, action] = useActionState<FormState, FormData>(createPost, { ok: false });
+  return (
+    <form action={action}>
+      <label>Title <input name="title" required aria-describedby="title-err" /></label>
+      <p id="title-err" role="alert">{state.errors?.title?.[0]}</p>
+      <label>Body &lt;textarea name="body" required /></label>
+      <Submit />
+    </form>
+  );
+}
+</textarea>
+<p>This form works <strong>before JavaScript loads</strong> (progressive enhancement), because it's a real <code>&lt;form&gt;</code>. Optimistic UI: <code>useOptimistic</code> shows the expected result instantly and reconciles when the server responds.</p>
+
+<h2>Caching and invalidation</h2>
+<p>"There are only two hard things in computer science: cache invalidation and naming things." Caches exist at every layer:</p>
+<table>
+<tr><th>Layer</th><th>Tool</th><th>Invalidate with</th></tr>
+<tr><td>Browser / CDN</td><td><code>Cache-Control</code>, <code>ETag</code>, hashed filenames</td><td>New filename / purge / short TTL</td></tr>
+<tr><td>Framework</td><td>Next.js data and route cache, <code>unstable_cache</code>/<code>use cache</code></td><td><code>revalidatePath</code>, <code>revalidateTag</code>, TTL</td></tr>
+<tr><td>Application</td><td>Redis/Upstash, in-memory LRU</td><td>Delete on write, TTL, versioned keys</td></tr>
+<tr><td>Client state</td><td>TanStack Query</td><td><code>queryClient.invalidateQueries({ queryKey })</code></td></tr>
+<tr><td>Database</td><td>Query planner, materialized views, read replicas</td><td>Refresh strategy</td></tr>
+</table>
+<textarea class="code" data-lang="js" data-file="cache-aside.ts">
+// Cache-aside pattern with Redis
+async function getProduct(id: string) {
+  const key = `product:${id}`;
+  const hit = await redis.get(key);
+  if (hit) return JSON.parse(hit);
+  const product = await prisma.product.findUnique({ where: { id } });
+  if (product) await redis.set(key, JSON.stringify(product), { EX: 300 });   // 5 min TTL
+  return product;
+}
+async function updateProduct(id: string, data: object) {
+  const p = await prisma.product.update({ where: { id }, data });
+  await redis.del(`product:${id}`);                       // invalidate on write
+  return p;
+}
+// Beware cache stampedes (many misses at once): use locks, request coalescing or stale-while-revalidate.
+</textarea>
+
+<h2>Files and uploads</h2>
+<ol>
+<li>Server creates a <strong>presigned upload URL</strong> (S3, Cloudflare R2, Supabase Storage, UploadThing) after checking auth and file type/size limits.</li>
+<li>Browser uploads directly to object storage (the file never passes through your server).</li>
+<li>Client tells your server the final object key; server saves metadata in the DB and queues post-processing (resize, virus scan).</li>
+<li>Serve through a CDN with image transformation; keep private files behind signed URLs.</li>
+</ol>
+
+<h2>Data integrity patterns</h2>
+<ul>
+<li><strong>Optimistic concurrency</strong>: add a <code>version</code> column; <code>UPDATE … WHERE id=$1 AND version=$2</code>; if 0 rows updated, someone else changed it (return 409).</li>
+<li><strong>Soft deletes</strong>, <strong>audit trails</strong>, <strong>outbox pattern</strong> (write an event row in the same transaction, a worker publishes it) for reliable side effects.</li>
+<li><strong>Seed and test data</strong>: factories, a seed script, ephemeral test databases (Docker, Testcontainers).</li>
+<li><strong>Backups and migrations</strong>: automated backups with tested restores; backwards-compatible migrations (add column → deploy code → backfill → enforce → drop old).</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Model a blog (users, posts, comments, tags) in Prisma or Drizzle, run migrations, seed data, and inspect the generated SQL for a nested query.</li>
+<li>Build create/edit/delete post pages with Server Actions, Zod validation, field errors, <code>useActionState</code>, pending UI and <code>revalidatePath</code>.</li>
+<li>Add optimistic UI for likes with <code>useOptimistic</code>; make the server action fail intermittently and handle rollback.</li>
+<li>Implement cache-aside with Redis/Upstash for a hot query; measure latency before and after; implement safe invalidation.</li>
+<li>Implement presigned uploads to R2/S3 with size/type limits and an image resize job.</li>
+<li>Implement optimistic concurrency control with a <code>version</code> column and show a conflict UI.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why validate inside a Server Action even though the form validates?</summary>Server Actions are public HTTP endpoints; anyone can call them directly with arbitrary data, so server-side validation and authorization are mandatory.</details>
+<details><summary>What is an N+1 query and how does an ORM help or hurt?</summary>One query for a list plus one per item. ORMs can make it easy to trigger accidentally by lazy-loading; use eager loading/includes or joins to fetch relations in a single query.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 42 — Tailwind CSS & Utility-First Design</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="42-tailwind">
+<main><article>
+<h1>Lesson 42 — Tailwind CSS &amp; utility-first design</h1>
+<p class="lede">Tailwind gives you small single-purpose classes (<code>p-4</code>, <code>flex</code>, <code>text-lg</code>) that you compose in markup. It is the most widely used CSS approach in modern React projects, so you need to be fluent in it, and to know when not to use it.</p>
+
+<h2>Why it works</h2>
+<ul>
+<li><strong>No naming</strong>: you stop inventing class names.</li>
+<li><strong>Constrained design system</strong>: spacing, colors and sizes come from a scale, so UIs look consistent.</li>
+<li><strong>Local changes</strong>: editing a component's classes can't break another page.</li>
+<li><strong>Small CSS</strong>: only classes you use are generated (the file stops growing).</li>
+</ul>
+<p>Costs: long class lists, a learning curve for the vocabulary, and you must still understand CSS. Tailwind is a way of <em>writing</em> CSS, not a replacement for knowing it.</p>
+
+<h2>Try it (live, via CDN)</h2>
+<p>This demo uses the Tailwind browser build for convenience. Real projects use the build step below. Edit the classes and watch the result.</p>
+<textarea class="code" data-lang="html" data-run data-height="360px">
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<body class="bg-slate-100 p-6 font-sans">
+  <article class="max-w-sm rounded-2xl bg-white p-6 shadow-lg ring-1 ring-slate-200">
+    <div class="flex items-center gap-4">
+      <div class="grid size-12 place-items-center rounded-full bg-violet-600 text-lg font-bold text-white">A</div>
+      <div>
+        <h2 class="text-lg font-semibold leading-tight text-slate-900">Ada Lovelace</h2>
+        <p class="text-sm text-slate-500">Mathematician</p>
+      </div>
+    </div>
+    <p class="mt-4 text-slate-600">Wrote the first algorithm intended for a machine.</p>
+    <button class="mt-5 w-full rounded-lg bg-violet-600 px-4 py-2 font-medium text-white
+                   transition hover:bg-violet-700 focus-visible:outline focus-visible:outline-2
+                   focus-visible:outline-offset-2 focus-visible:outline-violet-600
+                   active:scale-[.98] sm:w-auto">
+      Follow
+    </button>
+  </article>
+</body>
+</textarea>
+
+<h2>Vocabulary map</h2>
+<table>
+<tr><th>Concept</th><th>Classes</th></tr>
+<tr><td>Spacing (1 unit = 0.25rem)</td><td><code>p-4 px-6 py-2 m-2 mx-auto mt-8 gap-4 space-y-2</code></td></tr>
+<tr><td>Sizing</td><td><code>w-full w-1/2 max-w-md h-screen min-h-0 size-10 aspect-video</code></td></tr>
+<tr><td>Layout</td><td><code>flex items-center justify-between grid grid-cols-3 col-span-2 hidden block</code></td></tr>
+<tr><td>Typography</td><td><code>text-sm text-2xl font-bold leading-6 tracking-tight truncate text-balance</code></td></tr>
+<tr><td>Color</td><td><code>bg-slate-900 text-white border-red-500 ring-2 bg-black/50</code> (opacity slash)</td></tr>
+<tr><td>Border / effects</td><td><code>rounded-xl border shadow-md ring-1 opacity-50 blur-sm backdrop-blur</code></td></tr>
+<tr><td>State variants</td><td><code>hover: focus: focus-visible: active: disabled: group-hover: peer-checked:</code></td></tr>
+<tr><td>Responsive (mobile-first)</td><td><code>sm: md: lg: xl: 2xl:</code> e.g. <code>w-full md:w-1/2</code></td></tr>
+<tr><td>Dark mode</td><td><code>dark:bg-slate-900 dark:text-slate-100</code></td></tr>
+<tr><td>Arbitrary values</td><td><code>w-[37rem] bg-[#1da1f2] grid-cols-[1fr_2fr] top-[calc(100%-1px)]</code></td></tr>
+</table>
+
+<h2>Real project setup (Vite)</h2>
+<textarea class="code" data-lang="bash">
+npm install tailwindcss @tailwindcss/vite
+</textarea>
+<textarea class="code" data-lang="js" data-file="vite.config.js">
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+export default defineConfig({ plugins: [react(), tailwindcss()] });
+</textarea>
+<textarea class="code" data-lang="css" data-file="src/index.css">
+@import "tailwindcss";
+
+/* Tailwind v4: configure in CSS with @theme (design tokens become CSS variables) */
+@theme {
+  --color-brand: #7c5cff;
+  --color-brand-dark: #5b3df5;
+  --font-display: "Inter", system-ui, sans-serif;
+  --breakpoint-3xl: 120rem;
+}
+</textarea>
+<div class="callout"><span class="label">Version note</span>The snippet above is Tailwind v4 (CSS-first config). Tailwind v3 uses <code>tailwind.config.js</code> plus <code>@tailwind base/components/utilities</code> directives. Check tailwindcss.com/docs for the setup matching your version; class names are mostly the same.</div>
+
+<h2>Managing long class lists</h2>
+<textarea class="code" data-lang="jsx" data-file="Button.jsx">
+import { cva } from "class-variance-authority";   // variants as data
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge";         // resolves conflicts: "p-2 p-4" → "p-4"
+
+const button = cva(
+  "inline-flex items-center justify-center rounded-lg font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50",
+  {
+    variants: {
+      variant: {
+        primary: "bg-brand text-white hover:bg-brand-dark",
+        ghost: "bg-transparent text-brand hover:bg-brand/10",
+      },
+      size: { sm: "h-8 px-3 text-sm", md: "h-10 px-4", lg: "h-12 px-6 text-lg" },
+    },
+    defaultVariants: { variant: "primary", size: "md" },
+  }
+);
+
+export const cn = (...inputs) => twMerge(clsx(inputs));        // the helper you'll see everywhere
+
+export function Button({ variant, size, className, ...props }) {
+  return <button className={cn(button({ variant, size }), className)} {...props} />;
+}
+</textarea>
+<ul>
+<li><strong>Extract components, not CSS classes.</strong> Repeat a pattern? Make a React component, not an <code>@apply</code> rule.</li>
+<li>Sort classes automatically with <code>prettier-plugin-tailwindcss</code>.</li>
+<li>Never build class names dynamically (<code>`text-${color}-500`</code>): the scanner can't see them. Use complete strings or a lookup map.</li>
+</ul>
+
+<h2>Tailwind vs the alternatives</h2>
+<table>
+<tr><th>Choose</th><th>When</th></tr>
+<tr><td>Tailwind</td><td>Product UIs, teams wanting consistency and speed, React/Next projects, prototyping</td></tr>
+<tr><td>CSS Modules / plain CSS</td><td>Content sites, highly bespoke art-directed pages, strict separation of concerns, long-lived libraries</td></tr>
+<tr><td>Component libraries (shadcn/ui, Radix Themes, MUI)</td><td>You want accessible components immediately. <strong>shadcn/ui</strong> copies Tailwind + Radix components into your repo so you own the code</td></tr>
+</table>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Recreate your Project 1 hero and project cards in Tailwind, mobile-first, with dark mode.</li>
+<li>Build a pricing table (3 tiers) with a highlighted middle tier, using <code>group-hover</code> and responsive grid.</li>
+<li>Build a <code>Button</code> with <code>cva</code> variants and <code>tailwind-merge</code>; show that a passed <code>className</code> overrides correctly.</li>
+<li>Define your brand tokens in <code>@theme</code> and use them as <code>bg-brand</code>, <code>font-display</code>.</li>
+<li>Build an accessible toggle using <code>peer</code> and a hidden checkbox.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why can't I build `text-${color}-500` dynamically?</summary>Tailwind generates CSS by scanning source for complete class names. A string assembled at runtime never appears in the source, so no CSS is generated.</details>
+<details><summary>Is Tailwind "just inline styles"?</summary>No. It supports media queries, pseudo-classes, dark mode, a constrained design scale and small output CSS, none of which inline styles can do.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

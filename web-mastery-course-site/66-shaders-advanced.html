@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 66 — Advanced Shaders & Post-Processing</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="66-shaders-advanced">
+<main><article>
+<h1>Lesson 66 — Advanced shaders &amp; post-processing</h1>
+<p class="lede">Shaders run on the GPU, in parallel for every vertex and pixel. Mastering them unlocks effects no built-in material can do: water, force fields, dissolves, toon rendering, GPU particles and screen-space effects.</p>
+
+<h2>Pipeline recap</h2>
+<ol>
+<li><strong>Vertex shader</strong> runs per vertex: outputs <code>gl_Position</code> (clip space). Great for displacement, waves, wind, skinning.</li>
+<li>GPU rasterizes triangles and <em>interpolates</em> outputs (<code>varying</code>s) across each face.</li>
+<li><strong>Fragment shader</strong> runs per pixel: outputs a color. Great for lighting, texturing, patterns, effects.</li>
+</ol>
+<p>Uniforms are constants per draw call (time, resolution, colors, textures). Attributes are per-vertex data (position, uv, normal). Think in <strong>normalized coordinates and math functions</strong>: <code>mix</code>, <code>smoothstep</code>, <code>step</code>, <code>fract</code>, <code>sin</code>, <code>length</code>, <code>dot</code>, <code>pow</code>.</p>
+
+<h2>Live: a ShaderMaterial with displacement and fresnel</h2>
+<textarea class="code" data-lang="html" data-run data-height="480px">
+<style>html,body{margin:0;height:100%;background:#0b0a10;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.append(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100); camera.position.set(0, 0, 4);
+new OrbitControls(camera, renderer.domElement).enableDamping = true;
+
+const material = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uA: { value: new THREE.Color("#7c5cff") }, uB: { value: new THREE.Color("#14e0a3") }, uAmp: { value: 0.25 } },
+  vertexShader: /* glsl */`
+    uniform float uTime; uniform float uAmp;
+    varying vec3 vNormal; varying vec3 vViewDir; varying float vWave;
+    void main() {
+      vec3 p = position;
+      float wave = sin(p.y * 4.0 + uTime * 2.0) * sin(p.x * 3.0 + uTime) * uAmp;
+      p += normal * wave;                                   // displace along the normal
+      vWave = wave;
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vNormal = normalize(normalMatrix * normal);           // approximate (ignores displaced normals)
+      vViewDir = normalize(-mv.xyz);
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: /* glsl */`
+    uniform vec3 uA; uniform vec3 uB; uniform float uTime;
+    varying vec3 vNormal; varying vec3 vViewDir; varying float vWave;
+    void main() {
+      float fresnel = pow(1.0 - max(dot(normalize(vNormal), normalize(vViewDir)), 0.0), 3.0);   // bright at grazing angles
+      vec3 base = mix(uA, uB, vWave * 2.0 + 0.5);
+      float bands = smoothstep(0.4, 0.5, fract(vWave * 12.0 + uTime * 0.2));                  // animated contour lines
+      vec3 col = base * (0.35 + 0.65 * bands) + fresnel * vec3(0.9, 0.95, 1.0);
+      gl_FragColor = vec4(col, 1.0);
+      #include <colorspace_fragment>
+    }`,
+});
+const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1.2, 64), material);
+scene.add(mesh);
+
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => { material.uniforms.uTime.value = clock.getElapsedTime(); mesh.rotation.y += 0.003; renderer.render(scene, camera); });
+</script>
+</textarea>
+
+<h2>Extending built-in materials (keep lighting, add your effect)</h2>
+<p>Writing a full lighting model yourself is a lot of work. Instead, patch the built-in shader with <code>onBeforeCompile</code> (or use drei's <code>shaderMaterial</code> / three-custom-shader-material).</p>
+<textarea class="code" data-lang="js" data-file="patch.js">
+const mat = new THREE.MeshStandardMaterial({ color: "#88aaff", roughness: 0.4 });
+mat.onBeforeCompile = (shader) => {
+  shader.uniforms.uTime = { value: 0 };
+  mat.userData.shader = shader;                                   // keep a handle to update uniforms later
+  shader.vertexShader = shader.vertexShader
+    .replace("#include <common>", "#include <common>\nuniform float uTime;")
+    .replace("#include <begin_vertex>", `#include <begin_vertex>
+      transformed.y += sin(position.x * 3.0 + uTime) * 0.1;`);     // wind sway, still PBR lit and shadowed
+};
+// each frame: if (mat.userData.shader) mat.userData.shader.uniforms.uTime.value = t;
+// If you change shader code after first render, set mat.customProgramCacheKey = () => "variant-id".
+</textarea>
+
+<h2>Techniques</h2>
+<table>
+<tr><th>Effect</th><th>Idea</th></tr>
+<tr><td><strong>Dissolve</strong></td><td>Sample noise; <code>discard</code> where noise &lt; threshold; add an emissive edge where noise ≈ threshold</td></tr>
+<tr><td><strong>Toon / cel shading</strong></td><td>Quantize <code>dot(normal, light)</code> with <code>step</code>/gradient texture; add outlines with inverted-hull or post-process</td></tr>
+<tr><td><strong>Water</strong></td><td>Sum of sines or noise for waves; normal maps scrolling; fresnel blend of reflection/refraction; depth-based foam</td></tr>
+<tr><td><strong>Triplanar mapping</strong></td><td>Texture by world position along 3 axes: no UV stretching on terrain/cliffs</td></tr>
+<tr><td><strong>GPU particles</strong></td><td>Store state in textures; update with a ping-pong render target (<code>GPUComputationRenderer</code>) or compute shaders (Lesson 67)</td></tr>
+<tr><td><strong>Raymarching / SDF</strong></td><td>Render implicit shapes in a fragment shader by marching rays through a distance function: metaballs, fractals, soft blends</td></tr>
+<tr><td><strong>Vertex animation textures</strong></td><td>Bake complex animation/simulation into textures; play on the GPU (crowds, cloth)</td></tr>
+</table>
+
+<h2>Post-processing</h2>
+<p>Render the scene to a texture, then run full-screen passes over it: bloom, depth of field, SSAO, color grading, vignette, chromatic aberration, outlines. Each pass costs fill-rate, so budget carefully on mobile.</p>
+<textarea class="code" data-lang="js" data-file="post.js">
+import { EffectComposer, RenderPass, EffectPass, BloomEffect, VignetteEffect, SMAAEffect } from "postprocessing";   // pmndrs/postprocessing: merges effects into few passes
+
+const composer = new EffectComposer(renderer, { multisampling: 0, frameBufferType: THREE.HalfFloatType });   // HDR buffer so bloom can see >1.0
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new EffectPass(camera,
+  new BloomEffect({ intensity: 1.2, luminanceThreshold: 1.0, mipmapBlur: true }),   // only HDR-bright pixels glow
+  new VignetteEffect({ darkness: 0.5 }),
+));
+composer.addPass(new EffectPass(camera, new SMAAEffect()));                         // antialias after effects
+renderer.setAnimationLoop(() => composer.render());                                  // NOT renderer.render
+
+// R3F:  <EffectComposer><Bloom mipmapBlur luminanceThreshold={1} /><Vignette /></EffectComposer>  (@react-three/postprocessing)
+// For bloom on specific objects, give them emissive colors with intensity > 1 and tone mapping on the composer's end.
+</textarea>
+<p>Custom full-screen effect: write a fragment shader that samples <code>tDiffuse</code> (the rendered scene) at <code>vUv</code> and returns a modified color (e.g., pixelate by snapping UVs, or RGB split by offsetting each channel).</p>
+<textarea class="code" data-lang="js" data-file="custom-pass.js">
+import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+const Pixelate = {
+  uniforms: { tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(innerWidth, innerHeight) }, uSize: { value: 6 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position, 1.0); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uSize; varying vec2 vUv;
+    void main(){ vec2 cell = uSize / uRes; vec2 uv = (floor(vUv / cell) + 0.5) * cell; gl_FragColor = texture2D(tDiffuse, uv); }`,
+};
+composer.addPass(new ShaderPass(Pixelate));
+</textarea>
+
+<h2>Debugging shaders</h2>
+<ul>
+<li>Output intermediate values as colors: <code>gl_FragColor = vec4(vec3(value), 1.0)</code>, <code>normal * 0.5 + 0.5</code>, <code>vec3(vUv, 0.0)</code>.</li>
+<li>GLSL is strict: <code>1</code> vs <code>1.0</code>, matching vector sizes, no implicit conversions. Read the compile log in the console.</li>
+<li>Tools: Spector.js (capture GL calls), Shadertoy (prototype fragment shaders), The Book of Shaders (learn), Chrome's Performance panel and GPU profiling, <code>renderer.info</code>.</li>
+<li>Performance: avoid branching on divergent conditions, minimize texture reads and <code>pow/sin</code> in hot loops, lower precision on mobile (<code>mediump</code> where safe), don't overdraw large transparent layers.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Work through The Book of Shaders chapters 1–11; port three of your Shadertoy experiments to a Three.js <code>ShaderMaterial</code>.</li>
+<li>Implement a dissolve effect on a glTF model by patching <code>MeshStandardMaterial</code> with <code>onBeforeCompile</code>, driven by a uniform slider.</li>
+<li>Write a stylized water plane: animated normals, fresnel, depth fade using the depth texture, foam at the shoreline.</li>
+<li>Build a toon material with a 3-step gradient and an inverted-hull outline.</li>
+<li>Add bloom, vignette and a custom chromatic-aberration pass; expose controls with lil-gui; measure the frame-time cost of each pass.</li>
+<li>Raymarch a scene of three metaballs in a full-screen quad and shade it with normals from the SDF gradient.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Where does a varying get its value in the fragment shader?</summary>The GPU interpolates the vertex shader outputs across the triangle's surface, so each pixel receives a blended value for its position.</details>
+<details><summary>Why use onBeforeCompile instead of a new ShaderMaterial?</summary>It keeps Three's lighting, shadows, fog and tone-mapping code, so you add one effect without rewriting the whole PBR shader.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

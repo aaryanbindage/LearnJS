@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 39 — Performance, Deployment & Production</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="39-three-deploy">
+<main><article>
+<h1>Lesson 39 — Performance, deployment &amp; production</h1>
+<p class="lede">A 3D site that runs at 120 FPS on your desktop but 8 FPS on a phone is a failed site. Learn to measure, budget, optimize, and ship.</p>
+
+<h2>Find the bottleneck first</h2>
+<table>
+<tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr>
+<tr><td>Low FPS on everything, GPU busy</td><td>Too many pixels (high DPR / big canvas), heavy shaders, post-processing, shadows, transparency overdraw</td><td>Cap DPR (<code>Math.min(dpr, 1.5–2)</code>), fewer passes, smaller shadow maps, cheaper materials</td></tr>
+<tr><td>Low FPS, CPU busy</td><td>Too many draw calls/objects, JS per-frame work, raycasting, GC</td><td>Instancing, merge geometry, static batching, avoid allocations in the loop</td></tr>
+<tr><td>Janky stutters</td><td>Garbage collection spikes, loading/decoding mid-session, shader compile</td><td>Reuse vectors, preload and <code>renderer.compile()</code> up front</td></tr>
+<tr><td>Slow first load</td><td>Huge models/textures/JS</td><td>Draco/Meshopt/KTX2, lazy-load, CDN, code-split</td></tr>
+<tr><td>Crash on mobile</td><td>GPU memory exhausted</td><td>Smaller textures, dispose, fewer render targets</td></tr>
+</table>
+
+<h2>Measure</h2>
+<textarea class="code" data-lang="js">
+// 1. Draw calls, triangles, textures, geometries
+console.log(renderer.info.render.calls, renderer.info.render.triangles);
+console.log(renderer.info.memory.geometries, renderer.info.memory.textures);
+
+// 2. Live FPS/GPU panel
+import Stats from "three/addons/libs/stats.module.js";
+const stats = new Stats(); document.body.append(stats.dom);
+// loop: stats.begin(); ...render...; stats.end();
+
+// 3. Tools: Chrome DevTools Performance panel, Spector.js (WebGL frame capture),
+//    r3f-perf, and testing on a real mid-range Android phone.
+</textarea>
+<p>Set budgets up front, e.g. <em>&lt; 100 draw calls, &lt; 500k triangles, &lt; 5 MB initial 3D payload, 60 FPS on a mid-range phone</em>.</p>
+
+<h2>Optimization checklist</h2>
+<h3>Rendering</h3>
+<ul>
+<li>Cap pixel ratio. Consider dynamic resolution: lower DPR when FPS dips (<code>PerformanceMonitor</code> in drei).</li>
+<li>Merge static geometry (<code>BufferGeometryUtils.mergeGeometries</code>) and use <code>InstancedMesh</code> for repeats.</li>
+<li>Share geometries and materials across meshes. Fewer unique materials = fewer state changes.</li>
+<li>Prefer baked lighting (lightmaps/AO maps) and an environment map over many real-time lights. Limit shadow-casting lights; bake static shadows.</li>
+<li>Frustum culling is on by default; add LOD (<code>THREE.LOD</code>) for far objects. Avoid transparency where possible (sorting and overdraw).</li>
+<li>Render on demand when nothing animates (<code>frameloop="demand"</code> in R3F; or stop <code>setAnimationLoop</code> when idle/hidden).</li>
+</ul>
+<h3>JavaScript</h3>
+<ul>
+<li>No allocations in the loop: hoist <code>new Vector3()</code> out, use <code>.set()</code>/<code>.copy()</code>.</li>
+<li>Don't raycast every frame against everything; use bounding volumes or BVH.</li>
+<li>Offload heavy computation to Web Workers; render with <code>OffscreenCanvas</code> if the main thread is busy.</li>
+</ul>
+<h3>Assets</h3>
+<ul>
+<li>Compress: Draco/Meshopt for geometry, KTX2 (Basis) for textures. Resize textures to what's visible (1k–2k, rarely 4k).</li>
+<li>Lazy-load heavy scenes below the fold (<code>IntersectionObserver</code>), show a poster image or placeholder first.</li>
+<li>Always <code>dispose()</code> geometries, materials, textures and render targets you drop.</li>
+</ul>
+<textarea class="code" data-lang="js">
+function disposeObject(root) {
+  root.traverse((o) => {
+    if (o.geometry) o.geometry.dispose();
+    const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+    for (const m of mats) {
+      for (const v of Object.values(m)) if (v && v.isTexture) v.dispose();
+      m.dispose();
+    }
+  });
+}
+// Also on teardown: renderer.setAnimationLoop(null); renderer.dispose(); controls.dispose(); remove listeners.
+</textarea>
+
+<h2>Robust production behavior</h2>
+<textarea class="code" data-lang="js">
+// 1. Detect WebGL and degrade gracefully
+function hasWebGL() {
+  try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); }
+  catch { return false; }
+}
+if (!hasWebGL()) showFallbackImage();
+
+// 2. Handle context loss (mobile GPUs reclaim memory)
+renderer.domElement.addEventListener("webglcontextlost", (e) => { e.preventDefault(); stopLoop(); });
+renderer.domElement.addEventListener("webglcontextrestored", () => startLoop());
+
+// 3. Pause when hidden or offscreen
+document.addEventListener("visibilitychange", () => document.hidden ? stopLoop() : startLoop());
+
+// 4. Respect user preferences
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;   // slow/disable auto-animation
+
+// 5. ResizeObserver on the canvas container (not just window resize)
+new ResizeObserver(([e]) => {
+  const { width, height } = e.contentRect;
+  renderer.setSize(width, height, false); camera.aspect = width / height; camera.updateProjectionMatrix();
+}).observe(container);
+</textarea>
+<h3>Accessibility &amp; UX for 3D</h3>
+<ul>
+<li>A canvas is invisible to screen readers: provide text alternatives, real HTML content for important information, keyboard controls, and a pause button for motion.</li>
+<li>Show a loader; never present a blank canvas. Provide a still fallback when WebGL isn't available.</li>
+<li>Don't hijack scroll without need; keep standard controls discoverable.</li>
+</ul>
+
+<h2>Build and deploy</h2>
+<textarea class="code" data-lang="bash">
+npm run build        # Vite bundles + hashes assets into dist/
+npx vite preview     # check the production build locally
+# Check bundle size: npx vite-bundle-visualizer   (three is large: import only what you need)
+</textarea>
+<ul>
+<li><strong>Hosting</strong>: Netlify, Vercel, Cloudflare Pages, GitHub Pages (static). Put big assets on a CDN with long cache headers and gzip/brotli.</li>
+<li>Serve <code>.glb</code>, <code>.ktx2</code>, <code>.hdr</code> with correct MIME types and cross-origin headers if on another domain (CORS).</li>
+<li>Draco/Basis decoders: host them with your app (copy from <code>three/examples/jsm/libs/draco</code> and <code>basis</code>) and point loaders at them.</li>
+<li>Tree-shaking: <code>import { Mesh, BoxGeometry } from "three"</code> helps bundlers; most of Three is still included but this is fine for most projects.</li>
+<li>Set <code>&lt;meta name="viewport"&gt;</code> and <code>touch-action: none</code> on the canvas if you handle gestures yourself.</li>
+<li><strong>Analytics for performance</strong>: sample FPS and device info (GPU via <code>WEBGL_debug_renderer_info</code>, sparingly) to see real-world problems.</li>
+</ul>
+
+<h2>What next after this course?</h2>
+<ul>
+<li><strong>WebGPU</strong> (<code>WebGPURenderer</code>, TSL): next-generation graphics and compute on the web.</li>
+<li><strong>Blender</strong> for modeling/baking; <strong>Theatre.js</strong> / GSAP for cinematic animation; <strong>Rapier</strong> for advanced physics.</li>
+<li><strong>Next.js</strong>, full-stack apps, databases and auth to build complete products.</li>
+<li>Read Three.js source and examples (threejs.org/examples) regularly: the best teacher.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Add <code>Stats</code> to the Lesson 38 galaxy and find which setting (DPR, point count, bloom) costs the most FPS.</li>
+<li>Build an auto quality tier: if average FPS &lt; 45 for 2 seconds, lower pixel ratio and disable shadows.</li>
+<li>Implement <code>disposeObject</code> and verify with <code>renderer.info.memory</code> that textures/geometries go back to zero after removal.</li>
+<li>Add a WebGL fallback screen and a <code>prefers-reduced-motion</code> mode to a previous scene.</li>
+<li>Compress a 20 MB model below 3 MB using gltf-transform without noticeable quality loss.</li>
+<li>Deploy a scene to a free host and test on a phone using Chrome remote debugging.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why are draw calls such a common bottleneck?</summary>Each draw call has CPU-side overhead (state setup, validation). Thousands of separate meshes exceed what the CPU can submit per frame, even if the GPU is idle.</details>
+<details><summary>What must you do when removing objects from the scene?</summary>Remove them, then dispose geometries, materials and textures; otherwise GPU memory leaks until the page is closed.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

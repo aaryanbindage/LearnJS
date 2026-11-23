@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 76 — Front-End System Design</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="76-frontend-system-design">
+<main><article>
+<h1>Lesson 76 — Front-end system design</h1>
+<p class="lede">System design is deciding how the pieces of a product fit together under real constraints: users, scale, devices, teams, deadlines. It's the skill that turns "I can build components" into "I can own a product", and it's the core of senior interviews.</p>
+
+<h2>A framework for any design question</h2>
+<ol>
+<li><strong>Clarify requirements</strong>: users, core features, what's out of scope. Functional (what it does) and non-functional (latency, offline, accessibility, devices, i18n, SEO, security, scale).</li>
+<li><strong>Define the data and API</strong>: entities, relationships, endpoints/events, pagination, errors, real-time needs.</li>
+<li><strong>Sketch the architecture</strong>: components/modules, rendering strategy, state ownership, data flow, caching layers.</li>
+<li><strong>Go deep on the hard parts</strong>: performance, consistency, failure modes, accessibility, security.</li>
+<li><strong>Discuss trade-offs and evolution</strong>: alternatives considered, what you'd measure, how it grows. There is no perfect design, only justified ones.</li>
+</ol>
+
+<h2>Decision toolkit</h2>
+<table>
+<tr><th>Decision</th><th>Options → pick when…</th></tr>
+<tr><td><strong>Rendering</strong></td><td>SSG (static content), SSR/streaming (personalized + SEO), ISR (catalogs), CSR (app behind login), islands (mostly-static + interactive bits)</td></tr>
+<tr><td><strong>State ownership</strong></td><td>URL (shareable), server cache (TanStack Query), local state (ephemeral), global store (cross-cutting), see Lesson 61</td></tr>
+<tr><td><strong>Data fetching</strong></td><td>REST/GraphQL/RPC; fetch-on-render vs render-as-you-fetch vs server components; prefetch on intent; avoid waterfalls</td></tr>
+<tr><td><strong>Pagination</strong></td><td>Offset (simple, jumpy), cursor (stable, scalable), infinite scroll + virtualization (feeds); preserve scroll on back navigation</td></tr>
+<tr><td><strong>Freshness</strong></td><td>Polling, SSE, WebSocket, push; stale-while-revalidate; optimistic updates with reconciliation</td></tr>
+<tr><td><strong>Offline</strong></td><td>Service worker + cache strategy, IndexedDB, sync queue + conflict resolution (CRDT/LWW)</td></tr>
+<tr><td><strong>Styling and design system</strong></td><td>Tokens + CSS (modules/Tailwind), headless primitives, theming, Storybook</td></tr>
+<tr><td><strong>Team scale</strong></td><td>Monorepo/modular monolith, feature boundaries, codeowners; micro-frontends only for org scale</td></tr>
+</table>
+
+<h2>Worked example 1: a news-feed / social timeline</h2>
+<ul>
+<li><strong>Requirements</strong>: infinite scroll, posts with images/video, like/comment optimistic, new-post indicator, works on slow mobile, accessible, SEO for public posts.</li>
+<li><strong>Data/API</strong>: <code>GET /feed?cursor=…&amp;limit=20</code> returns posts + next cursor; normalized store of posts/users by id; <code>POST /posts/:id/like</code> idempotent.</li>
+<li><strong>Rendering</strong>: SSR the first page (fast LCP + SEO), hydrate; subsequent pages client-fetched. Stream the shell; Suspense per module.</li>
+<li><strong>Performance</strong>: <strong>virtualize</strong> the list (windowing: only visible rows in DOM), reserve image dimensions (no CLS), lazy-load media with <code>IntersectionObserver</code>/<code>loading="lazy"</code>, responsive images (AVIF), video poster + load on demand, prefetch next page near the end, request cancellation.</li>
+<li><strong>State</strong>: TanStack Query infinite query keyed by feed type; optimistic like with rollback; deduplicate posts across feeds via normalized cache.</li>
+<li><strong>Freshness</strong>: poll or SSE "new posts available" pill (don't shift content under the user's cursor), update on focus.</li>
+<li><strong>A11y</strong>: <code>role="feed"</code> with <code>article</code> items, focus management on load more, announce new content politely, keyboard shortcuts documented, reduced motion.</li>
+<li><strong>Failure modes</strong>: partial failures (one media fails), retry/backoff, offline banner, empty/error states, duplicate/out-of-order responses (use request ids or keys).</li>
+</ul>
+
+<h2>Worked example 2: autocomplete / typeahead</h2>
+<ul>
+<li><strong>Flow</strong>: input → debounce (150–300 ms) → request → results; cancel in-flight requests (<code>AbortController</code>) so stale responses never overwrite newer ones.</li>
+<li><strong>Caching</strong>: cache by normalized query (prefix reuse), in memory + HTTP cache; prefetch popular queries; local filtering when the dataset is small (trie / fuzzy search in a Worker).</li>
+<li><strong>Ranking</strong> on the server (popularity, recency, personalization); highlight matches; keep latency &lt; 100 ms perceived.</li>
+<li><strong>A11y (ARIA combobox pattern)</strong>: <code>role="combobox"</code>, <code>aria-expanded</code>, <code>aria-controls</code>, <code>aria-activedescendant</code>, arrow keys / Enter / Escape, announce result count in a live region. Better: use a headless library (Lesson 62).</li>
+<li><strong>Edge cases</strong>: IME composition, paste, very fast typing, empty results, errors, mobile keyboards.</li>
+</ul>
+
+<h2>Worked example 3: a collaborative 3D editor (Figma-for-3D)</h2>
+<ul>
+<li><strong>Architecture</strong>: an <em>engine</em> layer (scene graph, commands, undo stack, picking, gizmos, in Three.js, framework-agnostic) separated from a <em>React shell</em> (panels, inspector, toolbars) that subscribes to engine state.</li>
+<li><strong>State</strong>: scene document as serializable data (the source of truth) → rendered into Three objects. <strong>Command pattern</strong> for every edit → undo/redo, autosave, and sync via operations.</li>
+<li><strong>Collaboration</strong>: CRDT (Yjs) or operational log over WebSocket; presence cursors and selections; conflict handling per property; authoritative server for permissions.</li>
+<li><strong>Performance</strong>: render on demand (not continuous), instancing, BVH picking, LOD, Web Workers/OffscreenCanvas for heavy import/processing, progressive loading of assets, GPU memory budget and eviction.</li>
+<li><strong>Persistence/offline</strong>: IndexedDB autosave, versioned document schema with migrations, asset storage in object storage with content hashing.</li>
+<li><strong>Quality</strong>: golden-image tests for rendering, property-based tests for commands (apply + undo = identity), perf budgets in CI.</li>
+</ul>
+
+<h2>Cross-cutting concerns checklist</h2>
+<table>
+<tr><th>Concern</th><th>Questions to ask</th></tr>
+<tr><td>Performance</td><td>What's the LCP element? Bundle budget? Virtualization? Image/video strategy? Main-thread work? Web Worker candidates?</td></tr>
+<tr><td>Accessibility</td><td>Keyboard flow? Screen reader semantics? Focus management on route/modal changes? Contrast/motion/zoom?</td></tr>
+<tr><td>Internationalization</td><td>Text expansion, RTL, plural rules, date/number/currency formats (<code>Intl</code>), locale in the URL?</td></tr>
+<tr><td>Security</td><td>XSS vectors, CSP, auth/session model, CSRF, third-party scripts, sensitive data in client storage?</td></tr>
+<tr><td>Reliability</td><td>Loading/empty/error/offline states? Retries, timeouts, idempotency? Graceful degradation? Error boundaries?</td></tr>
+<tr><td>Observability</td><td>RUM vitals, error tracking, feature usage analytics, release tagging?</td></tr>
+<tr><td>Testing &amp; rollout</td><td>Unit/integration/E2E strategy? Feature flags, canary, A/B tests, rollback?</td></tr>
+<tr><td>Maintainability</td><td>Module boundaries, ownership, design system, docs, migration path?</td></tr>
+</table>
+
+<h2>Virtualization demo</h2>
+<p>Rendering 100,000 DOM rows kills a browser. Windowing renders only what's visible. Try it:</p>
+<textarea class="code" data-lang="html" data-run data-height="360px">
+<style>body{margin:0;font:14px system-ui}#vp{height:300px;overflow:auto;border:1px solid #ccc;position:relative}
+.row{position:absolute;left:0;right:0;height:30px;line-height:30px;padding:0 10px;border-bottom:1px solid #eee;box-sizing:border-box}
+#stat{padding:6px 10px;background:#f4f2fa}</style>
+<div id="stat"></div>
+<div id="vp"><div id="spacer"></div></div>
+<script>
+  const N = 100000, H = 30, OVERSCAN = 5, items = Array.from({ length: N }, (_, i) => "Row #" + (i + 1));
+  spacer.style.height = N * H + "px";
+  const pool = new Map();                                    // index → element, reused as the user scrolls
+  function render() {
+    const top = vp.scrollTop, first = Math.max(0, Math.floor(top / H) - OVERSCAN);
+    const last = Math.min(N - 1, Math.ceil((top + vp.clientHeight) / H) + OVERSCAN);
+    for (const [i, el] of pool) if (i < first || i > last) { el.remove(); pool.delete(i); }
+    for (let i = first; i <= last; i++) if (!pool.has(i)) {
+      const el = document.createElement("div"); el.className = "row"; el.style.top = i * H + "px"; el.textContent = items[i];
+      vp.append(el); pool.set(i, el);
+    }
+    stat.textContent = `${N.toLocaleString()} items, DOM rows rendered: ${pool.size}`;
+  }
+  vp.addEventListener("scroll", () => requestAnimationFrame(render)); render();
+</script>
+</textarea>
+<p>Production: use <strong>TanStack Virtual</strong> or <code>react-window</code>. Variable heights need measurement; keep keyboard navigation and screen-reader semantics (<code>aria-rowcount</code>, <code>aria-setsize</code>/<code>aria-posinset</code>) intact.</p>
+
+<h2>Communicating a design</h2>
+<ul>
+<li>Draw boxes and arrows: client components, stores, network, server/cache/DB, with data flow labeled. Write the API shapes.</li>
+<li>State assumptions out loud, quantify (requests/s, payload sizes, list lengths, latency budget), and name the trade-off of each decision ("optimistic updates feel instant but need reconciliation").</li>
+<li>Write a short design doc / RFC for real work: context, goals/non-goals, proposal, alternatives, risks, rollout, open questions. Get feedback before building.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Do a 45-minute written design for each: news feed, autocomplete, chat app, photo gallery, kanban board, video player, collaborative whiteboard, e-commerce product page. Use the 5-step framework and the checklist.</li>
+<li>Implement the virtualized list with variable row heights and keyboard navigation; compare memory and scroll FPS with the naive list at 100k rows.</li>
+<li>Build the autocomplete with cancellation, caching and full combobox ARIA; test with a screen reader.</li>
+<li>Write an RFC for a real change in Project 5 (e.g., adding offline support) with alternatives and a rollout plan; have a peer review it.</li>
+<li>Study two public engineering write-ups (e.g., how a large company built their feed or editor) and summarize the decisions and trade-offs in one page.</li>
+<li>Run a mock system design interview with a peer (30 min each way) and give each other feedback on structure, depth and communication.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why cancel in-flight requests in autocomplete?</summary>Responses can arrive out of order. Without cancelation (or ignoring stale responses), an older slower response may overwrite the newer query's results.</details>
+<details><summary>What does virtualization trade off?</summary>Huge performance and memory gains in exchange for complexity: measurement of variable heights, scroll restoration, find-in-page, and accessibility semantics need extra care.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

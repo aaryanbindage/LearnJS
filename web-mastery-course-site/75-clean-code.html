@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 75 — Clean Code, Refactoring & Technical Debt</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="75-clean-code">
+<main><article>
+<h1>Lesson 75 — Clean code, refactoring &amp; technical debt</h1>
+<p class="lede">Code is read far more often than it is written. The goal isn't cleverness; it's code that the next person (usually you in three months) can understand and change safely.</p>
+
+<h2>Naming and structure</h2>
+<ul>
+<li><strong>Names reveal intent</strong>: <code>isOverdue(invoice)</code> beats <code>check(i)</code>. Booleans read as questions (<code>hasAccess</code>), functions as verbs (<code>fetchUser</code>), collections as plurals. Avoid abbreviations and noise words (<code>data</code>, <code>info</code>, <code>manager</code>).</li>
+<li><strong>Small functions that do one thing</strong> at one level of abstraction. If you need a comment to explain a block, extract it into a well-named function.</li>
+<li><strong>Few parameters</strong> (≤ 3); pass an options object beyond that. Avoid boolean flag parameters (<code>render(true, false)</code>); split into two functions or use named options.</li>
+<li><strong>Early returns</strong> flatten nesting. <strong>Pure functions</strong> where possible; isolate side effects at the edges.</li>
+<li><strong>Comments explain <em>why</em></strong> (constraints, trade-offs, links), not <em>what</em>. Delete commented-out code (Git remembers).</li>
+</ul>
+<textarea class="code" data-lang="js" data-run>
+// BEFORE: nested, flag arguments, magic numbers, mixed concerns
+function proc(u, o, f) {
+  let r = 0;
+  if (u) {
+    if (u.a) {
+      for (let i = 0; i < o.length; i++) {
+        if (o[i].s == 1) { r += o[i].p * o[i].q; if (f) r = r * 0.9; }
+      }
+    }
+  }
+  return r;
+}
+
+// AFTER: intent-revealing, flat, each piece testable
+const STATUS_PAID = 1;
+const LOYALTY_DISCOUNT = 0.1;
+
+const lineTotal = (item) => item.price * item.quantity;
+const isPaid = (order) => order.status === STATUS_PAID;
+const applyDiscount = (amount, rate) => amount * (1 - rate);
+
+function paidRevenue(user, orders, { loyaltyDiscount = false } = {}) {
+  if (!user?.active) return 0;
+  const subtotal = orders.filter(isPaid).reduce((sum, o) => sum + lineTotal(o), 0);
+  return loyaltyDiscount ? applyDiscount(subtotal, LOYALTY_DISCOUNT) : subtotal;
+}
+
+const orders = [{ status: 1, price: 10, quantity: 3 }, { status: 0, price: 99, quantity: 1 }, { status: 1, price: 5, quantity: 2 }];
+console.log(paidRevenue({ active: true }, orders), paidRevenue({ active: true }, orders, { loyaltyDiscount: true }), paidRevenue(null, orders));
+</textarea>
+
+<h2>Principles worth keeping</h2>
+<ul>
+<li><strong>DRY, but not at any cost</strong>: duplication is cheaper than the wrong abstraction. Wait for the third occurrence ("rule of three") and make sure the pieces change for the same reason.</li>
+<li><strong>KISS / YAGNI</strong>: build what's needed now. Speculative generality (config for features nobody asked for) is debt.</li>
+<li><strong>SOLID in spirit</strong>: single responsibility, depend on abstractions at boundaries, prefer composition. Don't turn it into ceremony.</li>
+<li><strong>Make illegal states unrepresentable</strong> (Lesson 47). <strong>Fail fast</strong> with clear errors at boundaries.</li>
+<li><strong>Separation of concerns</strong>: UI, state, data access, business rules. <strong>Command–query separation</strong>: functions either do something or return something.</li>
+<li><strong>Law of Demeter</strong>: talk to your direct collaborators (<code>order.total()</code>), not through chains (<code>order.customer.address.country.code</code>).</li>
+<li><strong>Immutability and explicit dependencies</strong> make code predictable and testable.</li>
+</ul>
+
+<h2>Code smells and how to respond</h2>
+<table>
+<tr><th>Smell</th><th>Refactoring</th></tr>
+<tr><td>Long function / deep nesting</td><td>Extract function, guard clauses, replace nested conditionals with early returns</td></tr>
+<tr><td>Large component doing everything</td><td>Extract child components and custom hooks; separate data fetching from presentation</td></tr>
+<tr><td>Duplicated logic (3+ places)</td><td>Extract shared function/hook; or accept duplication if semantics differ</td></tr>
+<tr><td>Long parameter lists / data clumps</td><td>Introduce a parameter object or type</td></tr>
+<tr><td>Switch/if chains on type</td><td>Lookup table of strategies, polymorphism, discriminated unions with exhaustive switch</td></tr>
+<tr><td>Primitive obsession (<code>string</code> for email, <code>number</code> for money)</td><td>Value types (branded types, small classes/functions), schema validation</td></tr>
+<tr><td>Shotgun surgery (one change touches many files)</td><td>Move related code together; deepen the module that owns the concept</td></tr>
+<tr><td>Feature envy / god object</td><td>Move behavior to where the data lives; split responsibilities</td></tr>
+<tr><td>Magic numbers/strings</td><td>Named constants, enums/union types, config</td></tr>
+<tr><td>Dead code, stale flags, commented-out blocks</td><td>Delete</td></tr>
+<tr><td>Mutable shared state / hidden globals</td><td>Pass dependencies explicitly; localize state; immutable updates</td></tr>
+</table>
+
+<h2>Refactoring safely</h2>
+<ol>
+<li><strong>Have tests first</strong>. If none exist, write <em>characterization tests</em> that pin current behavior (even if ugly), then refactor under their protection.</li>
+<li><strong>Tiny steps</strong>, each leaving tests green. Commit often; separate refactor commits from behavior changes.</li>
+<li><strong>Lean on tools</strong>: IDE rename/extract/move (they update references safely), TypeScript compiler errors as a to-do list, codemods (jscodeshift, ast-grep) for large mechanical changes.</li>
+<li><strong>Strangler pattern</strong> for big rewrites: build the new path beside the old, route traffic gradually, delete the old when empty. Avoid "big bang" rewrites; they often fail.</li>
+<li><strong>Boy-scout rule</strong>: leave code a little cleaner than you found it, in the area you're already changing.</li>
+</ol>
+
+<h2>Technical debt</h2>
+<ul>
+<li>Debt is a trade-off: deliberately shipping a shortcut to learn or hit a date is fine <em>if recorded and repaid</em>. Accidental, unacknowledged debt is what kills velocity.</li>
+<li><strong>Make it visible</strong>: track debt items in the backlog with impact ("slows every checkout change by a day") rather than vague "cleanup". Reserve capacity (~10–20%) for it.</li>
+<li><strong>Prioritize by pain</strong>: pay down debt in code that changes often (hot spots: check <code>git log</code> churn × complexity), ignore stable ugly code nobody touches.</li>
+<li><strong>Dependencies are debt</strong>: update regularly in small increments (Renovate/Dependabot), not once every two years; remove unused ones.</li>
+<li>Explain debt to non-engineers in terms of delivery speed, risk and cost.</li>
+</ul>
+
+<h2>Documentation and readability for teams</h2>
+<ul>
+<li>A good README is your best onboarding tool: purpose, quick start, architecture sketch, common commands, how to test and deploy.</li>
+<li>Prefer types, tests and naming over prose that rots. Use ADRs for decisions and JSDoc/TSDoc for public APIs (the "why", edge cases, examples).</li>
+<li>Automate style: Prettier + ESLint, so reviews focus on design. Keep consistent patterns across the codebase; consistency beats personal preference.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Take the worst function from one of your earlier projects. Write characterization tests, then refactor it in small commits to meet the guidelines above. Compare before/after complexity (ESLint <code>complexity</code> rule).</li>
+<li>Split a 300-line React component into components + custom hooks; show that the tests still pass and the render behavior is unchanged.</li>
+<li>Replace a big <code>switch</code> on <code>type</code> with a discriminated union and an exhaustive check; add a new case and watch the compiler guide you.</li>
+<li>Find hot spots in a repo: <code>git log --format=format: --name-only | sort | uniq -c | sort -rn | head</code>; pick one and list concrete refactors.</li>
+<li>Use a codemod (jscodeshift or ast-grep) to apply a mechanical change across a project (e.g., rename an API, convert <code>var</code> to <code>const</code>).</li>
+<li>Write an ADR and a tech-debt ticket (with impact and proposed fix) for something in your own code.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why write tests before refactoring?</summary>Refactoring means changing structure without changing behavior. Tests are how you know behavior stayed the same.</details>
+<details><summary>When is duplication better than abstraction?</summary>When the duplicated code changes for different reasons. A wrong abstraction couples unrelated things and is harder to undo than copied code.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

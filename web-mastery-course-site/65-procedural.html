@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 65 — Procedural Generation & Custom Geometry</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="65-procedural">
+<main><article>
+<h1>Lesson 65 — Procedural generation &amp; custom geometry</h1>
+<p class="lede">Instead of authoring every vertex, you write code that generates worlds: terrain, planets, trees, cities, particles. This lesson covers building <code>BufferGeometry</code> by hand, noise, and instancing, with a live terrain demo.</p>
+
+<h2>BufferGeometry from scratch</h2>
+<p>All Three.js geometry is typed arrays: <code>position</code> (x,y,z per vertex), optional <code>normal</code>, <code>uv</code>, <code>color</code>, and an optional <code>index</code> list that reuses vertices for triangles.</p>
+<textarea class="code" data-lang="js" data-file="geometry.js">
+import * as THREE from "three";
+
+const geo = new THREE.BufferGeometry();
+const positions = new Float32Array([
+  -1, -1, 0,   1, -1, 0,   1, 1, 0,   -1, 1, 0,      // 4 vertices of a quad
+]);
+geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+geo.setIndex([0, 1, 2,  0, 2, 3]);                      // two triangles (counter-clockwise = front face)
+geo.setAttribute("uv", new THREE.BufferAttribute(new Float32Array([0,0, 1,0, 1,1, 0,1]), 2));
+geo.computeVertexNormals();                             // smooth shading normals from the triangles
+geo.computeBoundingSphere();                            // needed for frustum culling after changing positions
+
+// Updating each frame (e.g., waves): mutate the array, then flag it
+geo.attributes.position.array[2] = Math.sin(t);
+geo.attributes.position.needsUpdate = true;
+</textarea>
+
+<h2>Noise: structured randomness</h2>
+<p><code>Math.random()</code> gives static. <strong>Noise</strong> (Perlin/simplex/value) gives smooth, continuous randomness: nearby inputs give nearby outputs. Layer it at multiple scales (<strong>fractal Brownian motion, fBm</strong>) for natural-looking terrain, clouds and rock.</p>
+<textarea class="code" data-lang="js" data-file="fbm.js">
+// Use a library: simplex-noise (npm). createNoise2D(seededRandom) gives deterministic worlds.
+import { createNoise2D } from "simplex-noise";
+import alea from "alea";
+const noise2D = createNoise2D(alea("my-seed"));
+
+function fbm(x, y, { octaves = 5, lacunarity = 2, gain = 0.5 } = {}) {
+  let amp = 1, freq = 1, sum = 0, norm = 0;
+  for (let i = 0; i < octaves; i++) {
+    sum += noise2D(x * freq, y * freq) * amp;
+    norm += amp; amp *= gain; freq *= lacunarity;       // each octave: higher frequency, lower amplitude
+  }
+  return sum / norm;                                    // −1..1
+}
+</textarea>
+
+<h2>Live: noise terrain with controls</h2>
+<p>This builds a grid, displaces vertices by fBm, colors by height, and lets you tweak parameters. (Needs internet for Three.js and lil-gui.)</p>
+<textarea class="code" data-lang="html" data-run data-height="520px">
+<style>html,body{margin:0;height:100%;background:#0b0a10;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/","lil-gui":"https://cdn.jsdelivr.net/npm/lil-gui@0.19.2/dist/lil-gui.esm.js"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import GUI from "lil-gui";
+
+// Tiny seeded value-noise (no dependency) with smooth interpolation
+function makeNoise(seed) {
+  const hash = (x, y) => { let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ seed; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; };
+  const fade = t => t * t * (3 - 2 * t);
+  return (x, y) => {
+    const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+    const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+    const u = fade(xf), v = fade(yf);
+    return (a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v) * 2 - 1;
+  };
+}
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.append(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0b0a10); scene.fog = new THREE.Fog(0x0b0a10, 30, 80);
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 200); camera.position.set(0, 14, 26);
+const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x223322, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(10, 20, 5); scene.add(sun);
+
+const params = { size: 60, segments: 120, height: 9, scale: 0.06, octaves: 5, seed: 7, wire: false };
+let mesh;
+const low = new THREE.Color("#1f6f4a"), mid = new THREE.Color("#8a7a55"), high = new THREE.Color("#f4f6fa"), water = new THREE.Color("#2a5d9a");
+
+function build() {
+  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); }
+  const noise = makeNoise(params.seed | 0);
+  const geo = new THREE.PlaneGeometry(params.size, params.size, params.segments, params.segments);
+  geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position, colors = new Float32Array(pos.count * 3), c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    let amp = 1, freq = params.scale, sum = 0, norm = 0;
+    for (let o = 0; o < params.octaves; o++) { sum += noise(x * freq, z * freq) * amp; norm += amp; amp *= 0.5; freq *= 2; }
+    const h = sum / norm;                                    // −1..1
+    const y = Math.max(h, -0.15) * params.height;            // flatten below sea level
+    pos.setY(i, y);
+    const t = (h + 1) / 2;
+    if (h < -0.15) c.copy(water); else if (t < 0.55) c.copy(low).lerp(mid, (t - 0.43) / 0.12); else c.copy(mid).lerp(high, Math.min(1, (t - 0.55) / 0.25));
+    colors.set([c.r, c.g, c.b], i * 3);
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: false, wireframe: params.wire }));
+  scene.add(mesh);
+}
+build();
+
+const gui = new GUI();
+for (const [k, min, max, step] of [["height", 1, 20, .1], ["scale", .01, .2, .005], ["octaves", 1, 8, 1], ["seed", 0, 999, 1]]) gui.add(params, k, min, max, step).onFinishChange(build);
+gui.add(params, "wire").onChange(build);
+gui.add(params, "segments", 20, 250, 1).onFinishChange(build);
+
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+</script>
+</textarea>
+
+<h2>Instancing: thousands of objects, one draw call</h2>
+<textarea class="code" data-lang="js" data-file="instanced.js">
+const COUNT = 5000;
+const mesh = new THREE.InstancedMesh(new THREE.ConeGeometry(0.2, 1, 6), new THREE.MeshStandardMaterial({ color: 0x2e8b57 }), COUNT);
+const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Euler();
+for (let i = 0; i < COUNT; i++) {
+  p.set((Math.random() - .5) * 100, 0, (Math.random() - .5) * 100);
+  p.y = heightAt(p.x, p.z);                           // sit on the terrain function
+  q.setFromEuler(up.set(0, Math.random() * Math.PI * 2, 0));
+  s.setScalar(0.6 + Math.random() * 1.2);
+  mesh.setMatrixAt(i, m.compose(p, q, s));
+  mesh.setColorAt(i, new THREE.Color().setHSL(0.33, 0.5, 0.2 + Math.random() * 0.2));
+}
+mesh.instanceMatrix.needsUpdate = true;
+scene.add(mesh);
+// Wind animation of instances is best done in a vertex shader (Lesson 66), not by rewriting 5,000 matrices on the CPU each frame.
+</textarea>
+
+<h2>Techniques catalogue</h2>
+<table>
+<tr><th>Technique</th><th>Use</th></tr>
+<tr><td><strong>Seeded PRNG</strong> (mulberry32, alea)</td><td>Reproducible worlds: same seed → same result; share "seeds" with users and for tests</td></tr>
+<tr><td><strong>Poisson-disc sampling</strong></td><td>Evenly spaced random points (trees, props) without clumps</td></tr>
+<tr><td><strong>Domain warping</strong></td><td>Feed noise into noise for swirly, organic shapes</td></tr>
+<tr><td><strong>L-systems</strong></td><td>Plants and fractals from rewriting rules</td></tr>
+<tr><td><strong>Marching cubes / dual contouring</strong></td><td>Voxel or implicit surfaces: caves, metaballs, Minecraft-like smooth terrain</td></tr>
+<tr><td><strong>Wave function collapse</strong></td><td>Tile-based level and city layouts obeying constraints</td></tr>
+<tr><td><strong>Chunking + LOD</strong></td><td>Infinite worlds: generate chunks around the player, drop distant ones, lower detail far away</td></tr>
+<tr><td><strong>Heightmap textures</strong></td><td>Do displacement on the GPU in a vertex shader; compute normals in the fragment shader</td></tr>
+<tr><td><strong>Web Workers</strong></td><td>Generate chunks off the main thread; transfer typed arrays back (Lesson 52)</td></tr>
+</table>
+<div class="callout"><span class="label">Performance</span>Generation can take hundreds of ms. Build in a Worker, show a loading state, reuse buffers, and update <code>BufferAttribute</code>s in place instead of recreating geometry. Always dispose geometry you discard.</div>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a custom <code>BufferGeometry</code> for a cube, a cylinder and a torus by hand (positions, indices, normals, UVs). Compare with the built-ins.</li>
+<li>Extend the terrain demo: add a water plane with transparency, snow above a threshold, and a "seed" text input that hashes strings to numbers.</li>
+<li>Scatter 3,000 trees with <code>InstancedMesh</code> using Poisson-disc sampling, rejecting steep slopes and underwater positions.</li>
+<li>Implement infinite terrain: generate 32×32 chunks around the camera in a Worker, add and remove them as you move.</li>
+<li>Generate a tree with an L-system and render branches as instanced cylinders.</li>
+<li>Replace CPU displacement with a heightmap texture and vertex shader displacement; compare frame times with 1M vertices.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why use fBm instead of one noise layer?</summary>One layer looks blobby. Summing octaves at doubling frequency and halving amplitude adds detail at every scale, like real terrain (mountains, hills, rocks).</details>
+<details><summary>Why index geometry?</summary>Indices let triangles share vertices, cutting memory and vertex processing compared with duplicating every corner.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 70 — WebXR, Spatial Audio & Cross-Device 3D</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="70-webxr-audio">
+<main><article>
+<h1>Lesson 70 — WebXR, spatial audio &amp; cross-device 3D</h1>
+<p class="lede">Sound and immersion complete a 3D experience. Learn Web Audio for interactive sound, spatialize it in a 3D scene, and extend your scene to VR/AR headsets and phones with WebXR, while making everything work on every input type.</p>
+
+<h2>Web Audio basics (live)</h2>
+<p>Web Audio is a graph: <strong>sources</strong> → <strong>effect nodes</strong> (gain, filter, delay, panner, compressor) → <strong>destination</strong>. Browsers require a user gesture before audio can start (the "autoplay policy"), so create or resume the <code>AudioContext</code> inside a click handler.</p>
+<textarea class="code" data-lang="html" data-run data-height="330px">
+<style>body{font-family:system-ui;padding:1rem}button{font:inherit;padding:.5em 1em;margin:.25rem .25rem .25rem 0}label{display:block;margin:.5rem 0}input[type=range]{width:240px}</style>
+<button id="start">Start / stop synth</button>
+<button id="blip">Play blip (envelope)</button>
+<label>Pitch <input id="pitch" type="range" min="100" max="880" value="220"></label>
+<label>Filter cutoff <input id="cut" type="range" min="200" max="8000" value="2000"></label>
+<label>Pan (left ↔ right) <input id="pan" type="range" min="-1" max="1" step="0.01" value="0"></label>
+<canvas id="vis" width="400" height="80" style="background:#111;border-radius:8px"></canvas>
+<script>
+  let ctx, osc, gain, filter, panner, analyser, running = false;
+  function build() {
+    ctx = new AudioContext();
+    gain = ctx.createGain(); gain.gain.value = 0.15;
+    filter = ctx.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = +cut.value;
+    panner = new StereoPannerNode(ctx, { pan: 0 });
+    analyser = ctx.createAnalyser(); analyser.fftSize = 256;
+    filter.connect(gain).connect(panner).connect(analyser).connect(ctx.destination);
+    draw();
+  }
+  start.onclick = async () => {
+    if (!ctx) build();
+    await ctx.resume();
+    if (running) { osc.stop(); running = false; return; }
+    osc = ctx.createOscillator(); osc.type = "sawtooth"; osc.frequency.value = +pitch.value;
+    osc.connect(filter); osc.start(); running = true;
+  };
+  blip.onclick = async () => {
+    if (!ctx) build(); await ctx.resume();
+    const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+    o.type = "triangle"; o.frequency.setValueAtTime(660, t); o.frequency.exponentialRampToValueAtTime(220, t + 0.2);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);   // attack/decay envelope: avoids clicks
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.3);
+  };
+  pitch.oninput = () => osc && osc.frequency.setTargetAtTime(+pitch.value, ctx.currentTime, 0.02);   // smooth param changes
+  cut.oninput = () => filter && filter.frequency.setTargetAtTime(+cut.value, ctx.currentTime, 0.02);
+  pan.oninput = () => panner && (panner.pan.value = +pan.value);
+  function draw() {
+    const c = vis.getContext("2d"), data = new Uint8Array(analyser.frequencyBinCount);
+    (function loop() { requestAnimationFrame(loop); analyser.getByteFrequencyData(data); c.clearRect(0, 0, 400, 80); c.fillStyle = "#14e0a3";
+      data.forEach((v, i) => c.fillRect(i * 3.2, 80 - v * 80 / 255, 2.6, v * 80 / 255)); })();
+  }
+</script>
+</textarea>
+<ul>
+<li>Schedule with <code>ctx.currentTime</code> and <code>AudioParam</code> methods (<code>setValueAtTime</code>, <code>linearRampToValueAtTime</code>, <code>setTargetAtTime</code>). The audio clock is far more precise than <code>setTimeout</code>.</li>
+<li>Play recorded sounds: <code>fetch</code> → <code>decodeAudioData</code> → <code>AudioBufferSourceNode</code> (one-shot per play; cheap). Use <strong>compressed formats</strong> (Opus/AAC/MP3) and sprite sheets for many short sounds.</li>
+<li>Libraries: <strong>Howler.js</strong> (simple), <strong>Tone.js</strong> (music, sequencing, synths), <strong>Three.js <code>PositionalAudio</code></strong>.</li>
+<li>For heavy DSP use <strong>AudioWorklet</strong> (runs on the audio thread, like a Worker for sound).</li>
+</ul>
+
+<h2>Spatial audio in a 3D scene</h2>
+<textarea class="code" data-lang="js" data-file="spatial.js">
+const listener = new THREE.AudioListener();            // the "ears": attach to the camera
+camera.add(listener);
+
+const sound = new THREE.PositionalAudio(listener);     // HRTF panning + distance attenuation
+new THREE.AudioLoader().load("/audio/engine.mp3", (buffer) => {
+  sound.setBuffer(buffer);
+  sound.setRefDistance(2);                             // full volume within 2 units
+  sound.setRolloffFactor(1.5);                         // how fast it fades with distance
+  sound.setDistanceModel("inverse");
+  sound.setLoop(true); sound.setVolume(0.8);
+});
+engineMesh.add(sound);                                 // sound follows the object
+
+// Start only after a user gesture:
+startButton.onclick = async () => { await listener.context.resume(); sound.play(); };
+
+// Add room feel: ConvolverNode (reverb), and drive engine pitch with speed: sound.setPlaybackRate(0.8 + speed * 0.05)
+// R3F: drei's <PositionalAudio url="/audio/engine.mp3" distance={2} loop autoplay />
+</textarea>
+<div class="callout"><span class="label">Good practice</span>Provide a mute control and sensible default volume, pause audio when the tab is hidden, persist the user's setting, never auto-play loud sound, and give visual equivalents for important audio cues (accessibility).</div>
+
+<h2>WebXR: VR and AR in the browser</h2>
+<p>WebXR gives your page access to headsets (Quest, Vision Pro, PC VR) and phone AR (Android Chrome). The scene, camera and render loop are the same Three.js you know; the XR session drives the camera pose and provides controllers/hands.</p>
+<textarea class="code" data-lang="js" data-file="vr.js">
+import { VRButton } from "three/addons/webxr/VRButton.js";
+import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
+
+renderer.xr.enabled = true;
+document.body.append(VRButton.createButton(renderer));        // shows "ENTER VR" if supported (needs HTTPS or localhost)
+
+// IMPORTANT: use setAnimationLoop (XR owns the frame callback), not requestAnimationFrame
+renderer.setAnimationLoop((time, frame) => { update(time); renderer.render(scene, camera); });
+
+// Controllers (rays + models)
+const c0 = renderer.xr.getController(0);
+c0.addEventListener("selectstart", onSelectStart);            // trigger/pinch
+c0.addEventListener("selectend", onSelectEnd);
+scene.add(c0);
+const grip = renderer.xr.getControllerGrip(0);
+grip.add(new XRControllerModelFactory().createControllerModel(grip));
+scene.add(grip);
+
+// The user's head is the camera; move the PLAYER RIG instead of the camera:
+const rig = new THREE.Group(); rig.add(camera); scene.add(rig);   // teleport by setting rig.position
+// AR: ARButton from three/addons/webxr/ARButton.js with requiredFeatures: ["hit-test"], place objects on real surfaces.
+// R3F: @react-three/xr  →  <XR store={store}>…</XR> + store.enterVR() / enterAR()
+</textarea>
+<h3>VR design rules</h3>
+<ul>
+<li><strong>Frame rate is comfort</strong>: sustain 72–120 fps; dropped frames cause motion sickness. Budget far tighter than desktop (Lesson 68): low poly counts, baked lighting, minimal transparency and post-processing, MSAA over screen-space AA.</li>
+<li><strong>Never move the camera without the user's input</strong> (no unexpected acceleration, camera shake, forced rotation). Use teleport or snap-turn, add vignettes for smooth locomotion.</li>
+<li><strong>Scale is real-world meters</strong>: a door is ~2 m. Test in the headset constantly; the emulator isn't enough.</li>
+<li><strong>UI</strong>: place panels 1–2 m away, large text, world-space (not head-locked). Use ray or direct poke interactions; support hands and controllers.</li>
+<li><strong>Develop</strong> with the Immersive Web Emulator (browser extension) and a real headset over HTTPS (ngrok/Cloudflare tunnel, or <code>adb reverse</code> for Quest).</li>
+</ul>
+
+<h2>One experience, every device</h2>
+<table>
+<tr><th>Concern</th><th>Approach</th></tr>
+<tr><td>Input types</td><td>Pointer events (mouse/touch/pen), keyboard, gamepad, XR controllers/hands behind one action layer</td></tr>
+<tr><td>Performance tiers</td><td>Detect GPU class (<code>detect-gpu</code>) and set quality presets: DPR, shadows, post FX, particle counts; adapt live with <code>PerformanceMonitor</code></td></tr>
+<tr><td>Fallbacks</td><td>WebGL unsupported → static image/video + message; XR unsupported → hide the button; WebGPU → WebGL</td></tr>
+<tr><td>Mobile specifics</td><td>Cap DPR at 1.5–2, avoid heavy shaders and large render targets, handle address-bar resize, prevent scroll/zoom conflicts (<code>touch-action: none</code> on canvas), pause when hidden, watch thermal throttling</td></tr>
+<tr><td>Accessibility</td><td>Keyboard-operable controls, text alternatives and a DOM description of the scene, reduced-motion mode, captions for audio, high-contrast UI, don't gate critical content behind 3D</td></tr>
+<tr><td>Progressive enhancement</td><td>Render meaningful HTML content first (SEO, no-JS), then load the 3D layer lazily after the main content (Lesson 45)</td></tr>
+</table>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Extend the synth: add an ADSR envelope, a delay effect with feedback, and a keyboard (A–K keys) playing notes. Add a visualizer.</li>
+<li>Build a 3D scene with a moving engine/drone using <code>PositionalAudio</code>; vary pitch with speed and volume with distance; add a mute button that persists.</li>
+<li>Load a drum-sample sprite sheet and make a clickable 3D drum pad with per-pad sounds scheduled precisely using the audio clock.</li>
+<li>Add <code>VRButton</code> to an existing scene; implement teleport locomotion with a controller ray and a floor target; test with the Immersive Web Emulator.</li>
+<li>Build an AR "place a model on the table" demo using hit-test (Android Chrome) and the <code>ARButton</code>.</li>
+<li>Create quality presets (low/medium/high) auto-selected by <code>detect-gpu</code>, with a manual override in settings; verify on a phone and a desktop.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why must audio start from a click?</summary>Browsers block autoplaying sound to protect users; an AudioContext starts suspended until a user gesture lets you call resume().</details>
+<details><summary>Why setAnimationLoop instead of requestAnimationFrame for XR?</summary>In XR the headset owns the frame timing and passes the pose with each frame callback; setAnimationLoop hooks into the XR session's loop, which requestAnimationFrame on the window cannot.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 23 — Components & Props</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="23-react-props">
+<main><article>
+<h1>Lesson 23 — Components &amp; props</h1>
+<p class="lede">Build UIs by composing small components and passing data between them.</p>
+
+<h2>Props</h2>
+<p>Props are the inputs to a component, passed like HTML attributes and received as one object. Props are <strong>read-only</strong>: a component must never modify its props.</p>
+<textarea class="code" data-lang="jsx" data-run>
+function Avatar({ name, size = 48, color = "#7c5cff" }) {     // destructure + defaults
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", background: color, color: "#fff",
+      display: "grid", placeItems: "center", fontWeight: 700,
+    }}>
+      {name[0]}
+    </div>
+  );
+}
+
+function Card({ title, children, footer }) {       // children = whatever is nested inside
+  return (
+    <section style={{ border: "1px solid #ccc", borderRadius: 12, padding: 16, maxWidth: 320 }}>
+      <h2 style={{ marginTop: 0 }}>{title}</h2>
+      {children}
+      {footer && <footer style={{ marginTop: 12, opacity: .7 }}>{footer}</footer>}
+    </section>
+  );
+}
+
+function App() {
+  return (
+    <Card title="Team" footer="Updated today">
+      <div style={{ display: "flex", gap: 8 }}>
+        <Avatar name="Ada" />
+        <Avatar name="Grace" color="tomato" />
+        <Avatar name="Linus" size={32} color="seagreen" />
+      </div>
+    </Card>
+  );
+}
+</textarea>
+<p>Try it: add a <code>Badge</code> component, pass a <code>shape</code> prop to <code>Avatar</code>, and nest another <code>Card</code> inside a <code>Card</code>.</p>
+
+<h2>Passing different kinds of values</h2>
+<textarea class="code" data-lang="jsx">
+<Profile
+  name="Ada"                 // string literal
+  age={36}                   // everything else in braces
+  admin                      // shorthand for admin={true}
+  tags={["a", "b"]}
+  address={{ city: "London" }}   // double braces: braces + object literal
+  onSave={() => console.log("saved")}   // callbacks flow data UP
+  {...extraProps}            // spread an object as props
+/>
+</textarea>
+
+<h2>Composition over inheritance</h2>
+<textarea class="code" data-lang="jsx" data-run>
+// Layout components with slots
+function Page({ header, sidebar, children }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 12 }}>
+      <header style={{ gridColumn: "1 / -1", background: "#eee", padding: 8 }}>{header}</header>
+      <aside style={{ background: "#ffe1ea", padding: 8 }}>{sidebar}</aside>
+      <main>{children}</main>
+    </div>
+  );
+}
+
+// Specialize a generic component by wrapping it
+function Button({ variant = "primary", ...rest }) {
+  const bg = variant === "primary" ? "#5b3df5" : "#e8e6f2";
+  const color = variant === "primary" ? "#fff" : "#222";
+  return <button style={{ background: bg, color, border: 0, borderRadius: 8, padding: "8px 14px" }} {...rest} />;
+}
+const DangerButton = (props) => <Button {...props} style={{ background: "crimson", color: "#fff" }} />;
+
+function App() {
+  return (
+    <Page header={<strong>My App</strong>} sidebar={<nav>Nav here</nav>}>
+      <p>Main content</p>
+      <Button onClick={() => alert("hi")}>Primary</Button>{" "}
+      <Button variant="secondary">Secondary</Button>{" "}
+      <DangerButton>Delete</DangerButton>
+    </Page>
+  );
+}
+</textarea>
+
+<h2>Thinking in components</h2>
+<ol>
+<li>Draw boxes around the UI; each box with a single responsibility is a candidate component.</li>
+<li>Name by what it <em>is</em> (<code>ProductCard</code>), not where it's used.</li>
+<li>Put components in files: <code>src/components/ProductCard.jsx</code> with one default or named export.</li>
+<li>Pass the data the component needs, not a whole giant object it only uses one field of.</li>
+<li>Don't define components inside other components (they'd be recreated and lose state each render).</li>
+</ol>
+<textarea class="code" data-lang="jsx" data-file="src/components/ProductCard.jsx">
+export default function ProductCard({ product, onAdd }) {
+  const { name, price, image } = product;
+  return (
+    <article className="product-card">
+      <img src={image} alt={name} loading="lazy" />
+      <h3>{name}</h3>
+      <p>${price.toFixed(2)}</p>
+      <button onClick={() => onAdd(product.id)}>Add to cart</button>
+    </article>
+  );
+}
+</textarea>
+<div class="callout warn"><span class="label">Rule</span>Never mutate props: <code>props.items.push(x)</code> is a bug. Copy first. Components must be <em>pure</em> with respect to their props and state: same inputs → same output.</div>
+
+<h2>PropTypes vs TypeScript</h2>
+<textarea class="code" data-lang="js" data-file="ProductCard.tsx">
+type Product = { id: number; name: string; price: number; image: string };
+type Props = { product: Product; onAdd: (id: number) => void };
+export default function ProductCard({ product, onAdd }: Props) { /* ... */ }
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build <code>Button</code>, <code>Badge</code>, <code>Avatar</code> and <code>Card</code> components with variants via props.</li>
+<li>Build a <code>ProductGrid</code> that takes an array and renders <code>ProductCard</code>s with your Part 2 CSS grid.</li>
+<li>Build a <code>Tabs</code>-looking static layout using slot-style props (<code>left</code>, <code>right</code>).</li>
+<li>Build an accessible <code>Alert</code> component with <code>type="info|error"</code>, an icon and <code>role="alert"</code>.</li>
+<li>Convert your Project 1 portfolio into components (<code>Hero</code>, <code>ProjectCard</code>, <code>Footer</code>).</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>What is <code>children</code>?</summary>A special prop holding whatever JSX is nested between a component's opening and closing tags.</details>
+<details><summary>How does a child send data to its parent?</summary>The parent passes a callback function as a prop; the child calls it with the data.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

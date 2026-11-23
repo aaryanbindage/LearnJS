@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 71 — Git, Code Review & Team Workflow</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="71-git-teams">
+<main><article>
+<h1>Lesson 71 — Git, code review &amp; team workflow</h1>
+<p class="lede">Writing code is half the job; the other half is changing a shared codebase safely with other people. Git fluency, small reviewable changes and good communication separate juniors from professionals.</p>
+
+<h2>Git mental model</h2>
+<ul>
+<li>A commit is an immutable <strong>snapshot</strong> with a parent pointer. A branch is a movable label pointing at a commit. <code>HEAD</code> is "where you are".</li>
+<li>Three areas: <strong>working tree</strong> → (<code>git add</code>) → <strong>index/staging</strong> → (<code>git commit</code>) → <strong>repository</strong>. Remotes (<code>origin</code>) are other copies; <code>fetch</code> downloads, <code>pull</code> = fetch + merge/rebase, <code>push</code> uploads.</li>
+<li>History is a graph (DAG). Most "scary" Git operations are just moving labels around it, and the <strong>reflog</strong> remembers almost everything for a while.</li>
+</ul>
+<textarea class="code" data-lang="bash">
+git status -sb                         # short status with branch
+git switch -c feat/search              # new branch
+git add -p                             # stage hunks interactively: keeps commits focused
+git commit -m "feat(search): debounce input and cancel stale requests"
+git fetch origin && git rebase origin/main     # replay your commits on top of the latest main (linear history)
+git push -u origin feat/search         # first push sets upstream
+git push --force-with-lease            # after a rebase: safe force push (refuses if someone else pushed)
+
+git log --oneline --graph --decorate -20
+git diff --staged                      # what will be committed
+git restore --staged file.js           # unstage;  git restore file.js discards working changes (careful)
+git stash push -m "wip" && git stash pop
+git switch -                           # previous branch
+</textarea>
+
+<h2>Fixing mistakes</h2>
+<table>
+<tr><th>Situation</th><th>Command</th></tr>
+<tr><td>Amend the last commit (not yet pushed)</td><td><code>git commit --amend</code></td></tr>
+<tr><td>Undo a pushed commit safely</td><td><code>git revert &lt;sha&gt;</code> (creates a new commit)</td></tr>
+<tr><td>Squash/reorder/edit local commits before review</td><td><code>git rebase -i origin/main</code> (<code>fixup</code>, <code>squash</code>, <code>reword</code>)</td></tr>
+<tr><td>Fixup a specific earlier commit</td><td><code>git commit --fixup &lt;sha&gt;</code> then <code>git rebase -i --autosquash origin/main</code></td></tr>
+<tr><td>Lost commits after a bad reset/rebase</td><td><code>git reflog</code> → <code>git switch -c rescue &lt;sha&gt;</code></td></tr>
+<tr><td>Find which commit introduced a bug</td><td><code>git bisect start; git bisect bad; git bisect good &lt;sha&gt;</code> (binary search; <code>git bisect run npm test</code> automates it)</td></tr>
+<tr><td>Who changed this line and why?</td><td><code>git blame -L 40,60 file</code>, <code>git log -S "symbol" -p</code></td></tr>
+<tr><td>Merge conflicts</td><td>Edit conflict markers, <code>git add</code>, <code>git rebase --continue</code> (or <code>merge --continue</code>). Enable <code>git config rerere.enabled true</code></td></tr>
+<tr><td>Bring one commit to another branch</td><td><code>git cherry-pick &lt;sha&gt;</code></td></tr>
+<tr><td>Work on two branches at once</td><td><code>git worktree add ../hotfix hotfix/123</code></td></tr>
+</table>
+<div class="callout warn"><span class="label">Golden rule</span>Don't rewrite (rebase/amend/force-push) history other people have based work on: shared branches like <code>main</code>. Rewrite your own feature branch freely until it's reviewed.</div>
+
+<h2>Branching strategies</h2>
+<ul>
+<li><strong>Trunk-based development</strong> (most high-performing teams): short-lived branches (&lt; 1–2 days) merged to <code>main</code> often, hidden behind <strong>feature flags</strong> if incomplete. Pairs with strong CI and fast review.</li>
+<li><strong>GitHub Flow</strong>: branch → PR → review → merge → deploy. Simple and fine for most products.</li>
+<li><strong>Git Flow</strong> (long-lived develop/release branches): heavy; mostly for versioned, packaged software.</li>
+<li>Merge styles: <em>squash merge</em> (one clean commit per PR; common), <em>rebase merge</em> (linear), <em>merge commit</em> (preserves branch topology). Pick one per repo.</li>
+</ul>
+
+<h2>Commits and pull requests that people can review</h2>
+<ul>
+<li><strong>Small PRs</strong> (&lt; ~300 changed lines) get reviewed faster and better. Split refactors from behavior changes. Stack PRs for big features.</li>
+<li><strong>Commit messages</strong>: imperative subject ≤ 72 chars; body explains <em>why</em>. Conventional Commits (<code>feat:</code>, <code>fix:</code>, <code>chore:</code>, <code>docs:</code>, <code>refactor:</code>) enable changelogs and automated versioning.</li>
+<li><strong>PR description</strong>: what/why, how to test, screenshots or video for UI, risks, rollout/rollback plan, linked issue.</li>
+<li>Self-review the diff first. Run the checks locally. Mark WIP as draft.</li>
+</ul>
+<textarea class="code" data-lang="bash" data-file=".github/pull_request_template.md">
+## What & why
+<!-- the problem and the approach, link the issue -->
+
+## How to test
+1.
+2.
+
+## Screenshots / recording
+
+## Risks & rollout
+- [ ] Behind a feature flag   - [ ] Migration included   - [ ] Docs updated   - [ ] Tests added
+</textarea>
+
+<h2>Code review: giving and receiving</h2>
+<h3>As a reviewer</h3>
+<ul>
+<li>Review for: correctness, edge cases, security, tests, readability, API design, performance on hot paths, accessibility. Don't nitpick what a linter/formatter should catch.</li>
+<li>Ask questions rather than issue verdicts ("What happens if this list is empty?"). Prefix severity: <code>blocking:</code>, <code>suggestion:</code>, <code>nit:</code>, <code>question:</code>. Praise good work.</li>
+<li>Respond quickly (same day). A slow review queue is the biggest hidden cost in teams.</li>
+</ul>
+<h3>As an author</h3>
+<ul>
+<li>Assume good intent; the review is about the code, not you. Reply to every comment, push fixes as new commits during review, and resolve threads when done.</li>
+<li>If a discussion drags on, jump on a quick call and write the outcome in the PR.</li>
+</ul>
+
+<h2>Repository hygiene &amp; automation</h2>
+<ul>
+<li><code>.gitignore</code> (node_modules, build output, <code>.env</code>), a committed lockfile, <code>.editorconfig</code>, Prettier + ESLint, <strong>CODEOWNERS</strong>, branch protection (require review + passing CI, no direct pushes to <code>main</code>), signed commits optionally.</li>
+<li><strong>Hooks</strong> with husky/lint-staged for fast local checks; never rely on them alone (CI is the gate).</li>
+<li><strong>Secrets</strong> committed by accident are compromised forever: rotate the key immediately; then clean history (<code>git filter-repo</code>) as a secondary step.</li>
+<li><strong>Monorepos</strong>: sparse checkout and tools like Turborepo/Nx for affected-only builds. <strong>Releases</strong>: semantic versioning, tags, changelogs (Changesets, release-please).</li>
+<li><strong>Documentation</strong>: README (what, why, quick start), CONTRIBUTING, <strong>ADRs</strong> (short Architecture Decision Records: context, decision, consequences), runbooks.</li>
+</ul>
+
+<h2>Working with others</h2>
+<ul>
+<li>Write things down: issues with acceptance criteria, design docs for big changes (problem, options, decision, risks), async updates. Over-communicate status and blockers.</li>
+<li>Estimate with ranges and slice work into vertical, shippable increments. Prefer reversible decisions; make irreversible ones deliberately.</li>
+<li>Pair/mob when stuck or onboarding; rotate knowledge so no one is a single point of failure.</li>
+<li>Open-source contribution is the best practice: read CONTRIBUTING, start with "good first issue", discuss before large changes, keep PRs small.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Create a repo; make a feature branch with 5 messy commits and use interactive rebase to turn them into 2 clean ones. Then deliberately cause and resolve a merge conflict, using <code>rerere</code>.</li>
+<li>Introduce a bug across 30 commits (script it) and find it with <code>git bisect run</code>.</li>
+<li>Destroy a branch with <code>reset --hard</code> then recover it from the reflog.</li>
+<li>Set up branch protection, CODEOWNERS, a PR template, conventional-commit linting (commitlint) and release-please on a practice repo.</li>
+<li>Find a "good first issue" in an open-source JS/Three.js project, read its contribution guide, and submit a real PR (docs fixes count).</li>
+<li>Review three PRs from others (or open-source) using the severity-prefix convention, and write an ADR for a decision in your Project 5.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Merge vs rebase?</summary>Merge joins histories with a merge commit and preserves the true timeline. Rebase replays your commits on a new base for a linear history, but rewrites them, so use it only on unshared branches.</details>
+<details><summary>Why small PRs?</summary>They're easier to understand, review thoroughly, test and roll back, and they merge sooner, reducing conflicts.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 57 — Next.js: SSR, SSG & Server Components</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="57-nextjs">
+<main><article>
+<h1>Lesson 57 — Next.js: SSR, SSG &amp; Server Components</h1>
+<p class="lede">So far your React apps ran entirely in the browser (client-side rendering). Production sites often render on the server for faster first paint, better SEO and direct data access. Next.js is the most widely used full-stack React framework. Alternatives with similar ideas: React Router (framework mode), Remix, TanStack Start, Astro.</p>
+
+<div class="callout warn"><span class="label">Fast-moving ecosystem</span>Next.js and React evolve quickly. The concepts here (rendering strategies, server vs client components, caching) are stable, but exact APIs, config flags and caching defaults change between versions. Always check nextjs.org/docs for your installed version.</div>
+
+<h2>Rendering strategies</h2>
+<table>
+<tr><th>Strategy</th><th>When HTML is made</th><th>Good for</th></tr>
+<tr><td><strong>CSR</strong> client-side</td><td>In the browser, after JS loads</td><td>Dashboards behind login, highly interactive apps</td></tr>
+<tr><td><strong>SSG</strong> static generation</td><td>At build time</td><td>Marketing pages, docs, blogs; fastest and cheapest (CDN)</td></tr>
+<tr><td><strong>SSR</strong> server rendering</td><td>On each request</td><td>Personalized or always-fresh pages with SEO needs</td></tr>
+<tr><td><strong>ISR</strong> incremental regeneration</td><td>Static, regenerated in the background every N seconds or on demand</td><td>Catalogs, news: static speed with fresh-enough data</td></tr>
+<tr><td><strong>Streaming</strong></td><td>Shell first, slow parts stream in via Suspense</td><td>Pages mixing fast and slow data</td></tr>
+</table>
+<p><strong>Hydration</strong>: the browser receives HTML, shows it immediately, then React attaches event handlers to it. Mismatches between server and client output cause hydration errors (e.g. rendering <code>Date.now()</code> or <code>Math.random()</code> directly).</p>
+
+<h2>Setup and the App Router</h2>
+<textarea class="code" data-lang="bash">
+npx create-next-app@latest my-app    # choose TypeScript, Tailwind, App Router, src/ dir
+cd my-app && npm run dev
+</textarea>
+<textarea class="code" data-lang="bash">
+src/app/
+  layout.tsx            # root layout: <html>, <body>, shared UI (persists across navigations)
+  page.tsx              # route "/"
+  loading.tsx           # automatic Suspense fallback for the segment
+  error.tsx             # error boundary for the segment ("use client")
+  not-found.tsx
+  products/
+    page.tsx            # "/products"
+    [id]/page.tsx       # "/products/:id" (dynamic segment)
+  api/
+    health/route.ts     # Route Handler: GET /api/health
+  (marketing)/about/page.tsx   # route group: organizes without changing the URL
+</textarea>
+<p>File-system routing: folders define URL segments; special files (<code>page</code>, <code>layout</code>, <code>loading</code>, <code>error</code>, <code>route</code>) define behavior. <code>middleware.ts</code> (renamed <em>proxy</em> in newer versions) runs before requests for redirects, auth gates and rewrites.</p>
+
+<h2>Server Components (the big idea)</h2>
+<p>In the App Router every component is a <strong>Server Component</strong> by default. It runs only on the server, ships <strong>zero JavaScript</strong> to the browser, and can be <code>async</code>: read databases, call internal services, use secrets directly, no API layer needed.</p>
+<textarea class="code" data-lang="jsx" data-file="src/app/products/page.tsx">
+import { db } from "@/lib/db";
+import { AddToCart } from "./AddToCart";             // a Client Component, below
+
+export const metadata = { title: "Products" };       // SEO: per-page metadata
+
+export default async function ProductsPage({ searchParams }) {
+  const { category } = await searchParams;           // URL state is available on the server
+  const products = await db.product.findMany({       // runs on the server: safe to use DB credentials
+    where: category ? { category } : undefined,
+    orderBy: { createdAt: "desc" },
+    take: 24,
+  });
+
+  return (
+    <main className="grid grid-cols-2 gap-4 p-6">
+      {products.map((p) => (
+        <article key={p.id}>
+          <h2>{p.name}</h2>
+          <p>${(p.priceCents / 100).toFixed(2)}</p>
+          <AddToCart productId={p.id} />             {/* interactive island */}
+        </article>
+      ))}
+    </main>
+  );
+}
+</textarea>
+<h3>Client Components</h3>
+<p>Add <code>"use client"</code> at the top of a file for components that need state, effects, event handlers, browser APIs, or libraries that depend on them (including Three.js/R3F canvases). They are still pre-rendered on the server but also hydrated in the browser.</p>
+<textarea class="code" data-lang="jsx" data-file="src/app/products/AddToCart.tsx">
+"use client";
+import { useState, useTransition } from "react";
+import { addToCart } from "@/app/actions";            // a Server Action
+
+export function AddToCart({ productId }: { productId: string }) {
+  const [pending, start] = useTransition();
+  const [added, setAdded] = useState(false);
+  return (
+    <button
+      disabled={pending}
+      onClick={() => start(async () => { await addToCart(productId); setAdded(true); })}
+    >
+      {pending ? "Adding…" : added ? "Added ✓" : "Add to cart"}
+    </button>
+  );
+}
+</textarea>
+<table>
+<tr><th>Server Component</th><th>Client Component</th></tr>
+<tr><td>async/await, DB, secrets, file system</td><td>useState, useEffect, event handlers</td></tr>
+<tr><td>No JS shipped, no hooks, no browser APIs</td><td>Runs on server (SSR) and client; adds to the JS bundle</td></tr>
+<tr><td>Can render Client Components</td><td>Can't import Server Components (but can receive them as <code>children</code>)</td></tr>
+</table>
+<div class="callout"><span class="label">Rule of thumb</span>Push <code>"use client"</code> as far down the tree as possible: make small interactive <em>leaves</em> client components and keep layouts and data-fetching on the server. Props passed from server to client must be serializable (no functions, class instances).</div>
+
+<h2>Data fetching, streaming and caching</h2>
+<textarea class="code" data-lang="jsx" data-file="src/app/dashboard/page.tsx">
+import { Suspense } from "react";
+
+export default function Dashboard() {
+  return (
+    <>
+      <h1>Dashboard</h1>                              {/* streams immediately */}
+      <Suspense fallback={<p>Loading stats…</p>}>
+        <Stats />                                     {/* slow: streams in when ready */}
+      </Suspense>
+      <Suspense fallback={<p>Loading feed…</p>}>
+        <Feed />
+      </Suspense>
+    </>
+  );
+}
+async function Stats() { const s = await getStats(); return <p>{s.users} users</p>; }
+
+// Run independent requests in parallel to avoid waterfalls:
+const [user, posts] = await Promise.all([getUser(id), getPosts(id)]);
+</textarea>
+<ul>
+<li><strong>Caching has several layers</strong> (request memoization, data cache, full-route cache, client router cache), and the defaults changed across Next.js versions. Learn the current model from the docs; configure per fetch/route (<code>revalidate</code>, <code>cache: "no-store"</code>, tags with <code>revalidateTag</code>/<code>revalidatePath</code>).</li>
+<li>Per-request personalized pages are dynamic (reading cookies/headers/searchParams opts into dynamic rendering).</li>
+<li>Prefer <strong>fetching on the server</strong> in components; use TanStack Query on the client for interactive, frequently updating data.</li>
+</ul>
+
+<h2>Built-in optimizations</h2>
+<textarea class="code" data-lang="jsx">
+import Image from "next/image";     // responsive sizes, lazy loading, AVIF/WebP, no CLS (give width/height or fill)
+import Link from "next/link";       // client-side navigation + prefetching in viewport
+import { Inter } from "next/font/google";   // self-hosted fonts, zero layout shift
+
+const inter = Inter({ subsets: ["latin"], display: "swap" });
+<Image src="/hero.jpg" alt="…" width={1200} height={600} priority />   // priority for the LCP image
+<Link href="/products/42" prefetch>View</Link>
+</textarea>
+
+<h2>Using Three.js / R3F with Next.js</h2>
+<textarea class="code" data-lang="jsx" data-file="src/components/Scene.tsx">
+"use client";
+import { Canvas } from "@react-three/fiber";
+export default function Scene() { return <Canvas>{/* … */}</Canvas>; }
+</textarea>
+<textarea class="code" data-lang="jsx" data-file="src/app/page.tsx">
+import dynamic from "next/dynamic";
+const Scene = dynamic(() => import("@/components/Scene"), { ssr: false, loading: () => <p>Loading 3D…</p> });
+// In newer versions, `ssr: false` must be used inside a Client Component. Real text content stays server-rendered for SEO.
+</textarea>
+
+<h2>Deploying</h2>
+<ul>
+<li><strong>Vercel</strong> (made by the Next.js team): zero-config. Self-host with <code>next build &amp;&amp; next start</code> on Node, or Docker (<code>output: "standalone"</code>); Cloudflare, Netlify and others via adapters.</li>
+<li>Pick the right runtime per route: Node (full APIs) vs Edge (fast, limited APIs).</li>
+<li>Set environment variables per environment; only <code>NEXT_PUBLIC_*</code> reach the browser.</li>
+</ul>
+
+<h2>When not to use Next.js</h2>
+<ul>
+<li>Pure client apps behind login with no SEO needs: Vite + React Router is simpler and cheaper to run.</li>
+<li>Content-heavy, mostly static sites: <strong>Astro</strong> ships far less JavaScript.</li>
+<li>If you don't want framework lock-in or complexity: keep your API separate (Fastify/Hono) and a thin frontend.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Create a Next.js app with: a static home page, a blog (Markdown or MDX, <code>generateStaticParams</code>), and a dynamic product page with SSR.</li>
+<li>Convert your Project 3 SPA's list/detail pages to Server Components; keep only the favorites button as a Client Component. Compare JavaScript bundle sizes.</li>
+<li>Use Suspense to stream a slow section. Verify in the Network tab that HTML arrives in chunks.</li>
+<li>Add per-page <code>generateMetadata</code> with Open Graph images; validate the results with a social card debugger.</li>
+<li>Embed an R3F scene with <code>dynamic(..., { ssr: false })</code> and make the surrounding page fully server-rendered text.</li>
+<li>Add ISR (<code>revalidate</code>) to a product list and trigger on-demand revalidation from a webhook route.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why are Server Components good for performance?</summary>They render on the server and send only HTML/RSC payload, shipping no component JavaScript to the browser, so less code to download, parse and hydrate.</details>
+<details><summary>Can a Client Component import a Server Component?</summary>No (it would pull server code into the bundle). Instead pass the Server Component as <code>children</code> or a prop from a Server Component parent.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

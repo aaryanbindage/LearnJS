@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 9 — Transforms, Transitions, Animations & Modern CSS</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="09-css-motion">
+<main><article>
+<h1>Lesson 9 — Transforms, transitions, animations &amp; modern CSS</h1>
+<p class="lede">Add motion that guides attention without hurting performance or accessibility, then tour the newest CSS features.</p>
+
+<h2>Transforms</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body { font-family: system-ui; display: grid; place-items: center; min-height: 90vh; margin: 0; perspective: 600px; }
+  .box { width: 120px; height: 120px; background: linear-gradient(135deg, #7c5cff, #e0457b); border-radius: 16px;
+         transform: translateX(0) rotate(0) scale(1);
+         transition: transform .6s cubic-bezier(.2,.8,.2,1); }
+  .box:hover { transform: translateY(-20px) rotate(15deg) scale(1.2); }
+  .flip:hover { transform: rotateY(180deg); }
+</style>
+<div class="box"></div>
+<p>Hover the box. Try adding <code>rotateY(180deg)</code> or <code>skew(10deg)</code>.</p>
+</textarea>
+<p>Functions: <code>translate() rotate() scale() skew()</code> and 3D variants (<code>translateZ</code>, <code>rotateX</code>, with <code>perspective</code>). Newer individual properties: <code>translate</code>, <code>rotate</code>, <code>scale</code>. Set <code>transform-origin</code> to pivot elsewhere.</p>
+<div class="callout"><span class="label">Performance</span>Animate <strong><code>transform</code></strong> and <strong><code>opacity</code></strong>. They run on the GPU compositor. Animating <code>width</code>, <code>top</code> or <code>margin</code> forces layout every frame and janks.</div>
+
+<h2>Transitions</h2>
+<textarea class="code" data-lang="css">
+.btn {
+  background: #7c5cff;
+  transition: background .2s ease, transform .2s ease;   /* property duration timing-function [delay] */
+}
+.btn:hover { background: #5b3df5; transform: translateY(-2px); }
+.btn:active { transform: translateY(0); }
+</textarea>
+<p>A transition animates between two states when a property changes. It needs a start value and an end value (so <code>height: auto</code> doesn't animate; use grid-row trick or <code>interpolate-size: allow-keywords</code> in new browsers).</p>
+
+<h2>Keyframe animations</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body { font-family: system-ui; display: grid; place-items: center; min-height: 90vh; margin: 0; background: #16151d; }
+  .dot { width: 40px; height: 40px; border-radius: 50%; background: #ffcf44;
+         animation: bounce 1s cubic-bezier(.3,0,.7,1) infinite alternate; }
+  @keyframes bounce {
+    from { transform: translateY(-60px) scaleY(1); }
+    90%  { transform: translateY(40px) scaleY(1); }
+    to   { transform: translateY(40px) scaleY(.6); }
+  }
+  .dot:nth-child(2) { animation-delay: .15s; } .dot:nth-child(3) { animation-delay: .3s; }
+  .wrap { display: flex; gap: 14px; }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+</style>
+<div class="wrap"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+</textarea>
+<p>Key properties: <code>animation-name, -duration, -timing-function, -delay, -iteration-count, -direction (alternate), -fill-mode (forwards), -play-state</code>. Respect <code>prefers-reduced-motion</code>.</p>
+
+<h2>Modern CSS you should know</h2>
+<textarea class="code" data-lang="css">
+/* Nesting */
+.card { padding: 1rem; &:hover { box-shadow: 0 8px 24px #0003; } .title { font-weight: 700; } }
+
+/* Parent selector */
+.field:has(input:invalid) { color: crimson; }
+
+/* Better color mixing */
+background: color-mix(in oklch, var(--brand) 20%, white);
+
+/* Cascade layers: control priority regardless of specificity */
+@layer reset, base, components, utilities;
+@layer components { .btn { padding: .6em 1.2em; } }
+
+/* Scroll-driven animations */
+.progress { animation: grow linear; animation-timeline: scroll(); }
+@keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Snap scrolling */
+.carousel { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }
+.carousel > * { flex: 0 0 80%; scroll-snap-align: center; }
+
+/* Misc */
+.thumb { aspect-ratio: 1; object-fit: cover; }
+.dialog::backdrop { background: #0008; }
+html { accent-color: #7c5cff; scroll-behavior: smooth; }
+@view-transition { navigation: auto; }
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a button with hover, active and focus-visible states that all transition smoothly.</li>
+<li>Create a loading spinner using only CSS keyframes (a bordered circle rotating).</li>
+<li>Build a 3D flip card (front and back faces with <code>backface-visibility: hidden</code>).</li>
+<li>Build a horizontal scroll-snap carousel.</li>
+<li>Animate an accordion open and closed (hint: <code>grid-template-rows: 0fr → 1fr</code>).</li>
+<li>Audit your animations in DevTools → Performance and make sure only transform/opacity animate.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why animate transform instead of left?</summary>transform and opacity are handled by the compositor without re-running layout or paint, so they stay at 60fps.</details>
+<details><summary>When should animations be disabled?</summary>When the user sets prefers-reduced-motion: reduce. Remove or tone down large movements.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

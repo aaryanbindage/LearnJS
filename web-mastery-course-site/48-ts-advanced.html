@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 48 — Advanced Types</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="48-ts-advanced">
+<main><article>
+<h1>Lesson 48 — Advanced types: generics, mapped, conditional</h1>
+<p class="lede">TypeScript's type system is a small programming language. Library authors use it to make APIs that infer everything. You need enough of it to read library types and to build a few of your own, without overdoing it.</p>
+
+<h2>Type-level building blocks</h2>
+<textarea class="code" data-lang="js" data-file="keyof.ts">
+type User = { id: number; name: string; active: boolean };
+
+type Keys = keyof User;                 // "id" | "name" | "active"
+type Values = User[keyof User];         // number | string | boolean  (indexed access)
+const cfg = { host: "x", port: 3000 } as const;
+type Cfg = typeof cfg;                  // { readonly host: "x"; readonly port: 3000 }
+
+// Template literal types
+type Event = "click" | "hover";
+type Handler = `on${Capitalize<Event>}`;      // "onClick" | "onHover"
+type Route = `/users/${number}` | `/posts/${string}`;
+</textarea>
+
+<h2>Mapped types</h2>
+<p>Loop over the keys of a type and transform each property. Most utility types are mapped types.</p>
+<textarea class="code" data-lang="js" data-file="mapped.ts">
+type Optional<T> = { [K in keyof T]?: T[K] };                 // = Partial<T>
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };         // remove readonly with -
+type Nullable<T> = { [K in keyof T]: T[K] | null };
+
+// Key remapping with `as`
+type Getters<T> = { [K in keyof T as `get${Capitalize<string & K>}`]: () => T[K] };
+type G = Getters<{ name: string; age: number }>;    // { getName: () => string; getAge: () => number }
+
+// Filter keys by value type
+type OnlyStrings<T> = { [K in keyof T as T[K] extends string ? K : never]: T[K] };
+</textarea>
+
+<h2>Conditional types and <code>infer</code></h2>
+<textarea class="code" data-lang="js" data-file="conditional.ts">
+type IsString<T> = T extends string ? true : false;
+type A = IsString<"x">;      // true
+type B = IsString<1>;        // false
+
+// Distributes over unions:
+type ToArray<T> = T extends unknown ? T[] : never;
+type C = ToArray<string | number>;      // string[] | number[]
+
+// `infer` captures a part of a matched type
+type ElementOf<T> = T extends (infer E)[] ? E : never;
+type D = ElementOf<number[]>;                           // number
+type Unwrap<T> = T extends Promise<infer R> ? Unwrap<R> : T;      // recursive
+type E = Unwrap<Promise<Promise<string>>>;              // string
+
+// How ReturnType is built:
+type MyReturn<F> = F extends (...args: any[]) => infer R ? R : never;
+</textarea>
+
+<h2>Generic constraints, defaults and inference tricks</h2>
+<textarea class="code" data-lang="js" data-file="generics-adv.ts">
+// Constrain to something with a length
+function longest<T extends { length: number }>(a: T, b: T): T { return a.length >= b.length ? a : b; }
+
+// Infer literal types with `const` type parameters (TS 5)
+function tuple<const T extends readonly unknown[]>(...xs: T): T { return xs; }
+const t = tuple("a", 1);     // readonly ["a", 1]  (not (string|number)[])
+
+// Typed event map: payload type follows the event name
+type Events = { login: { user: string }; logout: void; resize: { w: number; h: number } };
+class Emitter<E extends Record<string, unknown>> {
+  private handlers: { [K in keyof E]?: Array<(p: E[K]) => void> } = {};
+  on<K extends keyof E>(name: K, fn: (p: E[K]) => void) { (this.handlers[name] ??= []).push(fn); }
+  emit<K extends keyof E>(name: K, ...[p]: E[K] extends void ? [] : [E[K]]) {
+    this.handlers[name]?.forEach(fn => fn(p as E[K]));
+  }
+}
+const bus = new Emitter<Events>();
+bus.on("resize", ({ w, h }) => console.log(w, h));   // w, h typed
+bus.emit("logout");                                    // no payload required
+bus.emit("login", { user: "ada" });
+// bus.emit("login");                                  // ✖ payload required
+</textarea>
+
+<h2>Type-safe builders and APIs</h2>
+<textarea class="code" data-lang="js" data-file="router.ts">
+// Extract route params from a path string at the type level
+type Params<Path extends string> =
+  Path extends `${string}:${infer P}/${infer Rest}` ? { [K in P | keyof Params<`/${Rest}`>]: string }
+  : Path extends `${string}:${infer P}` ? { [K in P]: string }
+  : {};
+
+type P1 = Params<"/users/:id/posts/:postId">;     // { id: string; postId: string }
+declare function get<Path extends string>(path: Path, handler: (params: Params<Path>) => void): void;
+get("/users/:id", (p) => p.id);                   // p: { id: string }
+
+// Branded (nominal) types: prevent mixing structurally identical values
+type Brand<T, B> = T & { readonly __brand: B };
+type UserId = Brand<number, "UserId">;
+type PostId = Brand<number, "PostId">;
+const uid = 1 as UserId;
+function loadPost(id: PostId) {}
+// loadPost(uid);   // ✖ UserId is not assignable to PostId
+</textarea>
+
+<h2>Variance, <code>satisfies</code> and declaration files</h2>
+<textarea class="code" data-lang="js" data-file="misc.ts">
+// satisfies: validate without widening
+const palette = { red: [255, 0, 0], green: "#0f0" } satisfies Record<string, string | number[]>;
+palette.red.map(n => n * 2);        // still known to be number[]
+
+// Module augmentation: extend third-party types
+declare module "react" { interface CSSProperties { [key: `--${string}`]: string | number } }
+
+// Ambient declarations for assets (Vite)
+declare module "*.glsl" { const src: string; export default src; }
+declare module "*.module.css" { const classes: Record<string, string>; export default classes; }
+
+// Overloads vs generics vs unions: choose the simplest that expresses the API
+</textarea>
+
+<h2>When not to be clever</h2>
+<ul>
+<li>Type-level code is hard to read and slow to compile. If a type needs a comment longer than the function, simplify the design.</li>
+<li>Hide complexity behind a simple public signature; keep the tricky part inside one well-tested utility.</li>
+<li>Test types with <code>expectTypeOf</code> (Vitest) or <code>tsd</code> for library code.</li>
+<li>Read the types of libraries you use (<kbd>Cmd</kbd>+click in your editor): the fastest way to learn.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Implement <code>MyPick</code>, <code>MyOmit</code>, <code>MyReadonly</code>, <code>DeepPartial</code>, <code>Awaited</code> and <code>ReturnType</code> without using the built-ins. Try the <strong>type-challenges</strong> repo on GitHub (easy and medium sets).</li>
+<li>Write <code>Paths&lt;T&gt;</code>: all dot-notation key paths of a nested object (<code>"a" | "a.b" | "a.b.c"</code>), then <code>get(obj, "a.b")</code> typed to return the right value type.</li>
+<li>Build the typed <code>Emitter</code> above and extend it with <code>once</code> and <code>off</code>.</li>
+<li>Create branded <code>Email</code> and <code>UserId</code> types with validated constructors.</li>
+<li>Write a typed <code>createStore(initialState, reducers)</code> where action creators are inferred from reducer names.</li>
+<li>Read the type definitions of <code>@tanstack/react-query</code>'s <code>useQuery</code> and explain how it infers the data type from <code>queryFn</code>.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>What does <code>infer</code> do?</summary>Inside a conditional type it declares a type variable the compiler fills in with whatever part of the matched type is in that position.</details>
+<details><summary>Why use branded types?</summary>TypeScript is structural, so two ids that are both numbers are interchangeable. Brands add a phantom property that makes them distinct at compile time.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

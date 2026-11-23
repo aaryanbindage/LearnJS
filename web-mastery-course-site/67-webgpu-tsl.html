@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 67 — WebGPU, TSL & Compute</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="67-webgpu-tsl">
+<main><article>
+<h1>Lesson 67 — WebGPU, TSL &amp; compute</h1>
+<p class="lede">WebGPU is the successor to WebGL: lower overhead, modern GPU features and, crucially, <strong>compute shaders</strong>, which let the GPU run general-purpose parallel work (simulating a million particles, cloth, fluids, culling). Three.js supports it through <code>WebGPURenderer</code> and a JavaScript shader language called <strong>TSL</strong>.</p>
+
+<div class="callout warn"><span class="label">Moving target</span>The Three.js WebGPU renderer and TSL are evolving, and import paths, node names and defaults have changed between releases. Pin your Three.js version, read the official <code>webgpu_*</code> examples for that version, and treat the code below as the shape of the API rather than copy-paste truth.</div>
+
+<h2>WebGL vs WebGPU</h2>
+<table>
+<tr><th></th><th>WebGL 2</th><th>WebGPU</th></tr>
+<tr><td>API style</td><td>Global state machine (2000s OpenGL)</td><td>Explicit objects: pipelines, bind groups, command buffers</td></tr>
+<tr><td>Compute</td><td>No (hacks via fragment shaders)</td><td><strong>Yes</strong>: compute shaders, storage buffers</td></tr>
+<tr><td>Shading language</td><td>GLSL</td><td>WGSL (and TSL in Three.js)</td></tr>
+<tr><td>CPU overhead</td><td>Higher per draw call</td><td>Lower; render bundles; better multithreading story</td></tr>
+<tr><td>Support</td><td>Universal</td><td>Chrome/Edge, Safari and Firefox are rolling out; always provide a WebGL fallback</td></tr>
+</table>
+<p>Check support: <code>if (navigator.gpu) …</code>. Three's <code>WebGPURenderer</code> automatically falls back to a WebGL2 backend when WebGPU is unavailable (with some features, like compute, limited there).</p>
+
+<h2>Setting up the WebGPU renderer</h2>
+<textarea class="code" data-lang="js" data-file="main.js">
+import * as THREE from "three/webgpu";                    // the WebGPU build exports renderer + node materials
+import { color, float, uniform, uv, sin, time, positionLocal, normalLocal, mix, vec3, vec4, Fn } from "three/tsl";
+
+const renderer = new THREE.WebGPURenderer({ antialias: true });
+await renderer.init();                                    // async: the adapter/device must be requested first
+renderer.setSize(innerWidth, innerHeight);
+document.body.append(renderer.domElement);
+renderer.setAnimationLoop(() => renderer.render(scene, camera));   // (or renderAsync in older versions)
+</textarea>
+
+<h2>TSL: write shaders in JavaScript</h2>
+<p>TSL (Three Shading Language) builds a shader graph from ordinary JS function calls. The same code compiles to WGSL (WebGPU) or GLSL (WebGL fallback). Composition is easy: functions are reusable and mix with built-in material nodes, so you rarely patch strings.</p>
+<textarea class="code" data-lang="js" data-file="tsl-material.js">
+const uStrength = uniform(0.2);                           // JS-controlled uniform: change with uStrength.value = …
+
+const material = new THREE.MeshStandardNodeMaterial({ roughness: 0.35 });
+
+// Vertex: displace along the normal with a moving wave
+material.positionNode = positionLocal.add(
+  normalLocal.mul(sin(positionLocal.y.mul(4).add(time.mul(2))).mul(uStrength))
+);
+
+// Fragment: gradient by uv, animated
+const stripes = sin(uv().y.mul(30).add(time)).mul(0.5).add(0.5);
+material.colorNode = mix(color("#7c5cff"), color("#14e0a3"), stripes);
+
+// Reusable function nodes
+const fresnel = Fn(([power = float(3)]) => {
+  // …build with normalView, positionView, dot(), pow() …
+  return float(0);
+});
+material.emissiveNode = vec3(fresnel(2)).mul(0.5);
+</textarea>
+<ul>
+<li>Node materials expose slots (<code>colorNode</code>, <code>positionNode</code>, <code>normalNode</code>, <code>emissiveNode</code>, <code>opacityNode</code>…) instead of raw <code>gl_FragColor</code>.</li>
+<li>Control flow in TSL uses <code>If</code>, <code>Loop</code>, <code>select</code> (functions), not JS <code>if</code> (which runs on the CPU while <em>building</em> the graph).</li>
+</ul>
+
+<h2>Compute shaders: a GPU particle system</h2>
+<p>Particles live in <strong>storage buffers</strong> on the GPU. A compute pass updates all of them in parallel each frame, then the render pass draws them. No CPU loop, no per-frame uploads, so a million particles are practical.</p>
+<textarea class="code" data-lang="js" data-file="particles.js">
+import { instancedArray, instanceIndex, Fn, vec3, hash, deltaTime, time, positionLocal } from "three/tsl";
+
+const COUNT = 1_000_000;
+const positions  = instancedArray(COUNT, "vec3");         // storage buffers living on the GPU
+const velocities = instancedArray(COUNT, "vec3");
+
+// 1) Initialize once (compute)
+const init = Fn(() => {
+  const p = positions.element(instanceIndex);
+  const v = velocities.element(instanceIndex);
+  p.assign(vec3(hash(instanceIndex), hash(instanceIndex.add(1)), hash(instanceIndex.add(2))).sub(0.5).mul(10));
+  v.assign(vec3(0));
+})().compute(COUNT);
+await renderer.computeAsync(init);
+
+// 2) Update every frame (compute): attract toward origin with swirl
+const update = Fn(() => {
+  const p = positions.element(instanceIndex);
+  const v = velocities.element(instanceIndex);
+  const toCenter = p.negate().normalize();
+  v.addAssign(toCenter.mul(deltaTime.mul(2)));
+  v.mulAssign(0.995);                                      // drag
+  p.addAssign(v.mul(deltaTime));
+})().compute(COUNT);
+
+// 3) Render: a sprite material reading positions from the buffer
+const sprite = new THREE.SpriteNodeMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+sprite.positionNode = positions.toAttribute();
+sprite.scaleNode = float(0.02);
+const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), sprite, COUNT);
+scene.add(mesh);
+
+renderer.setAnimationLoop(() => { renderer.compute(update); renderer.render(scene, camera); });
+</textarea>
+
+<h2>What compute unlocks</h2>
+<ul>
+<li><strong>Massive particle/boid systems</strong>, fluid and smoke (grid simulations), cloth and soft bodies, GPU culling and LOD selection, skinning of crowds, procedural terrain generation and mesh building, image processing, and even small ML inference.</li>
+<li><strong>Workgroups</strong>: compute runs threads in groups with fast shared memory; coordinate with barriers for reductions, prefix sums and sorting. Race conditions are possible: two threads writing the same element needs <code>atomic</code> operations.</li>
+<li><strong>Reading back to the CPU</strong> (<code>getArrayBufferAsync</code>) is slow and asynchronous; keep data on the GPU and render directly from it.</li>
+</ul>
+
+<h2>Raw WebGPU (to understand what's underneath)</h2>
+<textarea class="code" data-lang="js" data-file="raw-webgpu.js">
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter.requestDevice();
+const module = device.createShaderModule({ code: /* wgsl */`
+  @group(0) @binding(0) var<storage, read_write> data: array<f32>;
+  @compute @workgroup_size(64)
+  fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+    if (id.x < arrayLength(&data)) { data[id.x] = data[id.x] * 2.0; }
+  }`});
+// pipeline = device.createComputePipeline({ layout: "auto", compute: { module, entryPoint: "main" } });
+// buffer = device.createBuffer({ size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
+// bindGroup, then encoder.beginComputePass(); pass.setPipeline; pass.setBindGroup; pass.dispatchWorkgroups(Math.ceil(n/64)); …
+// Learn this once via webgpufundamentals.org: it makes every higher-level abstraction legible.
+</textarea>
+
+<h2>Strategy: when to adopt</h2>
+<ul>
+<li><strong>Shipping to the general public today</strong>: Three.js with <code>WebGLRenderer</code> is the safe default. Use WebGPU/TSL for new projects where you need compute or want a forward-looking codebase, and test the fallback path.</li>
+<li>Feature-detect and degrade gracefully (fewer particles, simpler materials) rather than blocking users.</li>
+<li>Other WebGPU engines/libraries: Babylon.js (mature WebGPU), PlayCanvas, wgpu (Rust/WASM), TensorFlow.js/ONNX Runtime Web backends, WebLLM.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Run the official Three.js <code>webgpu_compute_particles</code> and <code>webgpu_tsl_*</code> examples locally for your pinned version; read the source and annotate the API differences from this lesson.</li>
+<li>Port the Lesson 66 displaced-fresnel material to a <code>MeshStandardNodeMaterial</code> with TSL nodes.</li>
+<li>Build a GPU particle fountain (compute): emit, apply gravity and floor bounce, recycle dead particles. Show the FPS at 100k, 1M and 5M.</li>
+<li>Do the "double values in a storage buffer" compute example in raw WebGPU following webgpufundamentals.org, then read the results back and verify.</li>
+<li>Add feature detection so your app uses <code>WebGPURenderer</code> when available and otherwise a simpler WebGL scene; test by disabling WebGPU in browser flags.</li>
+<li>Implement Conway's Game of Life with ping-pong storage buffers in compute and render the grid as a texture.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>What can WebGPU do that WebGL cannot?</summary>Run compute shaders (general GPU programs with storage buffers and shared memory), plus lower-overhead explicit pipelines, enabling simulations and culling entirely on the GPU.</details>
+<details><summary>Why is TSL useful?</summary>You write shader logic once in JavaScript; Three compiles it to WGSL or GLSL depending on the backend, and it composes with built-in node materials instead of string-patching shader code.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

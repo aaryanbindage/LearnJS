@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project 6 — A Production 3D Experience</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="p6-production-3d">
+<main><article>
+<h1>Project 6 — A production 3D experience</h1>
+<p class="lede">Ship a polished, performant, accessible 3D web application, the kind you'd put at the top of a portfolio. It must run well on a mid-range phone, degrade gracefully, load fast, and have real architecture behind it.</p>
+
+<h2>Choose one brief</h2>
+<ul>
+<li><strong>Product configurator</strong>: a customizable object (sneaker, chair, watch): materials, colors, parts, camera presets, price summary, share link encoding the configuration in the URL, AR "view in your room" where supported.</li>
+<li><strong>Browser game</strong>: a complete small 3D game (arena shooter, racer, puzzle platformer) with physics, enemies/obstacles, scoring, menus, save data, audio, gamepad + touch support.</li>
+<li><strong>Interactive story / data world</strong>: scroll- or exploration-driven 3D narrative or visualization of a real dataset (city, galaxy, climate), with a 2D accessible equivalent of the information.</li>
+<li><strong>Multiplayer playground</strong>: shared 3D space with presence, chat or simple interactions using Lesson 59 techniques.</li>
+</ul>
+
+<h2>Requirements</h2>
+<h3>Technical</h3>
+<ol>
+<li>React + R3F (or Three.js with a clean module structure), TypeScript strict, Vite or Next.js. State in a small store; no frame-rate data in React state.</li>
+<li>Custom visual identity: at least <strong>one custom shader or patched material</strong>, a cohesive lighting setup, and tasteful post-processing with a quality toggle.</li>
+<li>Assets: all models optimized (glTF + Draco/Meshopt, KTX2 textures), documented licenses, a loading screen with real progress, lazy loading for non-critical assets.</li>
+<li>Physics or simulation <strong>or</strong> a procedural/GPU-driven element (instancing, compute, noise generation).</li>
+<li>Fixed-timestep logic where simulation matters; unit tests for pure logic (math, game rules, configurators' pricing).</li>
+</ol>
+<h3>Performance targets</h3>
+<ol>
+<li>60 fps on a mid-range phone (or a stable 30 with adaptive quality) and 144 on desktop where possible. Draw calls &lt; 150, initial download &lt; 5 MB (excluding lazy assets), first meaningful content (HTML UI) &lt; 2 s on 4G.</li>
+<li>Adaptive quality via <code>PerformanceMonitor</code>/GPU tiers; DPR capped; shadows and post FX scale down automatically.</li>
+<li>No memory growth over a 10-minute session (verify with heap snapshots and <code>renderer.info</code>).</li>
+</ol>
+<h3>Experience &amp; accessibility</h3>
+<ol>
+<li>Works with mouse, touch and keyboard (gamepad/XR optional bonus). On-screen controls for touch; remappable or documented keys.</li>
+<li>Real HTML for all text/UI; keyboard-accessible menus; descriptive text alternatives for the 3D content; <code>prefers-reduced-motion</code> mode; audio mute and captions for important cues.</li>
+<li>Graceful fallbacks: no WebGL → static fallback with a message; low-power → simplified scene.</li>
+<li>Sound design: spatial audio and UI sounds, with user gesture start and a persisted volume setting.</li>
+</ol>
+<h3>Delivery</h3>
+<ol>
+<li>Deployed to a public HTTPS URL on a CDN with correct caching (immutable hashed assets, <code>Content-Encoding</code> brotli, <code>.glb</code> and <code>.ktx2</code> served with proper MIME types and long cache lifetimes).</li>
+<li>CI: lint, typecheck, unit tests, build, Playwright smoke test (page loads, canvas renders, no console errors, a key interaction works) and a size budget check.</li>
+<li>README with GIF/video demo, architecture diagram (scene graph, stores, systems), performance numbers before/after optimization, asset credits, and "what I'd do next".</li>
+<li>Analytics for load time/FPS buckets and error reporting (Sentry) to learn from real devices.</li>
+</ol>
+
+<h2>Milestones (≈ 3 weeks)</h2>
+<ol>
+<li><strong>Week 1</strong>: concept, moodboard, greybox prototype of core interaction with placeholder shapes; performance budget written down; architecture and stores.</li>
+<li><strong>Week 2</strong>: real assets in the pipeline, materials/shaders, lighting, UI and audio, input on all devices; first deployment.</li>
+<li><strong>Week 3</strong>: optimization on a real phone, accessibility and fallbacks, tests/CI, polish (transitions, loading, feedback), README, demo video, peer playtest feedback applied.</li>
+</ol>
+
+<h2>Review rubric</h2>
+<table>
+<tr><th>Area</th><th>Excellent looks like</th></tr>
+<tr><td>Visual craft</td><td>Cohesive art direction; lighting and materials feel intentional; motion has easing and purpose</td></tr>
+<tr><td>Performance</td><td>Measured, documented, adaptive; hits the budget on target hardware</td></tr>
+<tr><td>Architecture</td><td>Clear separation of scene, logic, state and UI; reusable systems; testable core</td></tr>
+<tr><td>Accessibility &amp; resilience</td><td>Usable without a mouse, understandable without sound, safe on weak devices</td></tr>
+<tr><td>Delivery</td><td>Live, fast, monitored, reproducible build; honest documentation</td></tr>
+</table>
+
+<section class="checkpoint"><h2>Self-review</h2>
+<details><summary>Before you call it done</summary>
+<ul><li>Did I test on a real mid-range phone and a throttled CPU?</li>
+<li>Can someone play or configure using only a keyboard or only touch?</li>
+<li>Is there a measured before/after for at least three optimizations?</li>
+<li>What happens on a 3G connection, with WebGL disabled, and after 10 minutes of play?</li>
+<li>Could a teammate understand and extend the codebase from the README alone?</li></ul></details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

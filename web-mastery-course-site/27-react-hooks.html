@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 27 — Refs, Reducers, Memoization & Custom Hooks</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="27-react-hooks">
+<main><article>
+<h1>Lesson 27 — Refs, reducers, memoization &amp; custom hooks</h1>
+<p class="lede">The rest of the everyday hooks, and how to package your own logic into reusable hooks.</p>
+
+<h2><code>useRef</code></h2>
+<p>A ref is a box (<code>{ current }</code>) that persists across renders; <strong>changing it does not trigger a re-render</strong>. Two uses: reaching DOM nodes, and storing mutable values (timer ids, previous values, Three.js objects!).</p>
+<textarea class="code" data-lang="jsx" data-run>
+function App() {
+  const inputRef = useRef(null);
+  const renders = useRef(0);
+  renders.current++;                         // no re-render caused
+  const timerRef = useRef(null);
+  const [secs, setSecs] = useState(0);
+
+  const start = () => { if (!timerRef.current) timerRef.current = setInterval(() => setSecs(s => s + 1), 1000); };
+  const stop = () => { clearInterval(timerRef.current); timerRef.current = null; };
+  useEffect(() => stop, []);
+
+  return (
+    <div>
+      <input ref={inputRef} placeholder="Focus me with the button" />{" "}
+      <button onClick={() => inputRef.current.focus()}>Focus</button>
+      <p>Rendered {renders.current} times · timer: {secs}s</p>
+      <button onClick={start}>Start</button> <button onClick={stop}>Stop</button>
+    </div>
+  );
+}
+</textarea>
+<p>Don't read or write <code>ref.current</code> during render (except lazy init). Use it in handlers and effects.</p>
+
+<h2><code>useReducer</code></h2>
+<p>When state updates are many or interdependent, centralize them in a pure <em>reducer</em>: <code>(state, action) =&gt; newState</code>. It's easier to test and reason about.</p>
+<textarea class="code" data-lang="jsx" data-run>
+const initial = { items: [], nextId: 1 };
+
+function reducer(state, action) {
+  switch (action.type) {
+    case "add":
+      return { items: [...state.items, { id: state.nextId, text: action.text, done: false }], nextId: state.nextId + 1 };
+    case "toggle":
+      return { ...state, items: state.items.map(i => i.id === action.id ? { ...i, done: !i.done } : i) };
+    case "remove":
+      return { ...state, items: state.items.filter(i => i.id !== action.id) };
+    case "clear_done":
+      return { ...state, items: state.items.filter(i => !i.done) };
+    default:
+      throw new Error("Unknown action: " + action.type);
+  }
+}
+
+function App() {
+  const [state, dispatch] = useReducer(reducer, initial);
+  const [text, setText] = useState("");
+  return (
+    <div>
+      <form onSubmit={e => { e.preventDefault(); if (text.trim()) { dispatch({ type: "add", text }); setText(""); } }}>
+        <input value={text} onChange={e => setText(e.target.value)} placeholder="New task" /> <button>Add</button>
+      </form>
+      <ul>
+        {state.items.map(i => (
+          <li key={i.id}>
+            <label style={{ textDecoration: i.done ? "line-through" : "" }}>
+              <input type="checkbox" checked={i.done} onChange={() => dispatch({ type: "toggle", id: i.id })} /> {i.text}
+            </label> <button onClick={() => dispatch({ type: "remove", id: i.id })}>✕</button>
+          </li>))}
+      </ul>
+      <button onClick={() => dispatch({ type: "clear_done" })}>Clear completed</button>
+    </div>
+  );
+}
+</textarea>
+
+<h2>Memoization: <code>useMemo</code>, <code>useCallback</code>, <code>memo</code></h2>
+<p>By default, when a component re-renders, <strong>all its children re-render</strong>. That's usually fine and fast. Memoization is an optimization for measured problems, not a default.</p>
+<textarea class="code" data-lang="jsx" data-run>
+function slowSquareSum(n) { let s = 0; for (let i = 0; i < n * 1e6; i++) s += i; return s; }
+
+const Child = memo(function Child({ onPing }) {          // skips re-render if props are equal
+  console.log("Child rendered");
+  return <button onClick={onPing}>Ping</button>;
+});
+
+function App() {
+  const [n, setN] = useState(5);
+  const [count, setCount] = useState(0);
+
+  const expensive = useMemo(() => slowSquareSum(n), [n]);   // cache a VALUE until n changes
+  const onPing = useCallback(() => setCount(c => c + 1), []);   // cache a FUNCTION identity
+
+  return (
+    <div>
+      <p>n={n} result={expensive}</p>
+      <button onClick={() => setN(n + 1)}>n+1</button>{" "}
+      <button onClick={() => setCount(c => c + 1)}>count: {count}</button>{" "}
+      <Child onPing={onPing} />
+    </div>
+  );
+}
+</textarea>
+<div class="callout"><span class="label">Rule of thumb</span>Don't memoize until profiling (React DevTools Profiler) shows a real cost. <code>useCallback</code> only helps if the function is passed to a <code>memo</code>'d child or used as an effect dependency. React 19's <em>React Compiler</em> can add most of this automatically.</div>
+
+<h2>Custom hooks</h2>
+<p>A custom hook is just a function starting with <code>use</code> that calls other hooks. It lets you share <em>stateful logic</em> (not state itself: each caller gets its own state).</p>
+<textarea class="code" data-lang="jsx" data-run>
+function useLocalStorage(key, initialValue) {
+  const [value, setValue] = useState(() => {
+    try { const s = localStorage.getItem(key); return s !== null ? JSON.parse(s) : initialValue; }
+    catch { return initialValue; }
+  });
+  useEffect(() => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }, [key, value]);
+  return [value, setValue];
+}
+
+function useDebounce(value, ms = 300) {
+  const [v, setV] = useState(value);
+  useEffect(() => { const t = setTimeout(() => setV(value), ms); return () => clearTimeout(t); }, [value, ms]);
+  return v;
+}
+
+function useToggle(initial = false) {
+  const [on, setOn] = useState(initial);
+  return [on, useCallback(() => setOn(o => !o), []), setOn];
+}
+
+function App() {
+  const [name, setName] = useLocalStorage("demo-name", "");
+  const debounced = useDebounce(name, 500);
+  const [open, toggle] = useToggle();
+  return (
+    <div>
+      <input value={name} onChange={e => setName(e.target.value)} placeholder="Persists across reloads" />
+      <p>Debounced: {debounced}</p>
+      <button onClick={toggle}>{open ? "Hide" : "Show"}</button>{open && <p>Peekaboo</p>}
+    </div>
+  );
+}
+</textarea>
+<p>Other built-ins worth knowing: <code>useLayoutEffect</code> (measure DOM before paint), <code>useId</code>, <code>useTransition</code>/<code>useDeferredValue</code> (keep UI responsive during heavy updates), <code>useSyncExternalStore</code> (subscribe to external stores), <code>useImperativeHandle</code> (rare), and in React 19: <code>use</code>, <code>useActionState</code>, <code>useOptimistic</code>.</p>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Rewrite your todo app with <code>useReducer</code> and write unit tests for the reducer alone.</li>
+<li>Build <code>usePrevious(value)</code>, <code>useOnClickOutside(ref, handler)</code>, <code>useMediaQuery(query)</code>, <code>useFetch(url)</code>.</li>
+<li>Auto-focus an input when a modal opens, and return focus to the trigger when it closes.</li>
+<li>Build a stopwatch with <code>useRef</code> for the interval id and <code>performance.now()</code> for accuracy.</li>
+<li>Profile a list of 5,000 items with a slow child; fix it using <code>memo</code> and stable props, and measure before/after.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>State vs ref?</summary>State changes trigger re-renders and are used for anything shown on screen. Refs hold mutable values that don't affect rendering.</details>
+<details><summary>When is useReducer better than useState?</summary>Many related fields, complex transitions, or when the next state depends on several actions. It centralizes logic into a testable pure function.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

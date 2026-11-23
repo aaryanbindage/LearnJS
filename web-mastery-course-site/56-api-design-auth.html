@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 56 — API Design, Validation & Authentication</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="56-api-design-auth">
+<main><article>
+<h1>Lesson 56 — API design, validation &amp; authentication</h1>
+<p class="lede">An API is a product whose users are other programmers (including you in six months). Good APIs are consistent, predictable, hard to misuse and safe.</p>
+
+<h2>REST principles in practice</h2>
+<ul>
+<li><strong>Resources are nouns</strong>, methods are verbs: <code>GET /api/orders/42</code>, <code>POST /api/orders</code>, <code>DELETE /api/orders/42</code>. Plural collection names.</li>
+<li><strong>Nest sparingly</strong>: <code>/users/7/orders</code> is fine; deeper than two levels becomes awkward. Expose actions that don't fit CRUD as sub-resources: <code>POST /orders/42/cancel</code>.</li>
+<li><strong>Stateless</strong>: each request carries what the server needs (token). No server-side session assumptions in handlers beyond auth.</li>
+<li><strong>Status codes and bodies</strong>: use the right code; JSON everywhere; consistent envelope or none (pick one).</li>
+<li><strong>Versioning</strong>: <code>/v1/…</code> or a header. Prefer additive, backwards-compatible changes (new optional fields) so you rarely need a new version.</li>
+<li><strong>Idempotency</strong>: retries must be safe. Accept an <code>Idempotency-Key</code> header for <code>POST</code>s that charge money or create things.</li>
+</ul>
+<textarea class="code" data-lang="js" data-file="conventions.http">
+# List with pagination, filtering, sorting, and sparse fields
+GET /api/products?category=shoes&min_price=50&sort=-created_at&limit=20&cursor=eyJpZCI6MTAwfQ
+
+# Response
+200 OK
+{ "data": [ { "id": "p_123", "name": "Runner", "price": 8900 } ],
+  "page": { "next_cursor": "eyJpZCI6ODB9", "has_more": true } }
+
+# Error shape (consistent, machine- and human-readable)
+422 Unprocessable Content
+{ "error": { "code": "validation_failed", "message": "Invalid input",
+             "fields": { "email": "must be a valid email" }, "request_id": "req_8f2" } }
+</textarea>
+<ul>
+<li>Return money as integer minor units (cents) plus currency; dates as ISO-8601 UTC strings; ids as opaque strings.</li>
+<li>Expose the minimum fields (never return password hashes); version your DTOs separately from DB rows.</li>
+<li>Document with <strong>OpenAPI</strong> (Swagger UI, Scalar). Generate types/clients from it, or the reverse from Zod schemas (<code>zod-to-openapi</code>).</li>
+</ul>
+
+<h2>Alternatives: GraphQL, tRPC, RPC</h2>
+<table>
+<tr><th>Style</th><th>Strengths</th><th>Trade-offs</th></tr>
+<tr><td><strong>REST/JSON</strong></td><td>Universal, cacheable with HTTP, simple tooling</td><td>Over/under-fetching; many endpoints</td></tr>
+<tr><td><strong>GraphQL</strong></td><td>Client chooses fields; one endpoint; strong schema; good for many different clients</td><td>Caching, N+1 on the server (DataLoader), query cost limiting, more complexity</td></tr>
+<tr><td><strong>tRPC</strong></td><td>End-to-end TypeScript types with zero codegen, great for a monorepo with one TS client</td><td>TypeScript-only; not a public API</td></tr>
+<tr><td><strong>Server Actions / RPC</strong> (Next.js)</td><td>Call server functions from components</td><td>Tied to the framework; treat them as public endpoints and authorize in each</td></tr>
+<tr><td><strong>WebSocket / SSE</strong></td><td>Push updates</td><td>Stateful connections to scale (Lesson 59)</td></tr>
+</table>
+<textarea class="code" data-lang="js" data-file="graphql-example.graphql">
+query Product($id: ID!) {
+  product(id: $id) { name price reviews(first: 3) { rating author { name } } }
+}
+</textarea>
+
+<h2>Validation: the boundary rule</h2>
+<p>Parse, don't validate: turn <code>unknown</code> input into a trusted typed value at the edge, then pass only trusted data inward. Validate bodies, query strings, params and headers.</p>
+<textarea class="code" data-lang="js" data-file="validate.js">
+import { z } from "zod";
+
+export const SignUp = z.object({
+  email: z.string().trim().toLowerCase().email().max(254),
+  password: z.string().min(12).max(128),
+  name: z.string().trim().min(1).max(80),
+}).strict();                                       // reject unknown keys (prevents mass assignment)
+
+export const ListQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),   // query strings are strings: coerce
+  cursor: z.string().optional(),
+  sort: z.enum(["created_at", "-created_at", "price", "-price"]).default("-created_at"),
+});
+
+export function parse(schema, data) {
+  const r = schema.safeParse(data);
+  if (!r.success) {
+    const err = new Error("validation_failed"); err.statusCode = 422;
+    err.fields = Object.fromEntries(r.error.issues.map(i => [i.path.join("."), i.message]));
+    throw err;
+  }
+  return r.data;
+}
+</textarea>
+
+<h2>Authentication: who are you?</h2>
+<h3>Passwords done right</h3>
+<textarea class="code" data-lang="js" data-file="password.js">
+import argon2 from "argon2";            // or bcrypt/scrypt: slow, salted, adaptive hashes
+
+export const hashPassword = (pw) => argon2.hash(pw, { type: argon2.argon2id });
+export const verifyPassword = (hash, pw) => argon2.verify(hash, pw);   // constant-time comparison inside
+// Never log passwords. Reject known-breached passwords (HaveIBeenPwned k-anonymity API). Prefer length over complexity rules.
+</textarea>
+<h3>Server sessions (recommended default for web apps)</h3>
+<textarea class="code" data-lang="js" data-file="sessions.js">
+import { randomBytes, createHash } from "node:crypto";
+
+const sha256 = (s) => createHash("sha256").update(s).digest("hex");
+
+export async function createSession(db, userId) {
+  const token = randomBytes(32).toString("base64url");            // 256 bits of randomness, unguessable
+  await db.query("INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, now() + interval '30 days')",
+    [sha256(token), userId]);                                     // store only a HASH: a DB leak can't be replayed
+  return token;
+}
+export async function getSession(db, token) {
+  const { rows } = await db.query(
+    "SELECT user_id FROM sessions WHERE id = $1 AND expires_at > now()", [sha256(token)]);
+  return rows[0] ?? null;
+}
+export const destroySession = (db, token) => db.query("DELETE FROM sessions WHERE id = $1", [sha256(token)]);
+
+// Cookie: HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000. Rotate the token on login (prevents fixation).
+</textarea>
+<h3>Tokens (JWT), OAuth/OIDC and passkeys</h3>
+<ul>
+<li><strong>JWT</strong>: a signed (not encrypted!) JSON blob: <code>header.payload.signature</code>. Stateless, but you can't revoke it before expiry. Use short lifetimes (5–15 min) plus a refresh token, always verify <code>alg</code>, <code>exp</code>, <code>iss</code>, <code>aud</code>, and never put secrets in the payload.</li>
+<li><strong>OAuth 2.0 / OpenID Connect</strong>: "Sign in with Google/GitHub". Use the <strong>Authorization Code flow with PKCE</strong>; let a library (Auth.js, Better Auth, Lucia patterns, Clerk, Auth0, Supabase) handle it.</li>
+<li><strong>Passkeys / WebAuthn</strong>: public-key credentials stored in the device/password manager. Phishing-resistant and the best UX; use <code>@simplewebauthn</code>.</li>
+<li><strong>MFA</strong>: TOTP apps or WebAuthn; avoid SMS where possible.</li>
+</ul>
+
+<h2>Authorization: what may you do?</h2>
+<textarea class="code" data-lang="js" data-file="authz.js">
+// Check on the SERVER, on EVERY request, for EVERY resource. Hiding a button is not authorization.
+export async function requireUser(req) {
+  const user = await getUserFromSession(req);
+  if (!user) throw httpError(401, "unauthenticated");
+  return user;
+}
+
+export async function getOrder(req) {
+  const user = await requireUser(req);
+  const order = await db.order.findUnique({ where: { id: req.params.id } });
+  if (!order) throw httpError(404, "not found");
+  if (order.userId !== user.id && user.role !== "admin") throw httpError(404, "not found");  // 404 avoids confirming existence
+  return order;
+}
+
+// Role-based (RBAC), attribute-based (ABAC), or relationship-based (ReBAC): start simple with roles + ownership checks.
+// Centralize policy (CASL, Oso, or a plain can(user, action, resource) function) so rules aren't scattered.
+</textarea>
+
+<h2>Protecting your API</h2>
+<ul>
+<li><strong>Rate limiting</strong> (per IP and per account): token bucket in Redis; stricter on login, signup, password reset. Return <code>429</code> with <code>Retry-After</code>.</li>
+<li><strong>Limits</strong>: body size, pagination size, query depth/complexity (GraphQL), upload types and sizes, request timeouts.</li>
+<li><strong>CORS</strong> allow-list; <strong>CSRF</strong> protection when using cookies (Lesson 53); security headers (<code>helmet</code>).</li>
+<li><strong>Webhooks</strong>: verify signatures (HMAC) and timestamps; make handlers idempotent.</li>
+<li><strong>Audit logs</strong> for sensitive actions; alert on anomalies.</li>
+</ul>
+
+<h2>Contract testing</h2>
+<textarea class="code" data-lang="js" data-file="authz.test.js">
+it("prevents user B from reading user A's order", async () => {
+  const a = await signUpAndLogin(app, "a@example.com");
+  const b = await signUpAndLogin(app, "b@example.com");
+  const order = await createOrder(app, a.cookie);
+  const res = await app.inject({ method: "GET", url: `/api/orders/${order.id}`, headers: { cookie: b.cookie } });
+  expect(res.statusCode).toBe(404);
+});
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Design (on paper, then as an OpenAPI file) a REST API for an online bookstore: resources, relationships, pagination, errors, versioning, auth. Review it against the conventions above.</li>
+<li>Implement signup, login, logout and a <code>/me</code> endpoint with Argon2, hashed session tokens and secure cookies. Add rate limiting to login.</li>
+<li>Write an authorization test suite (the "user B cannot access user A" matrix) for every resource endpoint.</li>
+<li>Add OAuth login (GitHub) using a library; link it to existing accounts safely.</li>
+<li>Implement an <code>Idempotency-Key</code> middleware backed by a table and demonstrate that retrying a <code>POST</code> doesn't duplicate.</li>
+<li>Generate an OpenAPI spec from your Zod schemas and a typed client for your React app (e.g., <code>openapi-typescript</code>).</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Authentication vs authorization?</summary>Authentication proves who the caller is; authorization decides what that identity is allowed to do with each resource.</details>
+<details><summary>Why store a hash of the session token?</summary>If the database leaks, attackers can't use hashed tokens to impersonate users, since only the original random token (held by the client) can be used.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

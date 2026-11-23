@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 18 — Classes, this & Prototypes</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="18-js-classes">
+<main><article>
+<h1>Lesson 18 — Classes, <code>this</code> &amp; prototypes</h1>
+<p class="lede">Three.js is built on classes, and <code>this</code> trips up everyone at least once. Learn both properly.</p>
+
+<h2>Classes</h2>
+<textarea class="code" data-lang="js" data-run>
+class Animal {
+  #energy = 10;                      // private field (truly private)
+  static count = 0;                  // belongs to the class
+
+  constructor(name) { this.name = name; Animal.count++; }
+
+  speak() { return `${this.name} makes a sound`; }
+  eat(n = 1) { this.#energy += n; return this; }     // return this → chaining
+  get energy() { return this.#energy; }              // getter
+  set nickname(v) { this._nick = v.trim(); }         // setter
+  static create(name) { return new this(name); }     // static factory
+}
+
+class Dog extends Animal {
+  constructor(name, breed) { super(name); this.breed = breed; }   // call parent first
+  speak() { return super.speak() + ": Woof!"; }                   // override + reuse
+}
+
+const d = new Dog("Rex", "Lab");
+console.log(d.speak(), d.eat(5).eat().energy, Animal.count);
+console.log(d instanceof Dog, d instanceof Animal, Dog.create("Fido").name);
+// console.log(d.#energy);   // SyntaxError: private
+</textarea>
+<p>Prefer <strong>composition</strong> over deep inheritance: build behavior by combining small objects/functions rather than long <code>extends</code> chains.</p>
+
+<h2><code>this</code></h2>
+<p><code>this</code> is decided by <em>how a function is called</em>, not where it's written (except arrow functions, which inherit it from the surrounding scope).</p>
+<textarea class="code" data-lang="js" data-run>
+const user = {
+  name: "Ada",
+  regular() { return this?.name; },
+  arrow: () => typeof this,           // arrows don't have their own this
+  later() { setTimeout(() => console.log("arrow keeps this:", this.name), 10); },
+  laterBroken() { setTimeout(function () { console.log("regular fn loses this:", this?.name); }, 10); },
+};
+
+console.log(user.regular());            // "Ada": called as a method, this = user
+const detached = user.regular;
+console.log(detached());                // undefined: called plain, this lost
+console.log(detached.call({ name: "Bob" }), detached.apply({ name: "Cy" }));
+const bound = detached.bind(user);
+console.log(bound());                   // "Ada" forever
+user.later(); user.laterBroken();
+</textarea>
+<table>
+<tr><th>Call style</th><th><code>this</code> is…</th></tr>
+<tr><td><code>obj.method()</code></td><td><code>obj</code></td></tr>
+<tr><td><code>fn()</code></td><td><code>undefined</code> (strict) / global (sloppy)</td></tr>
+<tr><td><code>new Fn()</code></td><td>the new object</td></tr>
+<tr><td><code>fn.call(x)</code>, <code>apply</code>, <code>bind</code></td><td><code>x</code></td></tr>
+<tr><td>arrow function</td><td>inherited lexically</td></tr>
+<tr><td>DOM event handler (regular fn)</td><td>the element (<code>currentTarget</code>)</td></tr>
+</table>
+
+<h2>Prototypes (what classes really are)</h2>
+<p>Every object has a hidden link to a <strong>prototype</strong> object. When you read a property that isn't on the object itself, JS walks up the prototype chain. <code>class</code> is cleaner syntax over this mechanism.</p>
+<textarea class="code" data-lang="js" data-run>
+const animal = { speak() { return this.name + " makes a sound"; } };
+const dog = Object.create(animal);        // dog's prototype is animal
+dog.name = "Rex";
+console.log(dog.speak(), Object.getPrototypeOf(dog) === animal);
+console.log(dog.hasOwnProperty("speak"), "speak" in dog);
+
+function Cat(name) { this.name = name; }            // old-style constructor
+Cat.prototype.meow = function () { return this.name + " meows"; };
+console.log(new Cat("Tom").meow());
+
+class A { m() {} }
+console.log(typeof A, A.prototype.m === new A().m, Object.getPrototypeOf([]) === Array.prototype);
+</textarea>
+
+<h2>Other useful patterns</h2>
+<textarea class="code" data-lang="js" data-run>
+// Factory function: no `this`, no `new`, real privacy via closure
+function createStack() {
+  const items = [];
+  return { push: x => items.push(x), pop: () => items.pop(), get size() { return items.length; } };
+}
+const s = createStack(); s.push(1); s.push(2); console.log(s.pop(), s.size);
+
+// Mixins
+const Serializable = Base => class extends Base { toJSON() { return { ...this }; } };
+class Point { constructor(x, y) { this.x = x; this.y = y; } }
+class SPoint extends Serializable(Point) {}
+console.log(JSON.stringify(new SPoint(1, 2)));
+
+// Symbols, getters, Object.freeze
+const frozen = Object.freeze({ a: 1 });
+try { frozen.a = 2; } catch (e) { console.log("strict mode throws:", e.message); }   // sloppy mode would silently ignore it
+console.log(frozen.a);
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a <code>Vector2</code> class with <code>add</code>, <code>scale</code>, <code>length</code> (getter), and <code>static fromAngle</code>. (You'll meet <code>THREE.Vector3</code> in Part 5.)</li>
+<li>Build <code>Shape</code> → <code>Circle</code>/<code>Rect</code> with <code>area()</code> overrides, and a function summing areas.</li>
+<li>Fix: <code>class Btn { constructor(){ this.n=0; el.addEventListener("click", this.inc) } inc(){ this.n++ } }</code> three different ways (bind, arrow field, wrapper).</li>
+<li>Implement a tiny <code>EventEmitter</code> class with <code>on</code>, <code>off</code>, <code>emit</code>.</li>
+<li>Re-implement <code>new</code> as a function using <code>Object.create</code> and <code>apply</code>.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why does passing obj.method as a callback lose this?</summary>Passing detaches the function from its object; when called plain, there's no receiver. Use bind, an arrow wrapper, or an arrow class field.</details>
+<details><summary>What is a prototype chain?</summary>The sequence of objects JS searches for a property, from the object itself up through its prototypes until null.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

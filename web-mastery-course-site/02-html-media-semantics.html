@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 2 — Links, Images, Media & Semantic Layout</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="02-html-media-semantics">
+<main><article>
+<h1>Lesson 2 — Links, images, media &amp; semantic layout</h1>
+<p class="lede">Connect pages, embed media responsibly, and structure a page with landmarks that people and machines understand.</p>
+
+<h2>Links</h2>
+<textarea class="code" data-lang="html">
+<a href="https://example.com" target="_blank" rel="noopener noreferrer">External</a>
+<a href="about.html">Relative file</a>
+<a href="../img/a.png">Up one folder</a>
+<a href="/blog/post-1">Root-relative</a>
+<a href="#contact">Jump to the element with id="contact"</a>
+<a href="mailto:me@example.com">Email</a>
+<a href="tel:+15551234567">Call</a>
+</textarea>
+<ul>
+<li><strong>Absolute</strong> URLs include the full address. <strong>Relative</strong> ones start from the current file.</li>
+<li>Use <code>rel="noopener"</code> with <code>target="_blank"</code>.</li>
+<li>Link text must make sense alone: "Read the docs", not "click here".</li>
+</ul>
+
+<h2>Images</h2>
+<textarea class="code" data-lang="html" data-run>
+<!-- an inline SVG data URL so this demo needs no files -->
+<img alt="A purple circle on a yellow square" width="200" height="200"
+ src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='gold'/><circle cx='50' cy='50' r='30' fill='rebeccapurple'/></svg>">
+<p>Change the colors, then try removing the <code>width</code> and <code>height</code>.</p>
+</textarea>
+<ul>
+<li><code>alt</code> is mandatory. Decorative image: <code>alt=""</code>.</li>
+<li><code>width</code> and <code>height</code> reserve space and prevent layout shift. <code>loading="lazy"</code> defers offscreen images.</li>
+<li>Formats: SVG (icons, logos), WebP/AVIF (photos), PNG (lossless), JPG (photos).</li>
+</ul>
+<textarea class="code" data-lang="html">
+<picture>
+  <source type="image/avif" srcset="hero.avif">
+  <source type="image/webp" srcset="hero.webp">
+  <img src="hero.jpg" alt="Mountain at sunrise" width="1200" height="800">
+</picture>
+
+<img src="s.jpg" srcset="s.jpg 480w, m.jpg 960w, l.jpg 1600w"
+     sizes="(max-width: 600px) 100vw, 50vw" alt="...">
+</textarea>
+
+<h2>Audio, video, embeds</h2>
+<textarea class="code" data-lang="html">
+<video controls poster="thumb.jpg" width="640">
+  <source src="clip.mp4" type="video/mp4">
+  <track kind="captions" src="en.vtt" srclang="en" label="English">
+</video>
+<audio controls src="song.mp3"></audio>
+<iframe src="https://www.youtube.com/embed/ID" title="Video title" loading="lazy"></iframe>
+
+<figure>
+  <img src="cat.jpg" alt="Cat on keyboard">
+  <figcaption>The real author of this code.</figcaption>
+</figure>
+</textarea>
+
+<h2>Semantic layout</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body{font-family:system-ui;margin:0}
+  header,footer{background:#eee;padding:.5rem 1rem}
+  nav a{margin-right:1rem}
+  aside{background:#fff6d6;padding:.5rem 1rem}
+</style>
+<header>
+  <a href="#">Logo</a>
+  <nav aria-label="Main"><a href="#">Home</a><a href="#">About</a></nav>
+</header>
+<main>
+  <article>
+    <h1>Post title</h1>
+    <section><h2>Part one</h2><p>Body text…</p></section>
+    <aside>Related links</aside>
+  </article>
+</main>
+<footer><small>&copy; 2026</small></footer>
+</textarea>
+<p>Landmarks let screen reader users jump straight to <code>main</code> or <code>nav</code>, help search engines parse structure, and make code self-documenting. Use exactly one <code>&lt;main&gt;</code> per page.</p>
+<table>
+<tr><th>Element</th><th>Use for</th></tr>
+<tr><td>header / footer</td><td>Intro or closing content of page or section</td></tr>
+<tr><td>nav</td><td>Major navigation blocks</td></tr>
+<tr><td>main</td><td>The page's unique content</td></tr>
+<tr><td>article</td><td>Self-contained piece (post, card, comment)</td></tr>
+<tr><td>section</td><td>Thematic group, normally with a heading</td></tr>
+<tr><td>aside</td><td>Tangential content</td></tr>
+</table>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a 3-page site (index, about, contact) with a shared <code>&lt;nav&gt;</code> and working relative links.</li>
+<li>Add an image with a proper <code>alt</code>, <code>width</code>, <code>height</code> and a <code>figure</code> caption.</li>
+<li>Add an in-page table of contents that jumps to sections via <code>#id</code>.</li>
+<li>Rewrite a page built from <code>&lt;div&gt;</code>s using only semantic elements.</li>
+<li>Open DevTools → Elements → Accessibility to confirm your landmarks appear.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Which element: site menu? Standalone blog post? Sidebar? Image caption?</summary>nav; article; aside; figcaption inside figure.</details>
+<details><summary>Why is alt crucial?</summary>It is the only version of the image for screen reader users, search engines, and anyone whose image fails to load.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 61 — Advanced State & Architecture</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="61-react-architecture">
+<main><article>
+<h1>Lesson 61 — Advanced state &amp; architecture</h1>
+<p class="lede">As apps grow, the hard problems are not components but <em>state</em>: where it lives, who owns it, how it stays consistent, and how it survives the network.</p>
+
+<h2>A taxonomy of state</h2>
+<table>
+<tr><th>Kind</th><th>Examples</th><th>Home</th></tr>
+<tr><td><strong>Server state</strong></td><td>users, products, posts (async, shared, can go stale)</td><td>TanStack Query / framework loaders: a <em>cache</em>, not your store</td></tr>
+<tr><td><strong>URL state</strong></td><td>route, filters, sort, page, selected tab, open dialog id</td><td>The URL (shareable, back-button friendly)</td></tr>
+<tr><td><strong>Local UI state</strong></td><td>input text, hover, open/closed</td><td><code>useState</code> in the component</td></tr>
+<tr><td><strong>Shared client state</strong></td><td>cart, theme, wizard progress, editor document</td><td>Context, Zustand, Redux Toolkit, Jotai</td></tr>
+<tr><td><strong>Form state</strong></td><td>values, errors, touched</td><td>React Hook Form / form actions</td></tr>
+<tr><td><strong>Derived state</strong></td><td>totals, filtered lists</td><td>Computed during render: never stored</td></tr>
+</table>
+<p>The most common architecture mistake is putting server data into a global client store and manually syncing it. Use a query cache for server state and keep your store small.</p>
+
+<h2>TanStack Query in depth</h2>
+<textarea class="code" data-lang="jsx" data-file="queries.ts">
+import { useQuery, useMutation, useQueryClient, queryOptions, keepPreviousData } from "@tanstack/react-query";
+
+// Co-locate the key + fetcher; reuse in components, prefetching and invalidation
+export const todosQuery = (filter: string) =>
+  queryOptions({ queryKey: ["todos", { filter }], queryFn: () => api.getTodos(filter), staleTime: 30_000 });
+
+function Todos({ filter }: { filter: string }) {
+  const { data, isPending, isFetching, error } = useQuery({ ...todosQuery(filter), placeholderData: keepPreviousData });
+  // isPending: no data yet  |  isFetching: any request in flight (background refresh)
+}
+
+function useToggleTodo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (t: Todo) => api.updateTodo(t.id, { done: !t.done }),
+    onMutate: async (t) => {                                    // OPTIMISTIC UPDATE
+      await qc.cancelQueries({ queryKey: ["todos"] });
+      const previous = qc.getQueriesData<Todo[]>({ queryKey: ["todos"] });
+      qc.setQueriesData<Todo[]>({ queryKey: ["todos"] }, (old) => old?.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)));
+      return { previous };
+    },
+    onError: (_e, _t, ctx) => ctx?.previous.forEach(([key, data]) => qc.setQueryData(key, data)),   // rollback
+    onSettled: () => qc.invalidateQueries({ queryKey: ["todos"] }),                                 // reconcile with server
+  });
+}
+</textarea>
+<ul>
+<li><strong>Query keys</strong> are dependency arrays for data; structure them hierarchically so invalidation can target subtrees.</li>
+<li><strong>staleTime</strong> (how long data is "fresh") vs <strong>gcTime</strong> (how long unused data stays cached).</li>
+<li>Infinite scroll: <code>useInfiniteQuery</code>. Prefetch on hover/route-intent. Hydrate from the server with <code>HydrationBoundary</code>.</li>
+<li>Persist the cache for offline-first apps (<code>persistQueryClient</code>) and retry with backoff.</li>
+</ul>
+
+<h2>State machines for complex UI</h2>
+<p>Wizards, drag interactions, media players, auth flows and multi-step async processes have <em>modes</em>. Encode them explicitly. Try this live reducer-based machine (you saw the idea in Lesson 50):</p>
+<textarea class="code" data-lang="jsx" data-run>
+const machine = {
+  idle:       { START: "recording" },
+  recording:  { PAUSE: "paused", STOP: "processing" },
+  paused:     { RESUME: "recording", STOP: "processing" },
+  processing: { DONE: "idle", FAIL: "error" },
+  error:      { RETRY: "processing", DISMISS: "idle" },
+};
+function reducer(state, event) {
+  const next = machine[state]?.[event];
+  return next ?? state;                                // illegal events are ignored: no impossible states
+}
+function App() {
+  const [state, send] = useReducer(reducer, "idle");
+  const events = Object.keys(machine[state]);          // UI derives available actions from the machine
+  return (
+    <div>
+      <p>State: <strong>{state}</strong></p>
+      {events.map(e => <button key={e} onClick={() => send(e)} style={{ marginRight: 6 }}>{e}</button>)}
+    </div>
+  );
+}
+</textarea>
+<p><strong>XState</strong> adds hierarchy, parallel states, guards, delays, actors and a visual editor (Stately). Use it when logic is genuinely stateful and the bug rate is high; use <code>useReducer</code> otherwise.</p>
+
+<h2>Global client state patterns</h2>
+<textarea class="code" data-lang="jsx" data-file="store.ts">
+import { create } from "zustand";
+import { devtools, persist } from "zustand/middleware";
+import { immer } from "zustand/middleware/immer";
+
+type CartItem = { id: string; qty: number };
+type CartState = {
+  items: CartItem[];
+  add: (id: string) => void;
+  remove: (id: string) => void;
+  count: () => number;
+};
+
+export const useCart = create<CartState>()(
+  devtools(persist(immer((set, get) => ({
+    items: [],
+    add: (id) => set((s) => { const i = s.items.find((x) => x.id === id); i ? i.qty++ : s.items.push({ id, qty: 1 }); }),
+    remove: (id) => set((s) => { s.items = s.items.filter((x) => x.id !== id); }),
+    count: () => get().items.reduce((n, i) => n + i.qty, 0),
+  })), { name: "cart" }))
+);
+
+// Subscribe to the smallest slice so components re-render only when it changes:
+const count = useCart((s) => s.items.length);
+</textarea>
+<ul>
+<li><strong>Redux Toolkit</strong>: strong conventions, devtools, middleware, RTK Query; good for large teams with complex flows.</li>
+<li><strong>Zustand / Jotai / Valtio</strong>: minimal API, selector-based subscriptions, great for 3D apps where state changes fast.</li>
+<li>Whatever you pick: normalize relational data (<code>byId</code> maps), keep reducers pure, and keep side effects out of them.</li>
+</ul>
+
+<h2>Architecture for scale</h2>
+<h3>Feature-sliced structure and boundaries</h3>
+<textarea class="code" data-lang="bash">
+src/
+  app/            # providers, router, global styles
+  features/
+    checkout/
+      api/        # queries/mutations
+      components/ # UI only for this feature
+      model/      # state, hooks, selectors, types
+      index.ts    # PUBLIC API: only export what other features may use
+  shared/         # ui kit, utils, api client, config (no feature imports!)
+</textarea>
+<p>Enforce boundaries with lint rules (<code>eslint-plugin-boundaries</code>, <code>dependency-cruiser</code>, Nx module boundaries) so the architecture survives team growth.</p>
+<h3>Patterns that keep components simple</h3>
+<ul>
+<li><strong>Custom hooks as the service layer</strong>: <code>useCheckout()</code> encapsulates queries, mutations, derived data; the component only renders.</li>
+<li><strong>Presentational vs container</strong>: pure, prop-driven UI components are easy to test and put in Storybook.</li>
+<li><strong>Dependency injection via context</strong> for API clients, feature flags and analytics, so tests and stories can swap them.</li>
+<li><strong>Error handling strategy</strong>: error boundaries per region, typed error results in the data layer, user-friendly messages, and reporting to Sentry.</li>
+<li><strong>Feature flags</strong> (LaunchDarkly, Unleash, PostHog) to ship dark and roll out gradually.</li>
+<li><strong>Internationalization</strong> (i18next, Format.js) and <code>Intl</code> from day one if you may need it; <strong>forms</strong> via React Hook Form + Zod resolver.</li>
+</ul>
+
+<h2>Micro-frontends and monorepos (know when you don't need them)</h2>
+<p>Most teams are better served by a <strong>modular monolith</strong> or a <strong>monorepo</strong> (pnpm workspaces + Turborepo/Nx) sharing a UI package, config and types. Micro-frontends (Module Federation, single-spa) solve <em>organizational</em> scaling problems at high operational cost; adopt them only with that problem.</p>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Take Project 3 and classify every piece of state using the taxonomy. Move anything misplaced (server data in Redux, filters in <code>useState</code>) to the right home.</li>
+<li>Implement optimistic updates with rollback for add/toggle/delete in TanStack Query. Add tests simulating a failing server.</li>
+<li>Model a checkout wizard with a state machine; generate a diagram of it (XState visualizer or a hand-drawn graph) and write tests for every transition.</li>
+<li>Rebuild a context-based store as a Zustand store with selectors; use the React Profiler to show the render count difference under rapid updates.</li>
+<li>Restructure an app into features with public <code>index.ts</code> APIs and enforce boundaries with a lint rule that fails CI.</li>
+<li>Set up a pnpm monorepo with <code>apps/web</code>, <code>apps/api</code> and <code>packages/ui</code>, <code>packages/schemas</code> shared (Zod), with Turborepo caching.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why not store fetched data in Redux/Zustand?</summary>Server data needs caching, deduplication, background refresh, invalidation and retries, which a query library provides. Copying it into a global store means re-implementing those features and keeping two sources of truth in sync.</details>
+<details><summary>When do you need a state machine?</summary>When behavior depends on a mode with legal and illegal transitions (wizards, uploads, media, auth), especially when boolean flags are multiplying.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recommended IDEs, Extensions & Tools</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="ide-tools">
+<main><article>
+<h1>Recommended IDEs, extensions &amp; tools</h1>
+<p class="lede">Your editor is the tool you'll spend thousands of hours in. Pick one good setup, learn it deeply, and resist constant switching. Products and prices change, so confirm current details on each tool's website.</p>
+
+<h2>My recommendation</h2>
+<div class="callout"><span class="label">Short answer</span><strong>Use VS Code.</strong> It is free, has the largest extension ecosystem, and the best support for everything in this course (HTML, CSS, JS/TS, React, Node, GLSL). If you want AI built into the editor, <strong>Cursor</strong> is a VS Code fork with the same extensions and keybindings, so switching later costs you almost nothing.</div>
+
+<h2>Editors compared</h2>
+<table>
+<tr><th>Tool</th><th>Cost</th><th>Best for</th><th>Trade-offs</th></tr>
+<tr><td><strong>VS Code</strong></td><td>Free</td><td>Everyone; the safe default for web dev</td><td>Needs extensions for a full setup; can feel heavy with many</td></tr>
+<tr><td><strong>Cursor</strong></td><td>Free tier + paid plans</td><td>VS Code experience with deeply integrated AI editing and chat</td><td>Fork of VS Code; some Microsoft extensions/marketplace limits; subscription for heavy AI use</td></tr>
+<tr><td><strong>WebStorm</strong> (JetBrains)</td><td>Free for non-commercial use; paid for commercial</td><td>Out-of-the-box refactoring, debugging, TypeScript and React tooling</td><td>Heavier, fewer community extensions, different keybindings</td></tr>
+<tr><td><strong>Zed</strong></td><td>Free</td><td>Very fast, native, great multiplayer collaboration</td><td>Younger extension ecosystem</td></tr>
+<tr><td><strong>Neovim</strong> / Vim</td><td>Free</td><td>Keyboard-driven speed, terminal-based, works over SSH</td><td>Steep learning curve; you assemble the setup yourself</td></tr>
+<tr><td><strong>Sublime Text</strong></td><td>Paid license (free evaluation)</td><td>Extremely fast for quick edits and huge files</td><td>Less integrated tooling for TS/React debugging</td></tr>
+<tr><td><strong>Claude Code</strong></td><td>Requires a Claude plan or API usage</td><td>Agentic coding in your terminal and IDE: reads your repo, edits files, runs tests and commands</td><td>Complements an editor; it doesn't replace one. Review every change</td></tr>
+</table>
+
+<h2>A note on AI assistants while learning</h2>
+<div class="callout warn"><span class="label">Important</span>AI can make you faster, but it can also stop you from learning. Through <strong>Parts 1–5, type the code yourself</strong> and turn inline completions off. Use AI as a tutor ("explain why this fails", "review my solution") rather than a code generator. From Part 6 onward, AI becomes a legitimate productivity tool, but you must still be able to read, justify and debug every line it writes. Treat its output like a pull request from a confident junior developer.</div>
+<ul>
+<li><strong>Good uses</strong>: explaining errors and unfamiliar code, generating test cases, reviewing for bugs, scaffolding boilerplate you already understand, writing docs.</li>
+<li><strong>Bad uses</strong>: pasting in an exercise and submitting the output, accepting code you can't explain, trusting API names and versions without checking the docs.</li>
+</ul>
+
+<h2>VS Code setup</h2>
+<h3>Essential extensions</h3>
+<table>
+<tr><th>Extension</th><th>Why</th></tr>
+<tr><td><strong>ESLint</strong></td><td>Finds bugs and enforces rules as you type</td></tr>
+<tr><td><strong>Prettier</strong></td><td>Automatic formatting; end style arguments</td></tr>
+<tr><td><strong>Live Server</strong> (or just use Vite)</td><td>Auto-reloading preview for static pages</td></tr>
+<tr><td><strong>Error Lens</strong></td><td>Shows errors inline on the line</td></tr>
+<tr><td><strong>Tailwind CSS IntelliSense</strong></td><td>Class autocomplete and previews (Lesson 42)</td></tr>
+<tr><td><strong>ES7+ React/Redux snippets</strong></td><td>Fast component boilerplate</td></tr>
+<tr><td><strong>Auto Rename Tag</strong></td><td>Renames matching HTML/JSX tags together</td></tr>
+<tr><td><strong>Path Intellisense</strong></td><td>Autocompletes file paths in imports</td></tr>
+<tr><td><strong>GLSL Lint</strong> / <strong>Shader languages support</strong></td><td>Syntax highlighting and checks for shaders (Lesson 36)</td></tr>
+<tr><td><strong>GitLens</strong></td><td>Blame, history and diffs inline</td></tr>
+<tr><td><strong>Vitest</strong> / <strong>Playwright Test</strong></td><td>Run and debug tests from the editor</td></tr>
+<tr><td><strong>Prisma</strong>, <strong>SQLTools</strong></td><td>For the backend lessons (Part 8)</td></tr>
+<tr><td><strong>Docker</strong>, <strong>Thunder Client</strong> or <strong>REST Client</strong></td><td>Containers and quick API requests</td></tr>
+<tr><td><strong>Code Spell Checker</strong></td><td>Catch typos in identifiers and docs</td></tr>
+</table>
+<h3>Recommended <code>settings.json</code></h3>
+<textarea class="code" data-lang="js" data-file="settings.json (Cmd+Shift+P → Preferences: Open User Settings (JSON))">
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": { "source.fixAll.eslint": "explicit" },
+  "editor.tabSize": 2,
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": true,
+  "editor.linkedEditing": true,
+  "editor.minimap.enabled": false,
+  "editor.stickyScroll.enabled": true,
+  "editor.fontLigatures": true,
+  "editor.cursorSmoothCaretAnimation": "on",
+  "files.autoSave": "onFocusChange",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "emmet.includeLanguages": { "javascript": "javascriptreact", "typescript": "typescriptreact" },
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "explorer.confirmDelete": false,
+  "terminal.integrated.fontSize": 13,
+  "workbench.startupEditor": "none",
+  "git.autofetch": true,
+  "git.confirmSync": false
+}
+</textarea>
+
+<h3>Shortcuts that give the biggest speed-up (macOS / Windows-Linux)</h3>
+<table>
+<tr><th>Action</th><th>Keys</th></tr>
+<tr><td>Command palette (do anything)</td><td><kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></td></tr>
+<tr><td>Quick open file</td><td><kbd>Cmd</kbd>+<kbd>P</kbd> / <kbd>Ctrl</kbd>+<kbd>P</kbd></td></tr>
+<tr><td>Search across project</td><td><kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd></td></tr>
+<tr><td>Go to definition / find references</td><td><kbd>F12</kbd> / <kbd>Shift</kbd>+<kbd>F12</kbd></td></tr>
+<tr><td>Rename symbol everywhere</td><td><kbd>F2</kbd></td></tr>
+<tr><td>Quick fix / refactor menu</td><td><kbd>Cmd</kbd>+<kbd>.</kbd></td></tr>
+<tr><td>Multi-cursor: add next match</td><td><kbd>Cmd</kbd>+<kbd>D</kbd></td></tr>
+<tr><td>Move line up/down</td><td><kbd>Opt</kbd>+<kbd>↑/↓</kbd> (<kbd>Alt</kbd> on Windows)</td></tr>
+<tr><td>Duplicate line</td><td><kbd>Shift</kbd>+<kbd>Opt</kbd>+<kbd>↓</kbd></td></tr>
+<tr><td>Toggle comment</td><td><kbd>Cmd</kbd>+<kbd>/</kbd></td></tr>
+<tr><td>Toggle terminal</td><td><kbd>Ctrl</kbd>+<kbd>`</kbd></td></tr>
+<tr><td>Expand HTML with Emmet</td><td>type <code>ul&gt;li*3</code> then <kbd>Tab</kbd></td></tr>
+</table>
+<p>Spend one week deliberately using the command palette and "go to definition" instead of the mouse. It compounds.</p>
+
+<h3>Debugging in the editor</h3>
+<textarea class="code" data-lang="js" data-file=".vscode/launch.json">
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Chrome (Vite)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/src"
+    },
+    {
+      "name": "Debug Node file",
+      "type": "node",
+      "request": "launch",
+      "program": "${file}"
+    }
+  ]
+}
+</textarea>
+<p>Set breakpoints by clicking the gutter, press <kbd>F5</kbd>, and step through with <kbd>F10</kbd>/<kbd>F11</kbd>. Debugging beats <code>console.log</code> for anything non-trivial.</p>
+
+<h2>The rest of your toolbox</h2>
+<h3>Browsers and DevTools</h3>
+<ul>
+<li><strong>Chrome</strong> for development (best DevTools, Lighthouse, Performance panel); test also in <strong>Firefox</strong> (excellent CSS Grid/Flexbox inspectors, accessibility tools) and <strong>Safari</strong> (essential for iOS behavior).</li>
+<li>Extensions: <strong>React Developer Tools</strong>, <strong>axe DevTools</strong> (accessibility), <strong>Lighthouse</strong>, <strong>Wappalyzer</strong> (what a site uses), <strong>Spector.js</strong> (WebGL frame capture), a JSON viewer, and <strong>ColorZilla</strong> or the built-in eyedropper.</li>
+<li>Learn DevTools panels: Elements, Console, Sources (breakpoints), Network (throttling), Performance, Memory, Application (storage, service workers), Lighthouse, Rendering (paint flashing, FPS meter).</li>
+</ul>
+<h3>Terminal</h3>
+<ul>
+<li>macOS: <strong>iTerm2</strong>, <strong>Ghostty</strong>, <strong>Warp</strong> or the built-in Terminal. Use <strong>zsh</strong> with <strong>Oh My Zsh</strong> or <strong>Starship</strong> prompt, plus <strong>fzf</strong> (fuzzy find), <strong>ripgrep</strong> (<code>rg</code>, fast search), <strong>bat</strong>, <strong>eza</strong>, <strong>zoxide</strong> (smart <code>cd</code>), and <strong>tmux</strong> for sessions.</li>
+<li>Windows: <strong>Windows Terminal</strong> with <strong>WSL2</strong> (Ubuntu) so you develop in a Linux environment like production.</li>
+<li>Package manager: <strong>Homebrew</strong> (macOS). Node versions: <strong>fnm</strong>, <strong>nvm</strong> or <strong>Volta</strong>. Package managers: <strong>npm</strong> (default), <strong>pnpm</strong> (fast, disk-efficient; great for monorepos).</li>
+</ul>
+<h3>Version control and collaboration</h3>
+<ul>
+<li><strong>Git</strong> + <strong>GitHub CLI</strong> (<code>gh</code>) for pull requests from the terminal. A GUI such as <strong>GitHub Desktop</strong>, <strong>Fork</strong>, or <strong>Lazygit</strong> helps when visualizing branches.</li>
+</ul>
+<h3>Design and assets</h3>
+<ul>
+<li><strong>Figma</strong> for UI design and reading designs. <strong>Excalidraw</strong> for quick diagrams.</li>
+<li><strong>Blender</strong> (free) for 3D modeling, baking and glTF export (Lesson 68). <strong>Poly Haven</strong> and <strong>ambientCG</strong> for free PBR textures and HDRIs. <strong>gltf.report</strong> and <strong>gltf-transform</strong> for model optimization.</li>
+<li><strong>Squoosh</strong> or <strong>sharp</strong> for image compression; <strong>SVGOMG</strong> for SVG optimization.</li>
+</ul>
+<h3>API, database and infrastructure tools</h3>
+<ul>
+<li><strong>Bruno</strong>, <strong>Postman</strong>, <strong>Insomnia</strong> or <strong>Thunder Client</strong> to test APIs; <code>curl</code> and <code>httpie</code> in the terminal.</li>
+<li><strong>TablePlus</strong>, <strong>DBeaver</strong> or <strong>Drizzle Studio/Prisma Studio</strong> to inspect databases.</li>
+<li><strong>Docker Desktop</strong> or <strong>OrbStack</strong> (macOS) for containers (Lesson 72).</li>
+</ul>
+<h3>Learning and reference</h3>
+<ul>
+<li><strong>MDN Web Docs</strong>, <strong>javascript.info</strong>, <strong>react.dev</strong>, <strong>web.dev</strong>, <strong>threejs.org/docs</strong> and <strong>/examples</strong>, <strong>caniuse.com</strong>, <strong>bundlephobia</strong>, <strong>Shadertoy</strong>, <strong>The Book of Shaders</strong>.</li>
+</ul>
+
+<h2>Project-level configuration to copy</h2>
+<textarea class="code" data-lang="js" data-file=".prettierrc">
+{ "semi": true, "singleQuote": false, "trailingComma": "all", "printWidth": 100 }
+</textarea>
+<textarea class="code" data-lang="js" data-file=".editorconfig">
+root = true
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+</textarea>
+<textarea class="code" data-lang="js" data-file=".vscode/extensions.json (commit this so teammates get prompts)">
+{ "recommendations": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode", "usernamehw.errorlens", "bradlc.vscode-tailwindcss"] }
+</textarea>
+
+<h2>How to choose and stick with it</h2>
+<ol>
+<li>Pick <strong>VS Code</strong> (or Cursor) for the whole course.</li>
+<li>Install the essentials above and the settings. Do not install 40 extensions on day one; add one when you feel a specific pain.</li>
+<li>Learn 10 shortcuts this week and 10 more next week.</li>
+<li>Use the debugger and the formatter on save every day.</li>
+<li>After Part 8, if you want to explore, try WebStorm or Zed for a week on a real project, then decide. Switching for a reason is fine; switching for novelty is a time sink.</li>
+</ol>
+
+<section class="exercises"><h2>Setup tasks</h2><ol>
+<li>Install your editor, the essential extensions and the settings above. Open a project and confirm format-on-save works.</li>
+<li>Create <code>.prettierrc</code> and an ESLint config in a Vite project and make the editor show lint errors inline.</li>
+<li>Set a breakpoint in a small Node script and step through it with the debugger.</li>
+<li>Install <code>gh</code>, authenticate, and create a repository from the terminal.</li>
+<li>Learn and use 10 shortcuts from the table for a full day; keep a note of which ones stuck.</li>
+</ol></section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

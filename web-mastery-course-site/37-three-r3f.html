@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 37 — React Three Fiber & drei</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="37-three-r3f">
+<main><article>
+<h1>Lesson 37 — React Three Fiber &amp; drei</h1>
+<p class="lede">Combine Parts 4 and 5. <strong>React Three Fiber</strong> (R3F) is a React renderer for Three.js: your scene becomes JSX, state drives 3D, and you get components, hooks and the whole React ecosystem.</p>
+
+<h2>Setup</h2>
+<textarea class="code" data-lang="bash">
+npm create vite@latest r3f-demo -- --template react
+cd r3f-demo
+npm install three @react-three/fiber @react-three/drei
+npm run dev
+</textarea>
+<div class="callout"><span class="label">Versions</span>R3F v8 pairs with React 18; R3F v9 pairs with React 19. Install the one that matches your React version (check <code>npm ls react</code>) and see the R3F docs (r3f.docs.pmnd.rs) for current details.</div>
+
+<h2>Your first R3F scene</h2>
+<textarea class="code" data-lang="jsx" data-file="src/App.jsx">
+import { Canvas, useFrame } from "@react-three/fiber";
+import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
+import { useRef, useState } from "react";
+
+function Box(props) {
+  const ref = useRef();                              // ref to the THREE.Mesh
+  const [hovered, setHovered] = useState(false);
+  const [active, setActive] = useState(false);
+
+  useFrame((state, delta) => {                       // runs every frame (the render loop)
+    ref.current.rotation.y += delta * (hovered ? 3 : 1);
+  });
+
+  return (
+    <mesh
+      ref={ref}
+      {...props}
+      scale={active ? 1.4 : 1}
+      onClick={() => setActive(a => !a)}             // raycasting is built in!
+      onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+      onPointerOut={() => setHovered(false)}
+      castShadow
+    >
+      <boxGeometry args={[1, 1, 1]} />               {/* args = constructor arguments */}
+      <meshStandardMaterial color={hovered ? "hotpink" : "#7c5cff"} roughness={0.3} />
+    </mesh>
+  );
+}
+
+export default function App() {
+  return (
+    <div style={{ width: "100vw", height: "100dvh" }}>
+      <Canvas shadows camera={{ position: [3, 3, 6], fov: 50 }} dpr={[1, 2]}>
+        <color attach="background" args={["#14121f"]} />
+        <ambientLight intensity={0.4} />
+        <directionalLight position={[5, 8, 5]} intensity={2} castShadow />
+        <Box position={[-1.5, 0.5, 0]} />
+        <Box position={[1.5, 0.5, 0]} />
+        <ContactShadows position={[0, 0, 0]} opacity={0.5} blur={2.5} far={4} />
+        <Environment preset="city" />
+        <OrbitControls makeDefault enableDamping />
+      </Canvas>
+    </div>
+  );
+}
+</textarea>
+
+<h2>How JSX maps to Three.js</h2>
+<table>
+<tr><th>R3F</th><th>Three.js equivalent</th></tr>
+<tr><td><code>&lt;mesh position={[1,2,3]} /&gt;</code></td><td><code>new THREE.Mesh(); mesh.position.set(1,2,3)</code></td></tr>
+<tr><td><code>&lt;boxGeometry args={[1,2,3]} /&gt;</code></td><td><code>new THREE.BoxGeometry(1,2,3)</code>, auto-attached as <code>geometry</code></td></tr>
+<tr><td><code>&lt;meshStandardMaterial color="red" /&gt;</code></td><td>Material, auto-attached as <code>material</code></td></tr>
+<tr><td><code>&lt;mesh rotation-y={Math.PI} /&gt;</code></td><td>"Dash-case" sets nested props: <code>mesh.rotation.y = Math.PI</code></td></tr>
+<tr><td><code>&lt;group&gt;…&lt;/group&gt;</code></td><td><code>THREE.Group</code>; children nest in the scene graph</td></tr>
+<tr><td>Any Three class, camelCase, no <code>new</code></td><td>e.g. <code>&lt;pointLight /&gt;</code>, <code>&lt;gridHelper /&gt;</code></td></tr>
+<tr><td><code>extend({ MyClass })</code></td><td>register your own class as <code>&lt;myClass /&gt;</code></td></tr>
+</table>
+
+<h2>The hooks</h2>
+<textarea class="code" data-lang="jsx">
+import { useFrame, useThree, useLoader } from "@react-three/fiber";
+import { useGLTF, useTexture, useAnimations } from "@react-three/drei";
+
+function Rig() {
+  const { camera, gl, scene, size, viewport, pointer, clock } = useThree();   // renderer internals
+  useFrame((state, dt) => {
+    // state.pointer is normalized (-1..1). Smooth camera parallax:
+    camera.position.x += (state.pointer.x * 2 - camera.position.x) * 3 * dt;
+    camera.lookAt(0, 0, 0);
+  });
+  return null;                                  // components can render nothing; they just run logic
+}
+
+function Model(props) {
+  const { scene, animations } = useGLTF("/models/robot.glb");    // suspends while loading, caches
+  const { actions } = useAnimations(animations, scene);
+  useEffect(() => { actions.Idle?.reset().fadeIn(0.3).play(); }, [actions]);
+  return <primitive object={scene} {...props} />;               // drop any existing Object3D into the scene
+}
+useGLTF.preload("/models/robot.glb");
+
+function Floor() {
+  const [color, normal, rough] = useTexture(["/t/c.jpg", "/t/n.jpg", "/t/r.jpg"]);
+  return (
+    <mesh rotation-x={-Math.PI / 2} receiveShadow>
+      <planeGeometry args={[20, 20]} />
+      <meshStandardMaterial map={color} normalMap={normal} roughnessMap={rough} />
+    </mesh>
+  );
+}
+</textarea>
+<div class="callout warn"><span class="label">The #1 R3F rule</span><strong>Never <code>setState</code> every frame.</strong> React re-rendering 60×/second is slow. In <code>useFrame</code> mutate refs and Three objects directly (<code>ref.current.position.x += …</code>). Use React state only for <em>discrete</em> changes (selected, hovered, mode).</div>
+
+<h2>Suspense, loading and the drei toolbox</h2>
+<textarea class="code" data-lang="jsx">
+import { Suspense } from "react";
+import { Html, useProgress, Text, Float, Stage, Center, Bounds, ScrollControls, Scroll, useScroll,
+         PerspectiveCamera, Sky, Stars, Sparkles, MeshTransmissionMaterial, Instances, Instance } from "@react-three/drei";
+
+function Loader() { const { progress } = useProgress(); return <Html center>{progress.toFixed(0)}%</Html>; }
+
+<Canvas>
+  <Suspense fallback={<Loader />}>
+    <Model />
+  </Suspense>
+</Canvas>
+
+// Handy drei pieces:
+<Float speed={2} floatIntensity={1}><mesh>…</mesh></Float>        // gentle bobbing
+<Text fontSize={0.5} color="white" anchorX="center">Hello 3D</Text>   // crisp SDF text
+<Html position={[0, 2, 0]} transform occlude><button>HTML in 3D</button></Html>
+<Stage environment="city" intensity={0.6}><Model /></Stage>         // instant product-viewer lighting
+<ScrollControls pages={3}> … useScroll() … </ScrollControls>        // scroll-driven scenes
+</textarea>
+
+<h2>Shared state with Zustand (UI ↔ 3D)</h2>
+<textarea class="code" data-lang="jsx" data-file="store.js">
+import { create } from "zustand";
+export const useStore = create((set) => ({
+  color: "#7c5cff",
+  selected: null,
+  setColor: (color) => set({ color }),
+  select: (id) => set({ selected: id }),
+}));
+
+// HTML UI (outside <Canvas>):
+const setColor = useStore(s => s.setColor);
+<input type="color" onChange={e => setColor(e.target.value)} />
+
+// Inside the scene:
+const color = useStore(s => s.color);
+<meshStandardMaterial color={color} />
+</textarea>
+<p>Context from outside the <code>&lt;Canvas&gt;</code> is <em>not</em> available inside it (it's a separate React renderer). A store like Zustand, or re-providing the context inside, bridges the gap.</p>
+
+<h2>Performance in R3F</h2>
+<ul>
+<li><code>frameloop="demand"</code> + <code>invalidate()</code> renders only when something changes (great for configurators and dashboards).</li>
+<li>Reuse geometry and materials; <code>&lt;Instances&gt;</code> / <code>InstancedMesh</code> for many copies.</li>
+<li>Don't create objects in render: <code>useMemo(() =&gt; new THREE.Vector3(), [])</code> or module-level constants.</li>
+<li><code>&lt;Preload all /&gt;</code>, <code>&lt;AdaptiveDpr /&gt;</code>, <code>&lt;PerformanceMonitor /&gt;</code>, <code>&lt;Bvh&gt;</code>.</li>
+<li>Convert models to components with <code>npx gltfjsx model.glb --transform</code> (optimized + typed JSX).</li>
+<li>Inspect with <code>r3f-perf</code> and the Spector.js / Chrome Performance tools.</li>
+</ul>
+
+<h2>Next.js and SSR</h2>
+<p>Canvas needs the browser. In Next.js mark the component <code>"use client"</code> and/or load it with <code>dynamic(() =&gt; import("./Scene"), { ssr: false })</code>.</p>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Recreate your Lesson 35 clickable grid in R3F (<code>onClick</code>, <code>onPointerOver</code>, <code>useFrame</code>).</li>
+<li>Load a glTF with <code>useGLTF</code>, with a <code>Suspense</code> fallback showing a percentage.</li>
+<li>Build a color/material configurator: HTML buttons (outside Canvas) change the model via a Zustand store.</li>
+<li>Make the camera parallax follow the pointer with smoothing inside <code>useFrame</code>.</li>
+<li>Render 2,000 spinning cubes using <code>&lt;Instances&gt;</code> and measure FPS vs 2,000 separate meshes.</li>
+<li>Build a scroll-driven page with <code>ScrollControls</code> where the camera flies through 3 stations.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why not store a rotating object's angle in useState?</summary>It would trigger a React re-render every frame. Mutate the Three object's rotation in useFrame via a ref instead.</details>
+<details><summary>What does <code>args</code> do?</summary>It passes constructor arguments to the underlying Three.js class, e.g. <code>args=[1,2,3]</code> for BoxGeometry(1,2,3). Changing args recreates the object.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

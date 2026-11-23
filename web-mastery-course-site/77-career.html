@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 77 — Career: Portfolio, Interviews & Growth</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="77-career">
+<main><article>
+<h1>Lesson 77 — Career: portfolio, interviews &amp; growth</h1>
+<p class="lede">Skill gets you capable; evidence, communication and consistency get you hired and promoted. This lesson turns what you've built into a career: a portfolio that persuades, interview preparation, and habits for continued growth.</p>
+
+<h2>Your portfolio: evidence, not a list of tutorials</h2>
+<ul>
+<li><strong>3–5 strong projects beat 15 weak ones.</strong> Use Projects 3, 5 and 6 plus the capstone. Each should be deployed, fast, accessible and polished.</li>
+<li>For each project, write a short <strong>case study</strong>: the problem, your role, key decisions and trade-offs, a hard problem you solved (with a before/after metric), tech stack, what you'd improve, links to live demo + code.</li>
+<li>Show the <strong>engineering</strong>: tests, CI badge, architecture diagram, performance numbers, accessibility audit, clean README. Reviewers open the repo.</li>
+<li>Include a 3D/interactive showpiece if you're targeting creative/3D roles, but make sure the site itself loads fast and works without it. Don't let flashiness replace usability.</li>
+<li>Your site must be itself an example of mastery: semantic HTML, responsive, keyboard-accessible, Lighthouse green, no layout shift, a clear "about + contact + resume" path within 10 seconds.</li>
+</ul>
+
+<h2>Resume, GitHub and online presence</h2>
+<ul>
+<li>One page. Lead with impact: "Reduced LCP from 4.1 s to 1.3 s by …", "Built X used by N people". Avoid skill-bar graphics and lists of every tool you touched once.</li>
+<li>Pin your best repos with real READMEs; keep commit history meaningful. Contributions to open source (even docs and small bugs) signal collaboration ability.</li>
+<li>Write: short posts about things you learned (debugging stories, performance wins) show communication and depth. Share demos with short videos/GIFs.</li>
+</ul>
+
+<h2>The interview loop</h2>
+<table>
+<tr><th>Stage</th><th>What it tests</th><th>How to prepare</th></tr>
+<tr><td>Recruiter screen</td><td>Motivation, fit, logistics</td><td>A 60-second story: who you are, what you built, what you want next</td></tr>
+<tr><td>Coding (algorithms)</td><td>Problem-solving, communication</td><td>Lesson 51 patterns; 50–100 practice problems; talk while you think; test with examples</td></tr>
+<tr><td>Front-end coding (build a component)</td><td>HTML/CSS/JS fundamentals, accessibility, state, edge cases</td><td>Build from scratch in 45 min: autocomplete, modal, tabs, star rating, infinite scroll, todo, debounce, event emitter, Promise.all polyfill</td></tr>
+<tr><td>Front-end system design</td><td>Architecture and trade-offs</td><td>Lesson 76 framework; practice aloud with a timer</td></tr>
+<tr><td>Take-home / pair programming</td><td>Real-world quality, collaboration</td><td>Clean structure, tests, README with decisions; ask clarifying questions; timebox</td></tr>
+<tr><td>Behavioral</td><td>Teamwork, conflict, ownership, learning</td><td>Prepare 6–8 stories in STAR form (Situation, Task, Action, Result) with numbers</td></tr>
+</table>
+<h3>Classic front-end exercises to be able to write cold</h3>
+<textarea class="code" data-lang="js" data-run>
+// debounce, throttle, once, memoize: each is a closure + a timer or cache
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+function throttle(fn, ms) { let last = 0; return (...a) => { const now = Date.now(); if (now - last >= ms) { last = now; fn(...a); } }; }
+const memoize = (fn) => { const c = new Map(); return (x) => c.has(x) ? c.get(x) : (c.set(x, fn(x)), c.get(x)); };
+
+// Promise.all from scratch (also tests understanding of ordering and rejection)
+function promiseAll(promises) {
+  return new Promise((resolve, reject) => {
+    const results = []; let remaining = 0, i = 0;
+    for (const p of promises) { const idx = i++; remaining++;
+      Promise.resolve(p).then(v => { results[idx] = v; if (--remaining === 0) resolve(results); }, reject); }
+    if (remaining === 0) resolve([]);
+  });
+}
+console.log(await promiseAll([1, Promise.resolve(2), new Promise(r => setTimeout(() => r(3), 20))]));
+
+// deep clone with cycles, flatten, curry, EventEmitter: practice these too
+const flatten = (a) => a.reduce((acc, x) => Array.isArray(x) ? acc.concat(flatten(x)) : acc.concat(x), []);
+console.log(flatten([1, [2, [3, [4]]]]));
+</textarea>
+<h3>During the interview</h3>
+<ul>
+<li><strong>Clarify first</strong>, state your approach, then code. Narrate trade-offs. Start with a working simple solution, then optimize.</li>
+<li>Handle edge cases explicitly (empty, null, duplicates, large input). Run through an example by hand. Name things well even under time pressure.</li>
+<li>If stuck, say what you've tried and ask a focused question. Interviewers hire people they'd enjoy working with.</li>
+<li>Ask good questions at the end: how the team ships and reviews code, what the on-call looks like, how they measure success, what the first 90 days look like.</li>
+</ul>
+
+<h2>Finding and evaluating roles</h2>
+<ul>
+<li>Roles to target: front-end engineer, full-stack engineer, UI/design engineer, creative developer / WebGL engineer, developer experience, technical artist. Read job posts to see recurring skills and fill gaps with projects.</li>
+<li>Channels: referrals (the best), company career pages, communities (local meetups, Discords), open-source involvement, direct outreach with a specific note showing you used their product.</li>
+<li>Evaluate teams: mentorship, code review culture, test/CI health, how decisions are made, turnover, growth paths, compensation transparency. Negotiate: research ranges, anchor reasonably, consider total compensation and growth, get the offer in writing.</li>
+</ul>
+
+<h2>Growing after the first job</h2>
+<ul>
+<li><strong>Depth + breadth</strong> ("T-shaped"): go deep in one area (performance, graphics, accessibility, design systems, backend) while staying useful across the stack.</li>
+<li><strong>Scope growth</strong>: junior (tasks with guidance) → mid (features independently) → senior (ambiguous problems, mentoring, cross-team impact) → staff+ (org-level technical direction). Impact, not years, is the currency.</li>
+<li><strong>Habits</strong>: read other people's code, review PRs thoughtfully, write postmortems and design docs, keep a "brag document" of accomplishments, ask for feedback regularly, teach others.</li>
+<li><strong>Learning loop</strong>: build small projects that stretch you; read specs and source code (Lesson 78); follow a few high-quality sources (web.dev, MDN, React blog, Three.js forum, Frontend Masters, conference talks) instead of everything.</li>
+<li><strong>Sustainability</strong>: avoid burnout, protect focus time, step away, maintain a life outside code. Careers are long. Impostor feelings are normal; keep a record of what you've shipped.</li>
+</ul>
+
+<h2>Freelancing and building products</h2>
+<ul>
+<li>Narrow positioning beats "I do websites": e.g., "interactive 3D product pages for DTC brands". Show results, price on value, use contracts and milestones, communicate often.</li>
+<li>Your own product: validate before building (talk to users, landing page, pre-sales), ship small, measure, iterate. Handle payments, legal basics, privacy and support from the start.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Write a case study for your best project following the structure above, including at least two measured improvements, and publish it on your portfolio site.</li>
+<li>Audit your portfolio site: Lighthouse ≥ 95 across the board, axe clean, keyboard-only tour, test on a phone, a 10-second skim test with a friend. Fix everything found.</li>
+<li>Write 8 STAR stories (conflict, failure, leadership, ambiguity, deadline, learning, disagreement with a decision, biggest achievement) with concrete numbers.</li>
+<li>Implement from scratch, under timer: debounce, throttle, Promise.all, deep clone, EventEmitter, curry, an autocomplete, a modal with focus trap, and star rating. Record yourself narrating one and critique it.</li>
+<li>Do three mock interviews (coding, front-end design, behavioral) with peers or a platform; keep a log of feedback and improvements.</li>
+<li>Draft a 12-month growth plan: target role, three skills to deepen, one open-source contribution goal, and one public artifact (post/talk) per quarter.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>What makes a portfolio project persuasive?</summary>It's live, polished and fast, solves a real problem, and the case study shows decisions, trade-offs and measured results, with a repo that has tests, CI and a clear README.</details>
+<details><summary>What should you do when stuck in a coding interview?</summary>Think aloud, restate the problem, try a small example, offer a brute-force solution, then ask a focused question. Communication matters as much as the final answer.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

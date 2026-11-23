@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 72 — CI/CD, Docker & Deployment</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="72-cicd-deploy">
+<main><article>
+<h1>Lesson 72 — CI/CD, Docker &amp; deployment</h1>
+<p class="lede">Code that isn't deployed isn't a product. Learn to build, containerize, ship and roll back automatically, so releasing becomes boring and frequent instead of rare and scary.</p>
+
+<h2>Where to host what</h2>
+<table>
+<tr><th>Kind of app</th><th>Good options</th><th>Notes</th></tr>
+<tr><td>Static site / SPA / 3D demo</td><td>Cloudflare Pages, Netlify, Vercel, GitHub Pages, S3 + CDN</td><td>Cheapest and fastest. Set SPA fallback to <code>index.html</code>; long-cache hashed assets</td></tr>
+<tr><td>Next.js / SSR</td><td>Vercel, Netlify, Cloudflare, or Node/Docker on Fly.io/Railway/Render</td><td>Match the runtime (Node vs edge) to your dependencies</td></tr>
+<tr><td>API / long-running servers</td><td>Fly.io, Railway, Render, Cloud Run, ECS, a VPS (Hetzner/DigitalOcean)</td><td>Docker image + health checks + autoscaling or a single always-on instance</td></tr>
+<tr><td>Serverless functions</td><td>Vercel/Netlify Functions, Cloudflare Workers, AWS Lambda</td><td>Great for spiky load; mind cold starts, limits and DB connection pooling</td></tr>
+<tr><td>Database</td><td>Neon, Supabase, Railway, RDS, PlanetScale-like, Turso</td><td>Managed with automated backups; test restores</td></tr>
+<tr><td>Large assets</td><td>Cloudflare R2, S3 + CloudFront</td><td>Serve models/textures from a CDN with immutable caching</td></tr>
+</table>
+
+<h2>Docker essentials</h2>
+<p>A <strong>container</strong> packages your app with its runtime and dependencies so it runs the same everywhere. An <strong>image</strong> is the blueprint; a container is a running instance.</p>
+<textarea class="code" data-lang="bash" data-file="Dockerfile (multi-stage Node app)">
+# ---- build stage ----
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci                              # cached layer: only reruns when dependencies change
+COPY . .
+RUN npm run build && npm prune --omit=dev
+
+# ---- runtime stage: small, no build tools ----
+FROM node:22-alpine
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY package.json ./
+USER node                               # don't run as root
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost:3000/api/health || exit 1
+CMD ["node", "dist/server.js"]
+</textarea>
+<textarea class="code" data-lang="bash" data-file=".dockerignore">
+node_modules
+.git
+.env*
+dist
+coverage
+</textarea>
+<textarea class="code" data-lang="bash" data-file="docker-compose.yml (local dev stack)">
+services:
+  db:
+    image: postgres:16
+    environment: { POSTGRES_PASSWORD: dev, POSTGRES_DB: app }
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 5s, retries: 10 }
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+  api:
+    build: .
+    environment: { DATABASE_URL: "postgres://postgres:dev@db:5432/app", REDIS_URL: "redis://redis:6379" }
+    depends_on: { db: { condition: service_healthy } }
+    ports: ["3000:3000"]
+volumes: { pgdata: {} }
+</textarea>
+<textarea class="code" data-lang="bash">
+docker compose up -d --build        # start everything;  docker compose logs -f api;  docker compose down -v (wipes volumes)
+docker build -t myapp:1.0 . && docker run --rm -p 3000:3000 --env-file .env myapp:1.0
+docker image ls; docker system df; docker scout quickview    # size and vulnerability review
+</textarea>
+<ul>
+<li>Keep images small (alpine/distroless, multi-stage), pin versions, use a non-root user, never bake secrets into images (use runtime env/secret stores).</li>
+<li>Containers are <strong>ephemeral</strong>: store data in volumes or external services, log to stdout.</li>
+</ul>
+
+<h2>CI/CD pipeline</h2>
+<ul>
+<li><strong>CI</strong> (continuous integration): every push builds and tests automatically. <strong>CD</strong>: delivery (always releasable) or deployment (every green main goes to prod automatically).</li>
+<li>Pipeline stages: install (cached) → lint/typecheck → unit/integration tests → build → e2e → security scan → publish artifact/image → deploy → smoke test → notify.</li>
+<li>Preview deployments per PR (Vercel/Netlify/Cloudflare) let reviewers click the real thing.</li>
+</ul>
+<textarea class="code" data-lang="bash" data-file=".github/workflows/deploy.yml">
+name: Deploy
+on:
+  push: { branches: [main] }
+
+permissions: { contents: read, id-token: write }     # least privilege; OIDC instead of long-lived cloud keys
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml                 # reuse the CI workflow from Lesson 63
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production                         # protected: required reviewers, environment secrets
+    concurrency: { group: deploy-prod, cancel-in-progress: false }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: ${{ github.actor }}, password: ${{ secrets.GITHUB_TOKEN }} }
+      - uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Run migrations
+        run: npx prisma migrate deploy
+        env: { DATABASE_URL: "${{ secrets.DATABASE_URL }}" }
+      - name: Deploy
+        run: flyctl deploy --image ghcr.io/${{ github.repository }}:${{ github.sha }} --strategy rolling
+        env: { FLY_API_TOKEN: "${{ secrets.FLY_API_TOKEN }}" }
+      - name: Smoke test
+        run: curl --fail --retry 5 --retry-delay 3 https://app.example.com/api/health
+</textarea>
+
+<h2>Release safety</h2>
+<table>
+<tr><th>Technique</th><th>What it does</th></tr>
+<tr><td><strong>Rolling / blue-green</strong></td><td>Start new version beside the old; shift traffic when healthy; instant rollback by shifting back</td></tr>
+<tr><td><strong>Canary</strong></td><td>Send 1–5% of traffic to the new version; watch errors/latency; ramp up or abort</td></tr>
+<tr><td><strong>Feature flags</strong></td><td>Deploy code dark; enable per user/percentage; kill switch without redeploying</td></tr>
+<tr><td><strong>Backward-compatible migrations</strong></td><td>Expand (add column) → deploy code that writes both → backfill → switch reads → contract (drop old). Old and new code run simultaneously during deploys</td></tr>
+<tr><td><strong>Immutable, versioned builds</strong></td><td>Every deploy is a tagged artifact; rollback = redeploy previous artifact</td></tr>
+<tr><td><strong>Health checks &amp; graceful shutdown</strong></td><td>Platform only routes to healthy instances; handle SIGTERM and drain connections</td></tr>
+</table>
+
+<h2>Web delivery details</h2>
+<ul>
+<li><strong>Cache headers</strong>: <code>Cache-Control: public, max-age=31536000, immutable</code> for hashed assets (<code>app.3f9a.js</code>); <code>no-cache</code> (revalidate) for <code>index.html</code>.</li>
+<li><strong>Compression</strong>: brotli for text; correct MIME types for <code>.wasm</code>, <code>.glb</code>, <code>.ktx2</code>, <code>.webmanifest</code>.</li>
+<li><strong>HTTPS/HTTP3</strong>, HSTS, custom domain + DNS (A/AAAA/CNAME records), TLS certificates auto-managed by the host.</li>
+<li><strong>Environment config</strong>: build-time (<code>VITE_*</code>, public) vs runtime secrets (server only). Keep dev/staging/prod separate with their own databases and keys.</li>
+<li><strong>Infrastructure as code</strong> (Terraform, Pulumi, SST) once you outgrow clicking in dashboards.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Dockerize your Project 5 API with a multi-stage build; get the final image under ~150 MB and running as non-root; scan it with <code>docker scout</code> or Trivy.</li>
+<li>Write a compose file with Postgres, Redis and your API, plus a healthcheck-based startup order; document <code>docker compose up</code> in the README.</li>
+<li>Deploy a static 3D site to Cloudflare Pages with preview deploys per PR; set correct cache headers and verify with <code>curl -I</code>.</li>
+<li>Build a GitHub Actions pipeline that tests, builds an image, runs migrations, deploys, smoke-tests and rolls back automatically on failure.</li>
+<li>Practice an expand/contract migration: rename a column with zero downtime across three deploys.</li>
+<li>Put a feature behind a flag (Unleash/PostHog or a simple table), roll it out to 10% of users and then kill it.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why cache hashed assets forever but not index.html?</summary>A hashed filename changes whenever content changes, so old URLs never go stale. index.html references the current hashes, so it must be revalidated to pick up new releases.</details>
+<details><summary>Why must migrations be backward compatible?</summary>During a rolling deploy, old and new code run simultaneously against the same database, so schema changes must work with both versions.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 7 — CSS Grid</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="07-css-grid">
+<main><article>
+<h1>Lesson 7 — CSS Grid</h1>
+<p class="lede">Grid lays out in <strong>two dimensions</strong>: rows and columns at once. Use it for page layouts, galleries and dashboards. Flex and grid combine freely.</p>
+
+<h2>Defining tracks</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body { font-family: system-ui; margin: 8px; }
+  .grid {
+    display: grid;
+    grid-template-columns: 120px 1fr 2fr;   /* fixed, 1 share, 2 shares */
+    gap: 10px;
+  }
+  .grid > div { background: #7c5cff; color: #fff; padding: 1rem; border-radius: 8px; }
+  .wide { grid-column: 1 / -1; background: #1d1b2e !important; }  /* full width */
+  .tall { grid-row: span 2; }
+</style>
+<div class="grid">
+  <div>A</div><div class="tall">B (spans 2 rows)</div><div>C</div>
+  <div>D</div><div>E</div>
+  <div class="wide">Full width</div>
+</div>
+</textarea>
+<ul>
+<li><code>fr</code> is a fraction of the <em>leftover</em> space. <code>repeat(3, 1fr)</code> makes three equal columns.</li>
+<li><code>minmax(200px, 1fr)</code>: a track at least 200px, at most one share.</li>
+<li>Lines are numbered from 1; negative numbers count from the end (<code>-1</code> is the last line).</li>
+</ul>
+
+<h2>The responsive grid with no media queries</h2>
+<p>Resize the preview. Columns appear and disappear automatically.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body { font-family: system-ui; margin: 8px; }
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
+    gap: 10px;
+  }
+  .gallery div { aspect-ratio: 4/3; border-radius: 10px; display: grid; place-items: center; color: #fff; font-weight: 700; }
+  .gallery div:nth-child(1) { grid-column: span 2; grid-row: span 2; }  /* featured */
+</style>
+<div class="gallery">
+  <div style="background:#7c5cff">1</div><div style="background:#e0457b">2</div><div style="background:#14a38b">3</div>
+  <div style="background:#e8a317">4</div><div style="background:#3b82f6">5</div><div style="background:#8b5cf6">6</div>
+  <div style="background:#ef4444">7</div>
+</div>
+</textarea>
+<p><code>auto-fill</code> keeps empty tracks; <code>auto-fit</code> collapses them so items stretch to fill the row. The <code>min(140px, 100%)</code> keeps it from overflowing very narrow screens.</p>
+
+<h2>Named areas</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body { margin: 0; font-family: system-ui; }
+  .layout {
+    display: grid; min-height: 100vh; gap: 8px; padding: 8px;
+    grid-template-columns: 160px 1fr;
+    grid-template-areas:
+      "header header"
+      "nav    main"
+      "footer footer";
+    grid-template-rows: auto 1fr auto;
+  }
+  .layout > * { padding: 1rem; border-radius: 8px; }
+  header { grid-area: header; background: #ddd6ff; }
+  nav    { grid-area: nav;    background: #ffe1ea; }
+  main   { grid-area: main;   background: #d8f3ee; }
+  footer { grid-area: footer; background: #ffeec2; }
+  @media (max-width: 420px) {
+    .layout { grid-template-columns: 1fr;
+      grid-template-areas: "header" "nav" "main" "footer"; }
+  }
+</style>
+<div class="layout"><header>Header</header><nav>Nav</nav><main>Main</main><footer>Footer</footer></div>
+</textarea>
+
+<h2>Alignment</h2>
+<ul>
+<li>Items inside cells: <code>justify-items</code>, <code>align-items</code>, shorthand <code>place-items: center</code>.</li>
+<li>The whole track set inside the container: <code>justify-content</code>, <code>align-content</code>.</li>
+<li>One item: <code>justify-self</code>, <code>align-self</code>, <code>place-self</code>.</li>
+<li>Implicit tracks: <code>grid-auto-rows: minmax(100px, auto)</code>; <code>grid-auto-flow: dense</code> fills gaps (mind reading order).</li>
+</ul>
+
+<h2>Subgrid and overlap</h2>
+<textarea class="code" data-lang="css">
+/* Align title/body/footer across sibling cards */
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: auto; gap: 1rem; }
+.card  { display: grid; grid-row: span 3; grid-template-rows: subgrid; }
+
+/* Layer a caption over an image without position: absolute */
+.hero { display: grid; }
+.hero > * { grid-area: 1 / 1; }
+.hero figcaption { align-self: end; padding: 1rem; background: linear-gradient(transparent, #000a); color: #fff; }
+</textarea>
+
+<div class="callout"><span class="label">Flex or grid?</span>Content-driven and one axis (navbars, button groups) → <strong>flex</strong>. Layout-driven and two axes (pages, galleries, dashboards) → <strong>grid</strong>.</div>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a responsive image gallery with <code>auto-fit/minmax</code> where one featured image spans 2×2.</li>
+<li>Rebuild the holy-grail layout from Lesson 6 with <code>grid-template-areas</code>.</li>
+<li>Build a dashboard: header, sidebar, four stat tiles in a row, a chart spanning two columns, and a list.</li>
+<li>Overlay a caption on an image using the one-cell trick.</li>
+<li>Play <strong>CSS Grid Garden</strong>.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>fr vs %?</summary>% is a share of the container's full size and ignores gaps. fr divides the space left <em>after</em> gaps and fixed tracks.</details>
+<details><summary>auto-fit vs auto-fill?</summary>Both create as many tracks as fit. auto-fill keeps empty ones; auto-fit collapses them so existing items grow.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

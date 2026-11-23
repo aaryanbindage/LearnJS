@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 50 — Design Patterns in JavaScript</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="50-js-patterns">
+<main><article>
+<h1>Lesson 50 — Design patterns in JavaScript</h1>
+<p class="lede">Patterns are named solutions to recurring problems. They give teams a shared vocabulary. In JavaScript, closures, first-class functions and modules replace much of the class ceremony from older languages.</p>
+
+<h2>Module / factory (encapsulation)</h2>
+<textarea class="code" data-lang="js" data-run>
+function createWallet(initial = 0) {
+  let balance = initial;                         // private via closure
+  const history = [];
+  const record = (type, amount) => history.push({ type, amount, at: history.length });
+  return Object.freeze({
+    deposit(n) { if (n <= 0) throw new RangeError("positive only"); balance += n; record("deposit", n); return this; },
+    withdraw(n) { if (n > balance) throw new Error("insufficient"); balance -= n; record("withdraw", n); return this; },
+    get balance() { return balance; },
+    get history() { return [...history]; },      // return copies, not internals
+  });
+}
+const w = createWallet(10).deposit(5).withdraw(3);
+console.log(w.balance, w.history);
+</textarea>
+
+<h2>Observer / pub-sub</h2>
+<p>Decouple producers from consumers. This is DOM events, Node's <code>EventEmitter</code>, RxJS, and the heart of every state library.</p>
+<textarea class="code" data-lang="js" data-run>
+function createStore(initial) {
+  let state = initial;
+  const listeners = new Set();
+  return {
+    get: () => state,
+    set(update) {
+      const next = typeof update === "function" ? update(state) : update;
+      if (Object.is(next, state)) return;
+      state = next;
+      listeners.forEach(fn => fn(state));
+    },
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },   // returns an unsubscribe fn
+  };
+}
+const counter = createStore({ n: 0 });
+const off = counter.subscribe(s => console.log("render with", s));
+counter.set(s => ({ n: s.n + 1 }));
+counter.set(s => ({ n: s.n + 1 }));
+off();
+counter.set({ n: 99 });          // no one listening
+console.log(counter.get());
+// React's useSyncExternalStore(subscribe, get) plugs a store like this into components.
+</textarea>
+
+<h2>Strategy &amp; command</h2>
+<textarea class="code" data-lang="js" data-run>
+// Strategy: swap algorithms via a lookup of functions (no class hierarchy needed)
+const discounts = {
+  none: p => p,
+  percent: pct => p => p * (1 - pct / 100),
+  flat: amt => p => Math.max(0, p - amt),
+};
+const price = 80;
+console.log(discounts.none(price), discounts.percent(25)(price), discounts.flat(30)(price));
+
+// Command: represent actions as data → undo/redo, logging, replay, collaboration
+function createHistory(doc) {
+  const undo = [], redo = [];
+  const commands = {
+    insert: { do: (d, c) => d + c.text, undo: (d, c) => d.slice(0, -c.text.length) },
+    clear:  { do: (d, c) => (c.prev = d, ""), undo: (d, c) => c.prev },
+  };
+  return {
+    run(cmd) { doc = commands[cmd.type].do(doc, cmd); undo.push(cmd); redo.length = 0; return doc; },
+    undo() { const c = undo.pop(); if (c) { doc = commands[c.type].undo(doc, c); redo.push(c); } return doc; },
+    redo() { const c = redo.pop(); if (c) { doc = commands[c.type].do(doc, c); undo.push(c); } return doc; },
+  };
+}
+const h = createHistory("");
+console.log(h.run({ type: "insert", text: "Hello" }), h.run({ type: "insert", text: " world" }));
+console.log(h.undo(), "|", h.redo());
+</textarea>
+
+<h2>State machine</h2>
+<p>When behavior depends on "what mode am I in", model explicit states and transitions instead of juggling booleans. Impossible states become unrepresentable.</p>
+<textarea class="code" data-lang="js" data-run>
+const fetchMachine = {
+  initial: "idle",
+  states: {
+    idle:    { on: { FETCH: "loading" } },
+    loading: { on: { RESOLVE: "success", REJECT: "error" } },
+    success: { on: { FETCH: "loading" } },
+    error:   { on: { RETRY: "loading" } },
+  },
+};
+function transition(machine, state, event) {
+  const next = machine.states[state]?.on[event];
+  if (!next) { console.log(`  ✖ ignored ${event} in ${state}`); return state; }   // illegal transitions are no-ops
+  return next;
+}
+let s = fetchMachine.initial;
+for (const e of ["FETCH", "FETCH", "REJECT", "RETRY", "RESOLVE"]) { s = transition(fetchMachine, s, e); console.log(e, "→", s); }
+// For real apps use XState (also has a visualizer); React's useReducer is a lightweight version.
+</textarea>
+
+<h2>Dependency injection &amp; the adapter</h2>
+<textarea class="code" data-lang="js" data-run>
+// Pass dependencies in instead of importing them: trivial to test and swap.
+function createUserService({ http, clock = () => Date.now() }) {
+  return {
+    async load(id) {
+      const raw = await http.get(`/users/${id}`);
+      return { id: raw.id, name: raw.full_name, loadedAt: clock() };   // adapter: map server shape → app shape
+    },
+  };
+}
+// In tests: fake dependencies
+const fakeHttp = { get: async () => ({ id: 1, full_name: "Ada Lovelace" }) };
+const svc = createUserService({ http: fakeHttp, clock: () => 0 });
+console.log(await svc.load(1));
+</textarea>
+
+<h2>Other patterns you'll meet</h2>
+<table>
+<tr><th>Pattern</th><th>Where you see it</th></tr>
+<tr><td>Singleton</td><td>ES modules are singletons by default (module scope); avoid hidden global state otherwise</td></tr>
+<tr><td>Iterator / generator</td><td><code>for…of</code>, async iterators, streams</td></tr>
+<tr><td>Proxy</td><td>Vue reactivity, validation, logging; <code>new Proxy(target, { get, set })</code></td></tr>
+<tr><td>Decorator / higher-order function / middleware</td><td>Express middleware, Redux middleware, React HOCs, <code>memoize(fn)</code></td></tr>
+<tr><td>Builder / fluent interface</td><td>Query builders, <code>THREE.Vector3().set().add()</code></td></tr>
+<tr><td>Composite</td><td>The DOM and Three.js scene graph: a tree where nodes and groups share an interface</td></tr>
+<tr><td>Object pool / flyweight</td><td>Particle systems, <code>InstancedMesh</code> sharing geometry</td></tr>
+<tr><td>Repository</td><td>A data-access layer hiding where data comes from (API, cache, IndexedDB)</td></tr>
+<tr><td>Compound components, render props, hooks</td><td>React composition patterns (Lesson 30)</td></tr>
+</table>
+
+<h2>Principles behind the patterns</h2>
+<ul>
+<li><strong>Single responsibility</strong>: one reason to change per module.</li>
+<li><strong>Open/closed</strong>: extend behavior without editing core code (strategies, plugins).</li>
+<li><strong>Depend on abstractions</strong>: pass in what you need.</li>
+<li><strong>Composition over inheritance</strong>, <strong>immutability by default</strong>, <strong>make illegal states unrepresentable</strong>.</li>
+<li><strong>YAGNI</strong>: don't add a pattern until the problem exists. Three similar lines beat a premature abstraction.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build an <code>EventEmitter</code> with <code>on</code>, <code>once</code>, <code>off</code>, <code>emit</code> and a memory-safe unsubscribe. Use it to decouple a UI from a model.</li>
+<li>Add selectors and middleware (logging) to the <code>createStore</code> above; connect it to React with <code>useSyncExternalStore</code>.</li>
+<li>Model a checkout flow as a state machine (cart → address → payment → confirm → done/failed) and render the UI from the state only.</li>
+<li>Implement undo/redo for the canvas drawing app from Lesson 46 using the command pattern.</li>
+<li>Implement a reactive <code>observable(obj)</code> with <code>Proxy</code> that logs property sets.</li>
+<li>Write a middleware chain (<code>compose(...mws)(handler)</code>) like Express/Koa for processing requests.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why is a state machine better than several booleans?</summary>Booleans allow impossible combinations (loading and error at once). A machine enumerates legal states and transitions, so illegal ones can't occur.</details>
+<details><summary>What is dependency injection buying you?</summary>Testability and flexibility: collaborators are supplied from outside, so you can substitute fakes or alternative implementations without changing the code.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

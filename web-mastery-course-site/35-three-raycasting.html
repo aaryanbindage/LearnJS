@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 35 — Interaction: Raycasting</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="35-three-raycasting">
+<main><article>
+<h1>Lesson 35 — Interaction: raycasting</h1>
+<p class="lede">The DOM knows what you clicked; a 3D scene doesn't. A <strong>raycaster</strong> shoots an invisible line from the camera through the pointer and tells you which objects it hits.</p>
+
+<h2>How it works</h2>
+<ol>
+<li>Convert the pointer position to <strong>normalized device coordinates</strong> (NDC): x and y from −1 to +1, with y pointing up.</li>
+<li><code>raycaster.setFromCamera(pointer, camera)</code> builds a ray.</li>
+<li><code>raycaster.intersectObjects(objects, recursive)</code> returns hits sorted by distance: <code>object</code>, <code>point</code>, <code>distance</code>, <code>face</code>, <code>uv</code>, <code>instanceId</code>.</li>
+</ol>
+<textarea class="code" data-lang="js">
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+function updatePointer(e) {
+  const r = renderer.domElement.getBoundingClientRect();           // use the canvas rect, not the window
+  pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;           // flip Y
+}
+</textarea>
+
+<h2>Hover and click (live)</h2>
+<p>Hover a box to highlight it; click to launch it upward; click the floor to place a marker.</p>
+<textarea class="code" data-lang="html" data-run data-height="420px">
+<style>html,body{margin:0;overflow:hidden;background:#111;color:#fff;font:13px system-ui}#hud{position:fixed;left:10px;top:8px;pointer-events:none}</style>
+<div id="hud">Hover a box · click to bounce it</div>
+<script type="importmap">{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.append(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color("#14121f");
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(5, 6, 8);
+const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+
+scene.add(new THREE.HemisphereLight("#fff", "#334", 1.2));
+const sun = new THREE.DirectionalLight("#fff", 2); sun.position.set(4, 8, 5); scene.add(sun);
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), new THREE.MeshStandardMaterial({ color: "#2b2840" }));
+floor.rotation.x = -Math.PI / 2; scene.add(floor);
+
+// 5x5 grid of boxes. Store per-object state in userData.
+const boxes = [];
+for (let x = -2; x <= 2; x++) for (let z = -2; z <= 2; z++) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: "#7c5cff" }));
+  m.position.set(x * 1.8, 0.5, z * 1.8);
+  m.userData = { baseY: 0.5, vy: 0, hovered: false };
+  boxes.push(m); scene.add(m);
+}
+
+const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2(-10, -10);
+let downAt = null;
+renderer.domElement.addEventListener("pointermove", e => {
+  const r = renderer.domElement.getBoundingClientRect();
+  pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+});
+// Distinguish a click from an orbit-drag: compare pointer travel
+renderer.domElement.addEventListener("pointerdown", e => downAt = { x: e.clientX, y: e.clientY });
+renderer.domElement.addEventListener("pointerup", e => {
+  if (!downAt || Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 5) return;   // it was a drag
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.intersectObjects(boxes, false)[0];
+  if (hit) hit.object.userData.vy = 6;                      // launch!
+});
+
+const clock = new THREE.Clock();
+let hovered = null;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.intersectObjects(boxes, false)[0];
+  const obj = hit ? hit.object : null;
+  if (obj !== hovered) {                                    // only touch things when hover target changes
+    if (hovered) hovered.material.color.set("#7c5cff");
+    if (obj) obj.material.color.set("#ff4d8d");
+    hovered = obj;
+    renderer.domElement.style.cursor = obj ? "pointer" : "";
+  }
+
+  for (const b of boxes) {                                  // simple fake gravity
+    const u = b.userData;
+    u.vy -= 18 * dt; b.position.y += u.vy * dt;
+    if (b.position.y < u.baseY) { b.position.y = u.baseY; u.vy = 0; }
+    b.scale.setScalar(THREE.MathUtils.damp(b.scale.x, b === hovered ? 1.15 : 1, 10, dt));
+  }
+  controls.update(); renderer.render(scene, camera);
+});
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+</script>
+</textarea>
+
+<h2>Performance and patterns</h2>
+<ul>
+<li>Raycast against a <strong>short list</strong> of interactive objects, not <code>scene.children</code> with <code>recursive = true</code>, and not every frame on every pointer event if the scene is big. Throttle or do it in the loop once per frame (as above).</li>
+<li>For complex models use invisible low-poly proxy meshes (or <code>three-mesh-bvh</code> for accelerated raycasts).</li>
+<li><code>InstancedMesh</code> hits give <code>hit.instanceId</code>.</li>
+<li>Use <code>layers</code> to include/exclude objects: <code>raycaster.layers.set(1)</code>.</li>
+</ul>
+
+<h2>Other useful raycasts</h2>
+<textarea class="code" data-lang="js">
+// Place an object where the user clicks on the floor
+const hit = raycaster.intersectObject(floor)[0];
+if (hit) marker.position.copy(hit.point);
+
+// Walk the hit object's parents to find a "root" (for clicks on glTF sub-meshes)
+let o = hit.object; while (o && !o.userData.clickable) o = o.parent;
+
+// Intersect with an infinite math plane (drag on a plane without a mesh)
+const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const p = new THREE.Vector3(); raycaster.ray.intersectPlane(plane, p);
+
+// Project a 3D point to screen pixels to place an HTML label over the scene
+const v = obj.position.clone().project(camera);
+label.style.transform = `translate(${(v.x * 0.5 + 0.5) * innerWidth}px, ${(-v.y * 0.5 + 0.5) * innerHeight}px)`;
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Click a box to select it (outline with a second slightly larger back-face mesh, or an <code>EdgesGeometry</code> line). Click empty space to deselect.</li>
+<li>Click the floor to move a character marker there smoothly.</li>
+<li>Drag boxes along the floor using <code>pointerdown/move/up</code> and plane intersection (disable OrbitControls while dragging).</li>
+<li>Show an HTML tooltip (a real DOM element) next to the hovered object using <code>.project(camera)</code>.</li>
+<li>Make 10,000 instanced cubes and report which instance is under the mouse.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why flip the Y coordinate?</summary>DOM Y grows downward; Three's NDC Y grows upward, from -1 (bottom) to +1 (top).</details>
+<details><summary>How do I stop orbit drags from counting as clicks?</summary>Compare pointer-down and pointer-up positions (or time) and ignore the click if the pointer moved more than a few pixels.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 53 — Web Security</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="53-security">
+<main><article>
+<h1>Lesson 53 — Web security: XSS, CSRF, CSP &amp; auth</h1>
+<p class="lede">Every app you ship will be probed by automated attackers within hours. Security is a set of habits, not a feature you add at the end. This lesson is defensive: understand each attack so you can prevent it in your own code.</p>
+
+<h2>Threat model basics</h2>
+<ul>
+<li><strong>Never trust client input.</strong> Anything from the browser (forms, headers, cookies, URL, localStorage, even your own frontend's checks) can be forged. Validate and authorize on the server.</li>
+<li><strong>Least privilege</strong>, <strong>defense in depth</strong> (multiple layers), <strong>secure by default</strong>, <strong>fail closed</strong>.</li>
+<li>Use the <strong>OWASP Top 10</strong> as a checklist: broken access control, cryptographic failures, injection, insecure design, misconfiguration, vulnerable components, authentication failures, integrity failures, logging failures, SSRF.</li>
+</ul>
+
+<h2>XSS: Cross-Site Scripting</h2>
+<p>If attacker-controlled text is interpreted as HTML/JS in your page, their script runs with your user's session: it can read data, make requests as the user and steal tokens. Types: <em>stored</em> (saved in DB), <em>reflected</em> (from URL), <em>DOM-based</em> (client JS writes unsafe HTML).</p>
+<textarea class="code" data-lang="html" data-run data-height="320px">
+<style>body{font-family:system-ui;padding:1rem}input{font:inherit;padding:.4em;width:90%}.box{border:1px solid #ccc;padding:.5rem;margin:.5rem 0;border-radius:8px;min-height:2rem}code{background:#eee;padding:0 .3em}</style>
+<p>Try typing: <code>&amp;lt;img src=x onerror="alert('XSS!')"&amp;gt;</code></p>
+<input id="in" value="">
+<p><b>Unsafe</b> (innerHTML):</p><div class="box" id="bad"></div>
+<p><b>Safe</b> (textContent):</p><div class="box" id="good"></div>
+<script>
+  in_ = document.getElementById("in");
+  in_.addEventListener("input", () => {
+    bad.innerHTML = in_.value;          // ✖ attacker-controlled HTML is parsed and executed
+    good.textContent = in_.value;       // ✔ always treated as text
+  });
+</script>
+</textarea>
+<h3>Defenses</h3>
+<ol>
+<li><strong>Output-encode by default.</strong> React, Vue and other frameworks escape interpolated text. Danger zones: <code>dangerouslySetInnerHTML</code>, <code>innerHTML</code>, <code>insertAdjacentHTML</code>, <code>document.write</code>, <code>eval</code>, <code>new Function</code>, <code>javascript:</code> URLs in <code>href</code>, and unvalidated <code>href</code>/<code>src</code>.</li>
+<li><strong>Sanitize</strong> HTML you must render (rich text, markdown) with <strong>DOMPurify</strong> (or the Sanitizer API when available). Sanitize on output, with an allow-list.</li>
+<li><strong>Content Security Policy (CSP)</strong>: a response header restricting where scripts can come from. Even if an injection slips through, inline/unknown scripts won't run.</li>
+<li><strong>Cookies</strong> with <code>HttpOnly</code> so JS can't read session tokens.</li>
+<li><strong>Trusted Types</strong> (Chromium): forbid raw strings reaching dangerous sinks.</li>
+</ol>
+<textarea class="code" data-lang="bash" data-file="Content-Security-Policy header (example, strict)">
+Content-Security-Policy:
+  default-src 'self';
+  script-src 'self' 'nonce-{RANDOM_PER_RESPONSE}' 'strict-dynamic';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: https:;
+  connect-src 'self' https://api.example.com;
+  object-src 'none'; base-uri 'none'; frame-ancestors 'none';
+  form-action 'self'
+# Start with Content-Security-Policy-Report-Only to find what would break, then enforce.
+</textarea>
+
+<h2>CSRF: Cross-Site Request Forgery</h2>
+<p>A malicious site makes the victim's browser send a request to your site; the browser attaches the victim's cookies automatically, so the request looks authenticated (<code>POST /transfer?to=attacker</code>).</p>
+<h3>Defenses</h3>
+<ul>
+<li><strong><code>SameSite=Lax</code> or <code>Strict</code> cookies</strong> (Lax is the modern browser default): cookies aren't sent on cross-site POSTs.</li>
+<li><strong>CSRF tokens</strong> (synchronizer or double-submit) for state-changing requests when using cookie auth, or require a custom header (<code>X-Requested-With</code>) / JSON content type with strict CORS.</li>
+<li>Never change state on <code>GET</code>. Check <code>Origin</code>/<code>Referer</code> headers.</li>
+</ul>
+<textarea class="code" data-lang="bash" data-file="Secure session cookie">
+Set-Cookie: sid=9f8a...; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=3600
+# HttpOnly: no JS access (blocks XSS theft)   Secure: HTTPS only   SameSite: limits cross-site sending
+</textarea>
+
+<h2>Other injection and request attacks</h2>
+<table>
+<tr><th>Attack</th><th>What happens</th><th>Prevention</th></tr>
+<tr><td><strong>SQL injection</strong></td><td>Input becomes part of a query: <code>' OR 1=1 --</code></td><td>Parameterized queries / ORM; never concatenate; least-privilege DB user</td></tr>
+<tr><td><strong>Command injection</strong></td><td>Input reaches a shell</td><td>Avoid shelling out; pass argument arrays (<code>execFile</code>), allow-list inputs</td></tr>
+<tr><td><strong>Path traversal</strong></td><td><code>../../etc/passwd</code></td><td>Normalize and confine paths; map ids to files</td></tr>
+<tr><td><strong>SSRF</strong></td><td>Server fetches an attacker-chosen URL (internal metadata services)</td><td>Allow-list hosts, block private IP ranges, don't follow redirects blindly</td></tr>
+<tr><td><strong>Open redirect</strong></td><td><code>/login?next=https://evil.com</code></td><td>Only redirect to same-site relative paths or allow-listed hosts</td></tr>
+<tr><td><strong>Clickjacking</strong></td><td>Your page framed invisibly</td><td><code>frame-ancestors 'none'</code> / <code>X-Frame-Options: DENY</code></td></tr>
+<tr><td><strong>Prototype pollution</strong></td><td>Malicious <code>__proto__</code> keys in merged objects</td><td>Validate JSON with schemas; use <code>Object.create(null)</code>/<code>Map</code>; update deps</td></tr>
+<tr><td><strong>ReDoS</strong></td><td>Catastrophic regex backtracking freezes a server</td><td>Simple regexes, input length limits, <code>re2</code></td></tr>
+<tr><td><strong>Mass assignment</strong></td><td>Client sets <code>isAdmin: true</code></td><td>Whitelist fields via schemas (Zod); never spread request body into DB</td></tr>
+</table>
+<textarea class="code" data-lang="js" data-file="sql.js">
+// ✖ Vulnerable
+db.query(`SELECT * FROM users WHERE email = '${req.body.email}'`);
+// ✔ Parameterized: the driver sends data separately from the query
+db.query("SELECT * FROM users WHERE email = $1", [req.body.email]);
+</textarea>
+
+<h2>Authentication &amp; passwords</h2>
+<ul>
+<li><strong>Never store plaintext passwords.</strong> Hash with a slow, salted algorithm: <strong>argon2id</strong> (preferred), <strong>scrypt</strong> or <strong>bcrypt</strong>. Never roll your own crypto; never use fast hashes (SHA-256, MD5) for passwords.</li>
+<li><strong>Prefer a proven auth provider/library</strong> (Auth.js, Clerk, Supabase Auth, Auth0, Lucia patterns, Passkeys/WebAuthn) over building from scratch.</li>
+<li><strong>Passkeys (WebAuthn)</strong> are phishing-resistant and the best UX. Offer MFA (TOTP/WebAuthn).</li>
+<li><strong>Sessions vs JWT</strong>: server sessions with an <code>HttpOnly</code> cookie are simplest and revocable. JWTs are fine for short-lived API tokens but hard to revoke; don't store them in localStorage for sensitive apps.</li>
+<li>Rate-limit login, add lockout/backoff, generic error messages ("invalid credentials"), secure password reset (single-use, expiring tokens).</li>
+<li><strong>Authorization is separate from authentication</strong>: check permissions on <em>every</em> request, for <em>every</em> resource (broken object-level authorization: <code>GET /orders/1234</code> must verify that order belongs to the user).</li>
+</ul>
+
+<h2>Transport, headers, CORS and secrets</h2>
+<ul>
+<li><strong>HTTPS everywhere</strong>; HSTS (<code>Strict-Transport-Security</code>). No mixed content.</li>
+<li>Helpful headers: <code>X-Content-Type-Options: nosniff</code>, <code>Referrer-Policy: strict-origin-when-cross-origin</code>, <code>Permissions-Policy</code>, COOP/COEP when you need cross-origin isolation. In Express use <code>helmet</code>.</li>
+<li><strong>CORS is not a security boundary for your server</strong>; it only tells <em>browsers</em> which origins may read responses. Don't use <code>Access-Control-Allow-Origin: *</code> with credentials. Allow-list origins.</li>
+<li><strong>Secrets</strong>: never in source control or frontend bundles (anything in <code>VITE_*</code>/<code>NEXT_PUBLIC_*</code> is public). Use environment variables / secret managers, rotate leaked keys immediately, add <code>.env</code> to <code>.gitignore</code>, scan with <code>gitleaks</code>.</li>
+</ul>
+
+<h2>Supply chain security</h2>
+<ul>
+<li>Most of your code is dependencies. Keep them few and maintained; commit the lockfile; run <code>npm audit</code>, Dependabot/Renovate, and <code>npm ci</code> in CI.</li>
+<li>Beware typosquatting and malicious postinstall scripts; check download counts, repo, maintainers. Consider <code>--ignore-scripts</code> in CI and provenance/SBOM tooling.</li>
+<li>Subresource Integrity for third-party scripts: <code>&lt;script src integrity="sha384-…" crossorigin&gt;</code>. Minimize third-party tags (analytics, chat widgets run with full page power).</li>
+</ul>
+
+<h2>Privacy and compliance (briefly)</h2>
+<ul>
+<li>Collect the minimum data; define retention; encrypt in transit and at rest; log without secrets or PII.</li>
+<li>Know the regulations relevant to your users (GDPR, CCPA) and basic obligations: consent, deletion/export, breach notification.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a comment box that is deliberately XSS-vulnerable, exploit it with a harmless payload in a local sandbox, then fix it three ways (escape, DOMPurify, CSP) and verify each.</li>
+<li>Write a Node endpoint with a SQL injection hole, demonstrate it on a local SQLite file, then fix it with parameters.</li>
+<li>Add a strict CSP (report-only first) to a Vite/Next app and fix everything that breaks.</li>
+<li>Implement cookie-based login with an <code>HttpOnly; Secure; SameSite=Lax</code> session, CSRF token protection, and rate limiting.</li>
+<li>Write tests proving user A cannot read or edit user B's resource (object-level authorization).</li>
+<li>Run <code>npm audit</code>, <code>gitleaks</code> and a ZAP baseline scan against your local project; triage the findings.</li>
+<li>Work through the free <strong>PortSwigger Web Security Academy</strong> labs for XSS, CSRF and SQLi.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why is client-side validation not security?</summary>Attackers bypass your frontend and send requests directly. Client validation helps users; only server-side checks protect the system.</details>
+<details><summary>How does HttpOnly help against XSS?</summary>JavaScript can't read HttpOnly cookies, so an injected script can't steal the session token (it can still make requests as the user, so you must also prevent XSS).</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

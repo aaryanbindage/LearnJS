@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 51 — Data Structures & Algorithms for Web Developers</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="51-algorithms">
+<main><article>
+<h1>Lesson 51 — Data structures &amp; algorithms for web developers</h1>
+<p class="lede">You don't need to be a competitive programmer, but you do need to recognize when code will not scale, choose the right structure, and handle the problems that really occur in web apps: search, diffing, trees, graphs, layout and geometry.</p>
+
+<h2>Big-O in practice</h2>
+<table>
+<tr><th>Complexity</th><th>10 items</th><th>1,000,000 items</th><th>Example</th></tr>
+<tr><td>O(1)</td><td>1</td><td>1</td><td>Map/Set lookup, array index</td></tr>
+<tr><td>O(log n)</td><td>3</td><td>20</td><td>Binary search, balanced trees</td></tr>
+<tr><td>O(n)</td><td>10</td><td>1,000,000</td><td>Loop, <code>includes</code>, <code>filter</code></td></tr>
+<tr><td>O(n log n)</td><td>33</td><td>20,000,000</td><td>Good sorting</td></tr>
+<tr><td>O(n²)</td><td>100</td><td>10¹² (hours)</td><td>Nested loops, <code>includes</code> inside a loop</td></tr>
+</table>
+<p>The classic web bug: <code>items.filter(i =&gt; others.includes(i.id))</code> is O(n·m). Convert <code>others</code> to a <code>Set</code> first for O(n + m). Prove it:</p>
+<textarea class="code" data-lang="js" data-run>
+const N = 20000;
+const a = Array.from({ length: N }, (_, i) => i);
+const b = Array.from({ length: N }, (_, i) => i * 2);
+
+let t = performance.now();
+const slow = a.filter(x => b.includes(x));                 // O(n·m)
+console.log("array.includes:", (performance.now() - t).toFixed(0), "ms →", slow.length);
+
+t = performance.now();
+const set = new Set(b);
+const fast = a.filter(x => set.has(x));                    // O(n + m)
+console.log("Set.has:       ", (performance.now() - t).toFixed(1), "ms →", fast.length);
+</textarea>
+
+<h2>Everyday structures</h2>
+<table>
+<tr><th>Structure</th><th>JS</th><th>Use for</th></tr>
+<tr><td>Array</td><td><code>[]</code></td><td>Ordered lists; index access. <code>shift/unshift</code> are O(n)</td></tr>
+<tr><td>Hash map / set</td><td><code>Map</code>, <code>Set</code>, objects</td><td>Lookup by key, dedupe, counting, grouping, memoization</td></tr>
+<tr><td>Stack</td><td>array <code>push/pop</code></td><td>Undo, parsing, DFS, call stack</td></tr>
+<tr><td>Queue</td><td>array + index, or linked list</td><td>BFS, task scheduling, message handling</td></tr>
+<tr><td>Heap / priority queue</td><td>write your own or a library</td><td>Top-k, schedulers, Dijkstra</td></tr>
+<tr><td>Tree</td><td>nested objects</td><td>DOM, file systems, menus, scene graphs</td></tr>
+<tr><td>Graph</td><td>adjacency list: <code>Map&lt;node, node[]&gt;</code></td><td>Routes, dependencies, social links</td></tr>
+<tr><td>Trie</td><td>nested Maps</td><td>Autocomplete / prefix search</td></tr>
+<tr><td>Typed array</td><td><code>Float32Array</code></td><td>Numeric/GPU data</td></tr>
+</table>
+
+<h2>Patterns to master</h2>
+<h3>Hash maps: counting, grouping, two-sum</h3>
+<textarea class="code" data-lang="js" data-run>
+const words = "the quick brown fox jumps over the lazy dog the end".split(" ");
+const counts = new Map();
+for (const w of words) counts.set(w, (counts.get(w) ?? 0) + 1);
+console.log([...counts].sort((a, b) => b[1] - a[1]).slice(0, 3));
+
+function twoSum(nums, target) {                      // O(n) instead of O(n²)
+  const seen = new Map();
+  for (let i = 0; i < nums.length; i++) {
+    const need = target - nums[i];
+    if (seen.has(need)) return [seen.get(need), i];
+    seen.set(nums[i], i);
+  }
+  return null;
+}
+console.log(twoSum([2, 7, 11, 15], 9));
+</textarea>
+<h3>Binary search, sliding window, two pointers</h3>
+<textarea class="code" data-lang="js" data-run>
+function lowerBound(sorted, x) {                    // first index with sorted[i] >= x, O(log n)
+  let lo = 0, hi = sorted.length;
+  while (lo < hi) { const mid = (lo + hi) >>> 1; if (sorted[mid] < x) lo = mid + 1; else hi = mid; }
+  return lo;
+}
+console.log(lowerBound([1, 3, 5, 7, 9], 6));
+
+function longestUniqueSubstring(s) {                // sliding window, O(n)
+  const last = new Map(); let best = 0, start = 0;
+  for (let i = 0; i < s.length; i++) {
+    if (last.has(s[i]) && last.get(s[i]) >= start) start = last.get(s[i]) + 1;
+    last.set(s[i], i); best = Math.max(best, i - start + 1);
+  }
+  return best;
+}
+console.log(longestUniqueSubstring("abcabcbb"));
+</textarea>
+<h3>Trees and recursion (DOM-like data)</h3>
+<textarea class="code" data-lang="js" data-run>
+const tree = { name: "root", children: [
+  { name: "src", children: [{ name: "app.js" }, { name: "ui", children: [{ name: "button.js" }] }] },
+  { name: "README.md" },
+]};
+function walk(node, depth = 0, out = []) {            // depth-first
+  out.push("  ".repeat(depth) + node.name);
+  node.children?.forEach(c => walk(c, depth + 1, out));
+  return out;
+}
+console.log(walk(tree).join("\n"));
+
+function bfs(root, pred) {                             // breadth-first with a queue
+  const q = [root];
+  for (let i = 0; i < q.length; i++) { const n = q[i]; if (pred(n)) return n; q.push(...(n.children ?? [])); }
+}
+console.log(bfs(tree, n => n.name === "button.js")?.name);
+</textarea>
+<h3>Graphs: shortest path and dependency order</h3>
+<textarea class="code" data-lang="js" data-run>
+const graph = { A: ["B", "C"], B: ["D"], C: ["D", "E"], D: ["F"], E: ["F"], F: [] };
+
+function shortestPath(g, from, to) {                   // BFS on an unweighted graph
+  const prev = new Map([[from, null]]), q = [from];
+  for (let i = 0; i < q.length; i++) {
+    const n = q[i]; if (n === to) break;
+    for (const m of g[n]) if (!prev.has(m)) { prev.set(m, n); q.push(m); }
+  }
+  if (!prev.has(to)) return null;
+  const path = []; for (let n = to; n !== null; n = prev.get(n)) path.push(n);
+  return path.reverse();
+}
+console.log(shortestPath(graph, "A", "F"));
+
+function topoSort(g) {                                 // build order for dependencies (Kahn's algorithm)
+  const indeg = Object.fromEntries(Object.keys(g).map(k => [k, 0]));
+  for (const k in g) for (const m of g[k]) indeg[m]++;
+  const q = Object.keys(indeg).filter(k => indeg[k] === 0), out = [];
+  while (q.length) { const n = q.shift(); out.push(n); for (const m of g[n]) if (--indeg[m] === 0) q.push(m); }
+  return out.length === Object.keys(g).length ? out : "cycle!";
+}
+console.log(topoSort(graph));
+</textarea>
+<h3>Dynamic programming &amp; memoization</h3>
+<textarea class="code" data-lang="js" data-run>
+function editDistance(a, b) {                          // basis of diff tools and fuzzy search
+  const dp = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++)
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return dp[a.length][b.length];
+}
+console.log(editDistance("kitten", "sitting"), editDistance("react", "preact"));
+</textarea>
+
+<h2>Algorithms hiding in web work</h2>
+<ul>
+<li><strong>Virtual DOM diffing</strong> (React reconciliation): tree diff with keys → heuristics for O(n).</li>
+<li><strong>Debounce/throttle, rate limiting</strong> (token bucket), <strong>LRU cache</strong>, <strong>memoization</strong>.</li>
+<li><strong>Fuzzy search</strong> (edit distance, trigram, Fuse.js), <strong>autocomplete</strong> (trie), <strong>sorting/filtering large tables</strong> (virtualization + indexes).</li>
+<li><strong>Layout engines</strong> (flexbox), <strong>spatial indexes</strong> (quadtree, BVH) for collision and raycasting, <strong>pathfinding</strong> (A*) in games, <strong>geometry</strong> (dot/cross products, projections, lerp, quaternions) in 3D.</li>
+<li><strong>Cryptographic hashing</strong>, <strong>compression</strong>, <strong>CRDTs</strong> for collaborative editing.</li>
+</ul>
+
+<h2>A method for solving problems</h2>
+<ol>
+<li>Restate the problem; list inputs, outputs, constraints and edge cases (empty, one item, duplicates, huge).</li>
+<li>Do a tiny example by hand.</li>
+<li>Write the brute-force solution first and state its complexity.</li>
+<li>Find the bottleneck; pick a structure/pattern (hash map, sort + two pointers, BFS, DP) to remove it.</li>
+<li>Code it, then test with edge cases. State the final time and space complexity.</li>
+</ol>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Implement a <code>MinHeap</code> and use it for "top 10 of 1,000,000 numbers" in O(n log k).</li>
+<li>Implement a <code>Trie</code> with <code>insert</code> and <code>suggest(prefix)</code>; wire it to a live autocomplete input.</li>
+<li>Implement an LRU cache with O(1) get/set (Map or doubly-linked list + Map).</li>
+<li>Flatten and unflatten a nested comments tree from a flat list with <code>parentId</code> in O(n).</li>
+<li>Implement A* on a 2D grid and visualize it on canvas (Lesson 46).</li>
+<li>Solve 20 problems from NeetCode/LeetCode "easy–medium" across arrays, hashing, two pointers, trees, graphs and DP; write down the pattern used for each.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why convert an array to a Set before many lookups?</summary>Array includes is O(n) per lookup; Set.has is O(1) on average, turning an O(n·m) algorithm into O(n + m).</details>
+<details><summary>When is premature optimization not premature?</summary>When data sizes can grow large (lists of thousands, per-frame loops, large graphs) and a quadratic algorithm is on the hot path. Choosing the right structure is free; micro-tuning is not.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

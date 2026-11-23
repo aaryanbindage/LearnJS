@@ -1,0 +1,5 @@
+Deploy to GitHub Pages
+1. Create a repo, copy EVERYTHING in this folder (including the hidden .nojekyll file) to its root.
+2. Repo Settings > Pages > Deploy from a branch > main / (root).
+3. Open https://<user>.github.io/<repo>/
+All links are relative, so it works under a repo subpath. Demos that load Three.js, React or SQLite need internet.

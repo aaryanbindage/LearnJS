@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 43 — Container Queries, Anchor Positioning, View Transitions</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="43-css-advanced">
+<main><article>
+<h1>Lesson 43 — Container queries, anchor positioning &amp; view transitions</h1>
+<p class="lede">CSS now does things that once required JavaScript. This lesson covers the features that matter most. Support varies; always check caniuse.com and use <code>@supports</code> for progressive enhancement.</p>
+
+<h2>Container queries</h2>
+<p>Media queries respond to the <em>viewport</em>. Container queries respond to the size of the component's <em>parent</em>, so one component works in a sidebar and in a main column without knowing where it lives. This is what truly reusable components need.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body{font-family:system-ui;padding:1rem}
+  .slot{container-type:inline-size;container-name:card;border:2px dashed #aaa;padding:.5rem;margin:1rem 0;resize:horizontal;overflow:auto;max-width:100%;min-width:180px}
+  .card{display:grid;gap:.5rem;padding:1rem;border-radius:12px;background:#ece8ff}
+  .card .thumb{aspect-ratio:16/9;background:#7c5cff;border-radius:8px}
+  @container card (min-width: 420px){
+    .card{grid-template-columns:140px 1fr;align-items:center}
+    .card .thumb{aspect-ratio:1}
+  }
+  /* container query units: cqw, cqi */
+  .card h3{margin:0;font-size:clamp(1rem,5cqi,1.6rem)}
+</style>
+<p>Drag the dashed boxes' bottom-right corner to resize them.</p>
+<div class="slot"><div class="card"><div class="thumb"></div><div><h3>Responsive card</h3><p>Layout depends on the container.</p></div></div></div>
+<div class="slot" style="width:520px"><div class="card"><div class="thumb"></div><div><h3>Same component</h3><p>Wider slot, horizontal layout.</p></div></div></div>
+</textarea>
+<p>Style queries (<code>@container style(--theme: dark)</code>) and <code>container-type: size</code> exist too. Note: an element can't query itself, only an ancestor container.</p>
+
+<h2>The <code>:has()</code> selector in practice</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body{font-family:system-ui;padding:1rem}
+  .field{display:grid;gap:.25rem;margin:.75rem 0}
+  .field:has(input:invalid:not(:placeholder-shown)) label{color:crimson}
+  .field:has(input:invalid:not(:placeholder-shown)) input{border-color:crimson}
+  form:has(input:invalid) button{opacity:.4;pointer-events:none}      /* disable submit until all valid */
+  .grid{display:grid;gap:.5rem;grid-template-columns:repeat(2,1fr)}
+  .grid:has(> :nth-child(5)){grid-template-columns:repeat(3,1fr)}      /* quantity query: 5+ children → 3 columns */
+  .grid>div{background:#ddd6ff;padding:.5rem;border-radius:6px}
+</style>
+<form>
+  <div class="field"><label for="e">Email</label><input id="e" type="email" required placeholder="you@example.com"></div>
+  <button>Submit</button>
+</form>
+<div class="grid"><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div></div>
+</textarea>
+
+<h2>View Transitions</h2>
+<p>Animate between two DOM states (or two pages) with a browser-generated cross-fade or shared-element morph. In a single page, wrap the change in <code>document.startViewTransition()</code>.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body{font-family:system-ui;padding:1rem}
+  .box{width:80px;height:80px;background:#7c5cff;border-radius:12px;view-transition-name:box}
+  .box.big{width:240px;height:160px;background:#e0457b;border-radius:40px}
+  ::view-transition-group(box){animation-duration:.5s}
+  @media (prefers-reduced-motion:reduce){::view-transition-group(*){animation:none}}
+</style>
+<button id="b">Toggle</button>
+<div class="box" id="x"></div>
+<script>
+  b.onclick = () => {
+    const change = () => x.classList.toggle("big");
+    if (!document.startViewTransition) return change();   // graceful fallback
+    document.startViewTransition(change);
+  };
+</script>
+</textarea>
+<p>For multi-page sites: <code>@view-transition { navigation: auto; }</code> opts same-origin navigations into transitions, and matching <code>view-transition-name</code> values morph elements across pages. In SPAs the router (React Router's <code>viewTransition</code> prop, Next.js experimental flag) wires it up.</p>
+
+<h2>Anchor positioning (progressive)</h2>
+<p>Position a tooltip, popover or dropdown relative to another element in pure CSS, with automatic flipping when there's no room. This replaces Popper/Floating UI for simple cases. Combine with the Popover API for <em>zero-JS</em> accessible popovers. Support is newer, so wrap in <code>@supports</code>.</p>
+<textarea class="code" data-lang="html" data-file="anchor-popover.html">
+<button popovertarget="tip" style="anchor-name: --trigger">Info</button>
+<div id="tip" popover>I'm anchored to the button.</div>
+
+<style>
+  [popover] { margin: 0; padding: .5rem .75rem; border-radius: 8px; border: 1px solid #ccc; }
+  @supports (position-anchor: --x) {
+    #tip {
+      position-anchor: --trigger;
+      position-area: bottom span-right;          /* place below, aligned to the trigger */
+      position-try-fallbacks: flip-block;        /* flip above if it would overflow */
+    }
+  }
+</style>
+</textarea>
+<p>The <strong>Popover API</strong> (<code>popover</code>, <code>popovertarget</code>) gives light-dismiss, top-layer rendering and Escape handling for free. The <code>&lt;dialog&gt;</code> element does the same for modals (<code>showModal()</code>).</p>
+
+<h2>Scroll-driven animations</h2>
+<textarea class="code" data-lang="html" data-run data-height="320px">
+<style>
+  body{margin:0;font-family:system-ui}
+  .bar{position:fixed;top:0;left:0;height:6px;width:100%;background:#7c5cff;transform-origin:0 50%;
+       animation:grow linear both;animation-timeline:scroll(root)}
+  @keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  .reveal{margin:2rem;padding:2rem;background:#ece8ff;border-radius:12px;
+          animation:in linear both;animation-timeline:view();animation-range:entry 0% cover 35%}
+  @keyframes in{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
+  @supports not (animation-timeline:scroll()){.bar{display:none}.reveal{animation:none}}
+</style>
+<div class="bar"></div>
+<div style="height:200px;padding:2rem">Scroll down in the preview ↓</div>
+<div class="reveal">Section 1</div><div class="reveal">Section 2</div><div class="reveal">Section 3</div><div class="reveal">Section 4</div>
+</textarea>
+
+<h2>More platform features worth knowing</h2>
+<ul>
+<li><strong>Nesting</strong>, <strong><code>@layer</code></strong>, <strong><code>color-mix()</code></strong>, <strong><code>oklch()</code></strong>, relative color syntax (<code>oklch(from var(--brand) calc(l + .1) c h)</code>).</li>
+<li><strong><code>text-wrap: balance | pretty</code></strong>, <strong><code>field-sizing: content</code></strong> (auto-growing textarea), <strong><code>interpolate-size</code></strong> (animate to <code>height: auto</code>), <strong><code>@starting-style</code></strong> (animate elements entering the DOM), <strong><code>transition-behavior: allow-discrete</code></strong> (animate <code>display</code>).</li>
+<li><strong><code>subgrid</code></strong>, <strong><code>scrollbar-gutter</code></strong>, <strong><code>overscroll-behavior</code></strong>, <strong><code>content-visibility: auto</code></strong> (skip rendering offscreen sections: big performance win).</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a <code>ProductCard</code> that switches from stacked to horizontal by container width, and drop it into a narrow sidebar and a wide grid.</li>
+<li>Use <code>:has()</code> to build a CSS-only "filter chips" UI with checkboxes that hide non-matching cards.</li>
+<li>Add a view transition between a list item thumbnail and its detail image (shared <code>view-transition-name</code> set per item).</li>
+<li>Build a tooltip with the Popover API + anchor positioning with a JavaScript-free fallback.</li>
+<li>Create a scroll-linked reading progress bar and sections that reveal on scroll, with <code>prefers-reduced-motion</code> handling.</li>
+<li>Use <code>content-visibility: auto</code> on a long page and measure the rendering time change in the Performance panel.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>When container queries over media queries?</summary>When a component appears in different-width contexts. Media queries describe the page; container queries describe the component's available space.</details>
+<details><summary>How do you use new CSS safely?</summary>Treat it as progressive enhancement: the page must work without it. Wrap with @supports or feature-detect in JS, and test in Safari and Firefox.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

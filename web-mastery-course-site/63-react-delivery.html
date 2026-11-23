@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 63 — Testing Pyramid, E2E & Quality Gates</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="63-react-delivery">
+<main><article>
+<h1>Lesson 63 — Testing pyramid, E2E &amp; quality gates</h1>
+<p class="lede">Tests are how you change code without fear. A good test strategy catches the bugs that matter at the lowest cost, and automation (quality gates) keeps the standard without relying on willpower.</p>
+
+<h2>The testing trophy</h2>
+<table>
+<tr><th>Layer</th><th>Tools</th><th>What it proves</th><th>Cost / speed</th></tr>
+<tr><td><strong>Static</strong></td><td>TypeScript, ESLint, Prettier</td><td>Typos, wrong types, bad patterns, unreachable code</td><td>cheapest, instant</td></tr>
+<tr><td><strong>Unit</strong></td><td>Vitest</td><td>Pure logic: reducers, utilities, validators, algorithms</td><td>cheap, milliseconds</td></tr>
+<tr><td><strong>Integration / component</strong></td><td>Vitest + Testing Library, MSW, Testcontainers</td><td>Components with their hooks and network; API handlers with a real DB</td><td>moderate; <strong>best return</strong></td></tr>
+<tr><td><strong>End-to-end</strong></td><td>Playwright</td><td>Critical user journeys in a real browser against a real stack</td><td>expensive, slow, flaky if careless</td></tr>
+<tr><td><strong>Visual / a11y / perf</strong></td><td>Playwright screenshots, axe, Lighthouse CI</td><td>No unintended UI/accessibility/performance regressions</td><td>moderate</td></tr>
+</table>
+<p>Guidelines: <em>write tests that resemble how the software is used</em>; the more your tests mirror real usage, the more confidence they give. Test behavior, not implementation: renaming a private function shouldn't break tests.</p>
+
+<h2>Mocking the network with MSW</h2>
+<p>Mock Service Worker intercepts requests at the network layer, so your component's real <code>fetch</code>/TanStack Query code runs unchanged.</p>
+<textarea class="code" data-lang="jsx" data-file="test/handlers.ts">
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+
+export const handlers = [
+  http.get("/api/todos", () => HttpResponse.json([{ id: 1, title: "Learn MSW", done: false }])),
+  http.post("/api/todos", async ({ request }) => {
+    const body = (await request.json()) as { title: string };
+    return HttpResponse.json({ id: 2, title: body.title, done: false }, { status: 201 });
+  }),
+];
+export const server = setupServer(...handlers);
+// setup file: beforeAll(() => server.listen({ onUnhandledRequest: "error" })); afterEach(() => server.resetHandlers()); afterAll(() => server.close());
+</textarea>
+<textarea class="code" data-lang="jsx" data-file="Todos.test.tsx">
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
+import { server } from "../test/handlers";
+import { renderWithProviders } from "../test/utils";   // wraps QueryClientProvider (retry: false), Router, Theme
+import { Todos } from "./Todos";
+
+it("shows todos and adds a new one", async () => {
+  const user = userEvent.setup();
+  renderWithProviders(<Todos />);
+  expect(await screen.findByText("Learn MSW")).toBeInTheDocument();           // async: findBy*
+
+  await user.type(screen.getByRole("textbox", { name: /new todo/i }), "Write tests");
+  await user.click(screen.getByRole("button", { name: /add/i }));
+  expect(await screen.findByText("Write tests")).toBeInTheDocument();
+});
+
+it("shows an error state when the API fails", async () => {
+  server.use(http.get("/api/todos", () => new HttpResponse(null, { status: 500 })));   // per-test override
+  renderWithProviders(<Todos />);
+  expect(await screen.findByRole("alert")).toHaveTextContent(/something went wrong/i);
+});
+</textarea>
+
+<h2>End-to-end with Playwright</h2>
+<textarea class="code" data-lang="bash">
+npm init playwright@latest        # installs browsers and creates config + example tests
+npx playwright test               # run headless across Chromium/Firefox/WebKit
+npx playwright test --ui          # time-travel debugger
+npx playwright codegen http://localhost:3000   # record interactions into test code
+</textarea>
+<textarea class="code" data-lang="js" data-file="e2e/checkout.spec.ts">
+import { test, expect } from "@playwright/test";
+
+test.beforeEach(async ({ page }) => {
+  await page.goto("/");
+});
+
+test("a visitor can add a product and reach checkout", async ({ page }) => {
+  await page.getByRole("link", { name: "Shoes" }).click();
+  await page.getByRole("button", { name: "Add to cart" }).first().click();
+  await expect(page.getByRole("status")).toContainText("1 item");        // web-first assertions auto-retry
+
+  await page.getByRole("link", { name: "Cart" }).click();
+  await expect(page).toHaveURL(/\/cart$/);
+  await page.getByRole("button", { name: "Checkout" }).click();
+  await expect(page.getByRole("heading", { name: "Shipping" })).toBeVisible();
+});
+
+test("unauthenticated users are redirected from /account", async ({ page }) => {
+  await page.goto("/account");
+  await expect(page).toHaveURL(/\/login/);
+});
+
+test("matches the visual snapshot", async ({ page }) => {
+  await expect(page).toHaveScreenshot("home.png", { maxDiffPixelRatio: 0.01 });
+});
+</textarea>
+<h3>Making E2E reliable</h3>
+<ul>
+<li>Use <strong>role/label locators</strong>, never CSS chains. Never <code>sleep()</code>; rely on auto-waiting and web-first assertions.</li>
+<li><strong>Isolate state</strong>: seed the database per test or per worker; log in once and reuse <code>storageState</code>; stub third-party services.</li>
+<li>Keep E2E for <strong>critical journeys</strong> (signup, purchase, permissions); cover edge cases lower in the pyramid.</li>
+<li>Capture traces/videos on failure (<code>trace: "on-first-retry"</code>) and attach them to CI artifacts.</li>
+<li>Quarantine flaky tests immediately and fix them; a test suite people ignore is worse than none.</li>
+</ul>
+
+<h2>Testing 3D and canvas</h2>
+<ul>
+<li>Extract logic (math, state, game rules) into pure functions and unit-test them; keep the render layer thin.</li>
+<li>For R3F use <code>@react-three/test-renderer</code> to inspect the scene graph without a GPU.</li>
+<li>Smoke-test in Playwright: page loads, no console errors, canvas present, a click triggers expected UI/HTML state; use screenshot comparisons with tolerance (GPU variation).</li>
+<li>Track FPS/draw calls in a performance test using <code>renderer.info</code> exposed on <code>window</code> in test mode.</li>
+</ul>
+
+<h2>Quality gates in CI</h2>
+<textarea class="code" data-lang="bash" data-file=".github/workflows/ci.yml">
+name: CI
+on:
+  pull_request:
+  push: { branches: [main] }
+concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npx prisma migrate deploy
+      - run: npm test -- --coverage
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: playwright-report, path: playwright-report }
+</textarea>
+<ul>
+<li><strong>Pre-commit hooks</strong> (husky + lint-staged) run fast checks on changed files; CI is the real gate.</li>
+<li><strong>Branch protection</strong>: require CI passing, reviews and up-to-date branches before merge.</li>
+<li><strong>Coverage</strong> is a smoke detector, not a goal: a high percentage with weak assertions proves nothing. Watch for untested critical paths, and use <strong>mutation testing</strong> (Stryker) occasionally to judge test quality.</li>
+<li>Add <strong>bundle-size budgets</strong> (<code>size-limit</code>), <strong>Lighthouse CI</strong> thresholds, <strong>axe</strong> checks, dependency audit and secret scanning.</li>
+<li>Test-driven development for tricky logic: write the failing test, make it pass, refactor.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Add MSW to Project 3 and write component tests for loading, success, empty and error states of one list page.</li>
+<li>Write 3 Playwright journeys (happy path, validation failure, permission denied) using role locators and a seeded test user; enable trace on retry.</li>
+<li>Create a GitHub Actions workflow running lint, typecheck, unit tests, build and E2E; require it for merging into <code>main</code>.</li>
+<li>Add axe checks to every Storybook story or Playwright page, and fail on serious violations.</li>
+<li>Write a test for a Three.js game-logic module (e.g., collision or scoring) with no rendering, then a Playwright smoke test for the canvas page.</li>
+<li>Introduce a bug on purpose and note which test layer catches it first. Then write the missing test that would have caught it earlier.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why query by role in Testing Library?</summary>It mirrors how users and assistive tech perceive the UI, so tests verify accessibility and survive markup refactors.</details>
+<details><summary>Why keep E2E tests few?</summary>They are slow, costly and more brittle. Cover only critical journeys end-to-end and push everything else down to faster layers.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

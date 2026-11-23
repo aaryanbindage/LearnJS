@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 3 — Forms, Tables & Accessibility</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="03-html-forms-a11y">
+<main><article>
+<h1>Lesson 3 — Forms, tables &amp; accessibility</h1>
+<p class="lede">Collect input, present tabular data, and make everything usable by everyone.</p>
+
+<h2>Forms</h2>
+<p>Try submitting this form empty, then with a bad email. The browser validates for free.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body{font-family:system-ui;padding:8px} div{margin:.5rem 0}
+  label{display:block;font-weight:600} input:invalid{outline:2px solid crimson}
+</style>
+<form onsubmit="event.preventDefault(); alert('Valid! Would POST to server.')">
+  <div><label for="email">Email</label>
+    <input id="email" name="email" type="email" required autocomplete="email"></div>
+  <div><label for="age">Age</label>
+    <input id="age" name="age" type="number" min="13" max="120"></div>
+  <fieldset><legend>Plan</legend>
+    <label><input type="radio" name="plan" value="free" checked> Free</label>
+    <label><input type="radio" name="plan" value="pro"> Pro</label>
+  </fieldset>
+  <label><input type="checkbox" name="news"> Send me news</label>
+  <div><label for="c">Country</label>
+    <select id="c" name="country"><option value="us">USA</option><option value="uk">UK</option></select></div>
+  <div><label for="msg">Message</label>
+    <textarea id="msg" name="msg" rows="3" maxlength="500"></textarea></div>
+  <button type="submit">Send</button>
+</form>
+</textarea>
+<ul>
+<li><strong>Every input needs a <code>&lt;label&gt;</code></strong>, linked by <code>for</code>/<code>id</code> or by wrapping.</li>
+<li><code>name</code> is the key sent to the server; <code>value</code> is the data.</li>
+<li>Input types: <code>text email password number tel url date time color range file search checkbox radio hidden</code>.</li>
+<li>Validation attributes: <code>required pattern minlength maxlength min max step</code>. Style with <code>:invalid</code> and <code>:valid</code>.</li>
+<li><code>method="get"</code> puts data in the URL (searches); <code>post</code> sends it in the body (changes data).</li>
+<li>A <code>&lt;button&gt;</code> inside a form submits by default. Use <code>type="button"</code> otherwise.</li>
+</ul>
+
+<h2>Tables (tabular data only, never layout)</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>body{font-family:system-ui} table{border-collapse:collapse} th,td{border:1px solid #bbb;padding:6px 12px}</style>
+<table>
+  <caption>Quarterly sales</caption>
+  <thead><tr><th scope="col">Quarter</th><th scope="col">Sales</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Q1</th><td>$10k</td></tr>
+    <tr><th scope="row">Q2</th><td>$14k</td></tr>
+  </tbody>
+  <tfoot><tr><th scope="row">Total</th><td>$24k</td></tr></tfoot>
+</table>
+</textarea>
+<p><code>colspan</code> and <code>rowspan</code> merge cells.</p>
+
+<h2>Accessibility essentials</h2>
+<ol>
+<li><strong>Semantic HTML first.</strong> It gives keyboard and screen-reader support for free.</li>
+<li><strong>Keyboard</strong>: everything reachable with <kbd>Tab</kbd>, activatable with <kbd>Enter</kbd>/<kbd>Space</kbd>, with a visible focus ring. Never <code>outline: none</code> without a replacement.</li>
+<li><strong>Text alternatives</strong>: <code>alt</code>, captions, transcripts.</li>
+<li><strong>Contrast</strong>: at least 4.5:1 for body text (WCAG AA).</li>
+<li><strong>ARIA is a last resort.</strong> No ARIA beats bad ARIA. Useful: <code>aria-label</code>, <code>aria-expanded</code>, <code>aria-live="polite"</code>, <code>aria-hidden</code>.</li>
+<li>Never convey information by color alone.</li>
+<li>Real <code>&lt;button&gt;</code> for actions, real <code>&lt;a&gt;</code> for navigation.</li>
+<li>Put a skip link first in the body: <code>&lt;a href="#main"&gt;Skip to content&lt;/a&gt;</code>.</li>
+</ol>
+<div class="callout warn"><span class="label">Common mistake</span>A <code>placeholder</code> is not a label. It disappears while typing and often has poor contrast.</div>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a registration form with 6+ input types, all labeled and validated. Use <code>method="get"</code> and read the URL after submitting.</li>
+<li>Build a table of 5 items with a caption, header scopes and a footer total.</li>
+<li>Operate your forms using only the keyboard.</li>
+<li>Run Lighthouse (DevTools) on your page and reach 100 for Accessibility.</li>
+<li>Turn on VoiceOver (<kbd>Cmd</kbd>+<kbd>F5</kbd>) and listen to your page.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why can't <code>&lt;div onclick&gt;</code> be a button?</summary>It isn't focusable, has no button role for assistive tech, and doesn't respond to Enter/Space. A real <code>&lt;button&gt;</code> provides all of that.</details>
+<details><summary>What's wrong with placeholder-as-label?</summary>It vanishes on input, has low contrast, and isn't reliably announced as a label.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

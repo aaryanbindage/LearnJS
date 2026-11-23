@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 8 — Positioning, Responsive Design & Variables</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="08-css-responsive">
+<main><article>
+<h1>Lesson 8 — Positioning, responsive design &amp; variables</h1>
+<p class="lede">Place elements precisely, make layouts adapt to any screen, and use custom properties to build themeable systems.</p>
+
+<h2>Positioning</h2>
+<table>
+<tr><th>Value</th><th>Behavior</th></tr>
+<tr><td><code>static</code></td><td>Default, normal flow</td></tr>
+<tr><td><code>relative</code></td><td>Normal flow, offset from its own spot; becomes an anchor for absolute children</td></tr>
+<tr><td><code>absolute</code></td><td>Removed from flow; positioned against the nearest positioned ancestor</td></tr>
+<tr><td><code>fixed</code></td><td>Positioned against the viewport</td></tr>
+<tr><td><code>sticky</code></td><td>Normal flow until a scroll threshold, then sticks</td></tr>
+</table>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body { font-family: system-ui; margin: 0; }
+  .photo { position: relative; width: 260px; height: 160px; background: #7c5cff; border-radius: 12px; margin: 16px; }
+  .badge { position: absolute; top: -10px; right: -10px; background: crimson; color: #fff; padding: 4px 10px; border-radius: 99px; font-size: 13px; }
+  .bar { position: sticky; top: 0; background: gold; padding: 8px 16px; font-weight: 700; }
+  .filler { height: 600px; padding: 16px; }
+</style>
+<div class="bar">I'm sticky: scroll the preview</div>
+<div class="photo"><span class="badge">NEW</span></div>
+<div class="filler">Scroll me…</div>
+</textarea>
+<ul>
+<li><code>z-index</code> only works on positioned elements (and flex/grid items). It operates inside <em>stacking contexts</em> (created by <code>position + z-index</code>, <code>opacity &lt; 1</code>, <code>transform</code>, etc.).</li>
+<li><code>inset: 0</code> is shorthand for top/right/bottom/left 0.</li>
+</ul>
+
+<h2>Responsive design</h2>
+<p>Three ingredients: a viewport meta tag, flexible layout (flex/grid/%), and media queries where flexibility isn't enough.</p>
+<textarea class="code" data-lang="html">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</textarea>
+<p><strong>Mobile-first</strong>: write base styles for small screens, then add complexity at larger widths with <code>min-width</code> queries.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body { font-family: system-ui; margin: 8px; }
+  .layout { display: grid; gap: 10px; }              /* mobile: one column */
+  .layout > div { padding: 1rem; border-radius: 8px; background: #ddd6ff; }
+  @media (min-width: 500px) { .layout { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 800px) { .layout { grid-template-columns: 2fr 1fr 1fr; } }
+  @media (prefers-color-scheme: dark) { body { background: #111; color: #eee; } }
+  @media (hover: none) { .layout > div { background: #ffe1ea; } }  /* touch devices */
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+</style>
+<div class="layout"><div>One</div><div>Two</div><div>Three</div></div>
+<p>Resize this preview pane by dragging the textarea's corner or your window.</p>
+</textarea>
+<h3>Modern responsive tools</h3>
+<textarea class="code" data-lang="css">
+/* Container queries: respond to the parent's width, not the viewport */
+.card-wrap { container-type: inline-size; }
+@container (min-width: 400px) { .card { display: flex; gap: 1rem; } }
+
+/* Fluid everything */
+h1 { font-size: clamp(2rem, 1rem + 4vw, 4rem); }
+.container { width: min(100% - 2rem, 70rem); margin-inline: auto; }
+</textarea>
+<p>Don't target specific devices. Add a breakpoint where <em>your content</em> starts to look bad (drag the DevTools device toolbar slowly).</p>
+
+<h2>Custom properties (CSS variables)</h2>
+<p>Define with <code>--name</code>, read with <code>var(--name, fallback)</code>. They cascade and inherit, and can change at runtime, which makes theming trivial.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  :root {
+    --bg: #fff; --text: #1d1d1f; --brand: #7c5cff; --radius: 12px; --space: 1rem;
+  }
+  [data-theme="dark"] { --bg: #16151d; --text: #eee; --brand: #b4a2ff; }
+  body { background: var(--bg); color: var(--text); font-family: system-ui; padding: var(--space); transition: background .3s, color .3s; }
+  .btn { background: var(--brand); color: var(--bg); border: 0; padding: .6em 1.2em; border-radius: var(--radius); font: inherit; cursor: pointer; }
+</style>
+<h2>Theme switcher</h2>
+<button class="btn" onclick="
+  const r=document.documentElement;
+  r.dataset.theme = r.dataset.theme==='dark' ? 'light' : 'dark'">Toggle theme</button>
+</textarea>
+<p>Tip: keep a small design-token set (colors, spacing, radius, font sizes) in <code>:root</code> and use only those throughout.</p>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build a card with a badge pinned to its top-right corner using <code>relative</code> + <code>absolute</code>.</li>
+<li>Make a sticky table header and a sticky sidebar.</li>
+<li>Take your Lesson 7 dashboard and make it mobile-first with two breakpoints.</li>
+<li>Create light, dark and "high-contrast" themes using only custom properties and a <code>data-theme</code> attribute.</li>
+<li>Use a container query so a card switches from stacked to side-by-side based on its own width.</li>
+<li>Test with DevTools device mode and a real phone on your local network.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why is my absolutely positioned child in the wrong place?</summary>No ancestor is positioned, so it uses the viewport/initial containing block. Add <code>position: relative</code> to the intended parent.</details>
+<details><summary>Why mobile-first?</summary>Small-screen styles are simpler, so the base is lean and enhancements load only where needed; min-width queries layer cleanly.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 0 — Setup & How the Web Works</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="00-setup">
+<main><article>
+<h1>Lesson 0 — Setup &amp; how the web works</h1>
+<p class="lede">Before writing code, get your tools ready and understand what a browser actually does with it.</p>
+
+<h2>How the web works</h2>
+<p>A browser sends an HTTP <strong>request</strong> to a server (found via DNS from a domain name). The server returns a <strong>response</strong>, usually HTML. The browser parses the HTML into the <strong>DOM</strong>, fetches linked CSS, JS and images, applies styles, runs scripts, and paints pixels.</p>
+<table>
+<tr><th>Technology</th><th>Job</th><th>Analogy</th></tr>
+<tr><td>HTML</td><td>Structure &amp; meaning</td><td>Skeleton</td></tr>
+<tr><td>CSS</td><td>Presentation</td><td>Skin &amp; clothes</td></tr>
+<tr><td>JavaScript</td><td>Behavior</td><td>Muscles</td></tr>
+<tr><td>React</td><td>Build UIs from components</td><td>A framework for the muscles</td></tr>
+<tr><td>Three.js</td><td>3D graphics on WebGL</td><td>A movie set</td></tr>
+</table>
+
+<h2>Install your tools</h2>
+<ol>
+<li><strong>VS Code</strong> (code.visualstudio.com) with the extensions <em>Live Server</em>, <em>Prettier</em>, <em>ESLint</em>.</li>
+<li><strong>Node.js LTS</strong> (nodejs.org). Check with <code>node -v</code> and <code>npm -v</code>.</li>
+<li><strong>Git</strong>. Check with <code>git --version</code>.</li>
+<li><strong>Chrome or Firefox</strong> with DevTools (<kbd>F12</kbd> or <kbd>Cmd</kbd>+<kbd>Opt</kbd>+<kbd>I</kbd>).</li>
+</ol>
+<textarea class="code" data-lang="bash">
+mkdir ~/webcourse && cd ~/webcourse
+mkdir lesson-00 && cd lesson-00
+code .        # opens VS Code here
+git init      # start version control
+</textarea>
+
+<h2>Your first page (live)</h2>
+<p>This editor is live. Change the text and the colors and watch the result update.</p>
+<textarea class="code" data-lang="html" data-run>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Hello</title>
+    <style> h1 { color: rebeccapurple; font-family: system-ui; } </style>
+  </head>
+  <body>
+    <h1>Hello, web!</h1>
+    <p>I wrote this page.</p>
+  </body>
+</html>
+</textarea>
+<p>In your own editor, save this as <code>index.html</code> and open it with Live Server. Edits refresh automatically.</p>
+
+<h2>DevTools tour (spend 15 minutes)</h2>
+<ul>
+<li><strong>Elements</strong>: the live DOM and computed styles. Edit anything; changes are temporary.</li>
+<li><strong>Console</strong>: type <code>document.title = "Hacked"</code>.</li>
+<li><strong>Network</strong>: reload and see every request, status code, size and timing.</li>
+<li><strong>Sources</strong>: breakpoints. <strong>Application</strong>: storage and cookies.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>In the Network tab, find the HTTP status code and <code>Content-Type</code> of your page.</li>
+<li>Open any big website; in Elements, delete a heading and change a color.</li>
+<li>In the Console, run <code>document.querySelectorAll("a").length</code> on a news site.</li>
+<li>Run <code>git init</code> in your folder and make a first commit.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<p>Explain what happens between typing a URL and seeing a page.</p>
+<details><summary>Show the key steps</summary>DNS lookup → TCP/TLS connection → HTTP request/response → parse HTML into the DOM → parse CSS into the CSSOM → build render tree → layout → paint → run JavaScript (which can change the DOM again).</details></section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project 4 — Interactive 3D Scene</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="p4-three-scene">
+<main><article>
+<h1>Project 4 — Interactive 3D scene</h1>
+<p class="lede">Build a polished, performant, interactive 3D experience. Choose vanilla Three.js or React Three Fiber. Doing it once in each is the best way to learn both.</p>
+
+<h2>Pick a concept</h2>
+<ul>
+<li><strong>Product configurator</strong>: a glTF object (shoe, chair, headphones) on a turntable. UI to change colors/materials, hotspots with labels, screenshot button.</li>
+<li><strong>Low-poly island / diorama</strong>: stylized world with water shader, instanced trees, day/night cycle, ambient animation, and orbit camera limits.</li>
+<li><strong>Mini-game</strong>: marble maze, endless runner, or tower-stacker with physics, score, restart, and sound.</li>
+<li><strong>Data visualization</strong>: 3D globe or city with data-driven bars/points, hover tooltips, filters and animated transitions.</li>
+</ul>
+
+<h2>Requirements</h2>
+<ol>
+<li><strong>Scene quality</strong>: environment lighting, shadows or baked AO, tone mapping, consistent color management, and a considered palette.</li>
+<li><strong>Interaction</strong>: raycast hover + click feedback; keyboard and touch support; camera constraints.</li>
+<li><strong>Motion</strong>: delta-time animation, easing, and at least one scripted camera move.</li>
+<li><strong>Custom shader</strong>: at least one <code>ShaderMaterial</code> or <code>onBeforeCompile</code> effect (water, dissolve, fresnel glow, gradient sky...).</li>
+<li><strong>Assets</strong>: at least one optimized glTF (Draco/Meshopt) and compressed textures; loading screen with progress.</li>
+<li><strong>Post-processing</strong>: at most 2–3 passes, with a toggle for low-power mode.</li>
+<li><strong>UI</strong>: HTML/CSS overlay using the skills from Parts 2–4 (responsive, accessible, keyboard-operable). Real text for any important information.</li>
+<li><strong>Performance</strong>: ≥ 55 FPS on a mid-range laptop and ≥ 30 FPS on a phone; &lt; 150 draw calls; documented budgets and measurements (<code>renderer.info</code>).</li>
+<li><strong>Robustness</strong>: resize, DPR cap, context-loss handling, WebGL fallback, pause when hidden, proper disposal, reduced-motion mode.</li>
+<li><strong>Delivery</strong>: deployed URL, README with GIF/screenshots, architecture notes, and a "what I'd do next" list.</li>
+</ol>
+
+<h2>Suggested architecture (vanilla)</h2>
+<textarea class="code" data-lang="bash">
+src/
+  main.js              # bootstrap: create App, start loop
+  core/
+    Renderer.js        # renderer + resize + DPR + context-loss handling
+    Loop.js            # clock, delta, start/stop/pause
+    Assets.js          # LoadingManager, GLTF/KTX2/Draco loaders, cache
+    Input.js           # pointer/keyboard state, raycaster helper
+  scene/
+    World.js           # lights, environment, floor
+    Hero.js            # main object + materials
+    shaders/*.glsl     # import with vite-plugin-glsl or ?raw
+  ui/
+    overlay.js         # DOM UI and events
+  utils/dispose.js
+</textarea>
+<p>Each module exposes a small class with <code>update(dt)</code> and <code>dispose()</code>. The loop calls <code>update</code> on everything registered.</p>
+
+<h2>Milestones</h2>
+<ol>
+<li><strong>Block-out</strong>: primitives, camera, lights, controls. Lock the composition first.</li>
+<li><strong>Assets</strong>: model, textures, environment. Optimize and load with progress.</li>
+<li><strong>Interaction</strong>: raycasting, selection, camera transitions, UI hooks.</li>
+<li><strong>Look-dev</strong>: materials, custom shader, post-processing, color grading.</li>
+<li><strong>Performance &amp; polish</strong>: profile, budgets, mobile test, fallback, accessibility, cleanup.</li>
+<li><strong>Ship</strong>: build, deploy, document.</li>
+</ol>
+
+<section class="checkpoint"><h2>Self-review</h2>
+<details><summary>Questions a reviewer would ask</summary>
+<ul><li>What's your draw-call and triangle count? What did you do to reduce them?</li>
+<li>What happens on a phone, with WebGL disabled, or when the tab is in the background?</li>
+<li>Can a keyboard-only user, or a screen-reader user, get the essential information?</li>
+<li>Does anything leak after navigating away and back (memory, listeners, loops)?</li>
+<li>Can you explain every shader line?</li></ul></details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

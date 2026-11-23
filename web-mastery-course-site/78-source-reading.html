@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 78 — Reading Source Code & Contributing to Open Source</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="78-source-reading">
+<main><article>
+<h1>Lesson 78 — Reading source code &amp; contributing to open source</h1>
+<p class="lede">The fastest way past "tutorial level" is reading real code. Documentation tells you what a library promises; the source tells you what it does. Mastery means you're never blocked by "the library doesn't do X": you can open it, understand it, and fix or extend it.</p>
+
+<h2>How to read an unfamiliar codebase</h2>
+<ol>
+<li><strong>Run it first.</strong> Clone, install, run the dev server and tests. Use it as a user before reading as a developer.</li>
+<li><strong>Read the map</strong>: README, CONTRIBUTING, <code>package.json</code> (scripts, entry points, dependencies, <code>exports</code>), folder layout, architecture docs.</li>
+<li><strong>Pick one behavior</strong> and trace it from entry to exit: e.g., "what happens when I call <code>setState</code>?" or "how does <code>renderer.render()</code> draw a mesh?". Follow the call path with your editor's Go to Definition and Find References, plus the debugger.</li>
+<li><strong>Use the debugger and logs</strong>: set a breakpoint in <code>node_modules/&lt;lib&gt;</code> (source maps help), step through, inspect the call stack. It's faster than reading statically.</li>
+<li><strong>Read the tests</strong>: they're executable documentation of intended behavior and edge cases.</li>
+<li><strong>Read history</strong>: <code>git log -p -- file</code>, <code>git blame</code>, and the linked PRs/issues explain <em>why</em> weird code exists.</li>
+<li><strong>Take notes and draw diagrams.</strong> Summarize each module in one sentence. Rewrite a simplified version yourself.</li>
+</ol>
+
+<h2>Reading Three.js</h2>
+<textarea class="code" data-lang="bash">
+git clone --depth 1 https://github.com/mrdoob/three.js && cd three.js
+src/core/Object3D.js          # scene graph node: transforms, matrix updates, parent/children
+src/core/BufferGeometry.js    # attributes, index, bounding volumes
+src/objects/Mesh.js           # raycast() implementation
+src/renderers/WebGLRenderer.js# render(): culling, sorting, state, uniforms: the heart
+src/renderers/shaders/ShaderChunk/  # the GLSL snippets that onBeforeCompile patches (lights_fragment_begin, etc.)
+src/materials/MeshStandardMaterial.js
+examples/jsm/controls/OrbitControls.js   # excellent small, readable example of event → camera math
+examples/                     # hundreds of runnable demos: search them for any feature you need
+</textarea>
+<p>Exercise in reading: find where <code>Object3D.updateMatrixWorld</code> is called during <code>render</code>, why <code>matrixAutoUpdate</code> exists, and how frustum culling decides to skip an object. Then write a 100-line version of a scene graph that does the same.</p>
+
+<h2>Reading React (concepts, not every line)</h2>
+<ul>
+<li>Read <strong>Build your own React</strong> (Rodrigo Pombo) and "Inside Fiber" explanations first, then skim <code>packages/react-reconciler</code>: <code>ReactFiberWorkLoop</code> (render/commit phases), <code>ReactFiberHooks</code> (how hooks use a linked list per component), <code>ReactChildFiber</code> (reconciliation/keys).</li>
+<li>Implement a mini-React with <code>createElement</code>, a fiber-ish render loop and <code>useState</code> in ~150 lines. You will never again wonder why hooks must be called in the same order.</li>
+</ul>
+<textarea class="code" data-lang="jsx" data-run>
+// A 25-line mental model of hooks: a per-component array of slots indexed by call order
+let slots = [], cursor = 0, rerender;
+function useMiniState(initial) {
+  const i = cursor++;
+  if (!(i in slots)) slots[i] = initial;
+  const set = (v) => { slots[i] = typeof v === "function" ? v(slots[i]) : v; rerender(); };
+  return [slots[i], set];
+}
+function Counter() {
+  const [n, setN] = useMiniState(0);
+  const [label] = useMiniState("clicks");
+  return { n, label, click: () => setN((x) => x + 1) };
+}
+let view;
+const logs = [];
+rerender = () => { cursor = 0; view = Counter(); logs.push(`${view.label}: ${view.n}`); };
+rerender(); view.click(); view.click(); view.click();
+function App() { return <pre style={{ font: "14px ui-monospace,monospace" }}>{logs.join("\n")}</pre>; }
+// Hooks are order-dependent because identity = call index. A conditional hook shifts every slot after it.
+</textarea>
+
+<h2>Reading the platform</h2>
+<ul>
+<li><strong>Specs and MDN</strong>: when behavior surprises you, read the spec section (HTML, DOM, CSS specs, ECMAScript), and the Web Platform Tests for what browsers actually do. <code>caniuse.com</code> and MDN compatibility tables for support.</li>
+<li><strong>Browser DevTools</strong> are a code-reading tool for the web: inspect any site's CSS, JS (source maps), network waterfall and storage; learn from how great sites are built.</li>
+<li><strong>Bundle inspection</strong>: <code>source-map-explorer</code>/<code>vite-bundle-visualizer</code> show what's inside your app and which dependencies are heavy.</li>
+</ul>
+
+<h2>Debugging dependencies</h2>
+<ul>
+<li><strong>Patch temporarily</strong> with <code>patch-package</code> or <code>pnpm patch</code> while you wait for an upstream fix; link the issue in a comment.</li>
+<li><strong>Link a local checkout</strong> (<code>npm link</code>, <code>pnpm link</code>, or a workspace) to debug a library inside your app; add logs, then turn the fix into a PR.</li>
+<li><strong>Minimal reproduction</strong>: strip the problem to the smallest project/CodeSandbox/StackBlitz that shows it. 90% of the time you find your own bug while doing it; the rest, maintainers will thank you.</li>
+</ul>
+
+<h2>Contributing to open source</h2>
+<ol>
+<li><strong>Start small</strong>: documentation fixes, typos, clearer examples, reproducing and triaging issues, adding missing tests, "good first issue" labels. These build trust and teach the workflow.</li>
+<li><strong>Read CONTRIBUTING and the code of conduct</strong>; search existing issues and PRs before opening anything.</li>
+<li><strong>Discuss before big changes</strong>: open an issue/discussion describing the problem and your proposed approach. Maintainers' time is the scarce resource.</li>
+<li><strong>Make a focused PR</strong>: one concern, tests, docs, follows the project's style and commit/PR conventions, a clear description linking the issue. Be patient and gracious with review feedback; revisions are normal.</li>
+<li><strong>Ship your own small library</strong> once you've felt the pain of a gap: a good README, types, tests, semver, a changelog, CI publishing with provenance. Maintenance is the real work; start tiny.</li>
+</ol>
+<textarea class="code" data-lang="bash">
+gh repo fork owner/repo --clone && cd repo
+git switch -c fix/orbit-controls-touch-pan
+npm ci && npm test                      # confirm green BEFORE you change anything
+# …make the change, add a test that fails without it…
+git commit -m "fix(OrbitControls): correct two-finger pan direction on touch devices"
+git push -u origin HEAD && gh pr create --fill
+</textarea>
+
+<h2>Where to read next (high-yield)</h2>
+<table>
+<tr><th>Library</th><th>Why</th></tr>
+<tr><td><code>zustand</code></td><td>~100 lines of core. A masterclass in minimal state management and <code>useSyncExternalStore</code></td></tr>
+<tr><td><code>clsx</code>, <code>nanoid</code>, <code>mitt</code>, <code>ms</code></td><td>Tiny utilities, readable in minutes: perfect first reads</td></tr>
+<tr><td><code>express</code>/<code>hono</code></td><td>Routing and middleware composition</td></tr>
+<tr><td><code>@tanstack/query-core</code></td><td>Cache, observers and subscriptions framework-agnostically</td></tr>
+<tr><td><code>OrbitControls.js</code>, <code>GLTFLoader.js</code></td><td>Applied math + parsing binary formats</td></tr>
+<tr><td><code>vite</code> (plugin API)</td><td>How modern dev servers and bundling work</td></tr>
+<tr><td>Preact</td><td>A complete, readable React-compatible runtime in ~4 KB: great for understanding virtual DOM diffing</td></tr>
+</table>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Read the full source of <code>zustand</code> (or <code>mitt</code> + <code>nanoid</code>), then re-implement it from memory and compare. Write down three design decisions you learned.</li>
+<li>Trace <code>renderer.render(scene, camera)</code> in the Three.js repo with the debugger. Produce a one-page diagram of what happens, from culling to draw calls.</li>
+<li>Build a 150-line mini-React (<code>createElement</code>, render, <code>useState</code>, simple diffing) and run a counter and a todo list on it.</li>
+<li>Pick a dependency of Project 5, find a real bug or a docs gap, create a minimal reproduction, and open an issue or PR upstream.</li>
+<li>Make a documentation or test contribution to an open-source project that is merged. Keep the link in your portfolio.</li>
+<li>Publish a tiny library to npm (e.g., a typed utility or a Three.js helper) with tests, types, README and automated release.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why can't hooks be called conditionally?</summary>React identifies each hook by its call order in the component. Skipping or adding a call changes the order, so every later hook would read the wrong slot of state.</details>
+<details><summary>What's the best way to start contributing?</summary>Small, focused changes (docs, tests, reproductions, good-first-issues) after reading CONTRIBUTING, and discussing before large changes. This builds trust and teaches the project's workflow.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

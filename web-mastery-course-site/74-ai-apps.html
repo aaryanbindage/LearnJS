@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 74 — Building AI Features</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="74-ai-apps">
+<main><article>
+<h1>Lesson 74 — Building AI features into web apps</h1>
+<p class="lede">LLMs are now a standard ingredient: chat, summarization, extraction, search, assistants that take actions. This lesson covers how to integrate them safely and well: backend proxying, streaming UIs, structured output, tools, retrieval and evaluation.</p>
+
+<h2>Architecture: never call the model from the browser with your key</h2>
+<ul>
+<li>API keys are secrets. A key in front-end code is public and will be stolen and abused. <strong>Always call the model API from your server</strong> (or a serverless function) and expose your own authenticated, rate-limited endpoint to the front end.</li>
+<li>The backend also lets you add auth, per-user quotas, input validation, logging, cost tracking, caching, prompt templates and moderation.</li>
+<li>Pick the model per task: a small fast model for classification/extraction, a larger one for hard reasoning. Check current model names and pricing in the provider docs; they change often. (For the Claude API, the current model ids are in Anthropic's docs; the examples here use <code>claude-sonnet-5-5</code>.)</li>
+</ul>
+
+<h2>A minimal streaming endpoint (Node)</h2>
+<textarea class="code" data-lang="bash">
+npm i @anthropic-ai/sdk fastify zod
+export ANTHROPIC_API_KEY=...          # environment variable on the server only
+</textarea>
+<textarea class="code" data-lang="js" data-file="server.js">
+import Fastify from "fastify";
+import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
+
+const app = Fastify({ logger: true });
+const anthropic = new Anthropic();                                  // reads ANTHROPIC_API_KEY
+
+const Body = z.object({
+  messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(8000) })).min(1).max(40),
+});
+
+app.post("/api/chat", async (req, reply) => {
+  const user = await requireUser(req);                              // auth + per-user rate limit/quota BEFORE spending money
+  const { messages } = Body.parse(req.body);                        // validate untrusted input
+
+  reply.raw.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+  const stream = anthropic.messages.stream({
+    model: "claude-sonnet-5-5",
+    max_tokens: 1024,                                               // always cap output
+    system: "You are a concise assistant for the Acme store. Answer only about Acme products.",
+    messages,
+  });
+  req.raw.on("close", () => stream.abort());                        // stop paying when the user navigates away
+  stream.on("text", (t) => reply.raw.write(`data: ${JSON.stringify({ t })}\n\n`));
+  await stream.finalMessage();
+  reply.raw.write("data: [DONE]\n\n"); reply.raw.end();
+});
+app.listen({ port: 3000 });
+</textarea>
+
+<h2>The streaming chat UI</h2>
+<p>Users perceive streamed text as much faster. Read the response body as a stream and append tokens as they arrive. Try the interaction pattern below with a fake model (no network needed), then point it at your real endpoint.</p>
+<textarea class="code" data-lang="jsx" data-run data-height="380px">
+// Fake streaming source standing in for fetch("/api/chat"). Swap `streamReply` for a real reader of response.body.
+async function* streamReply(prompt, signal) {
+  const text = `You asked: "${prompt}". Here is a streamed answer, token by token, so the interface feels responsive even when the full response takes seconds to generate.`;
+  for (const word of text.split(" ")) {
+    await new Promise((r) => setTimeout(r, 60));
+    if (signal.aborted) return;
+    yield word + " ";
+  }
+}
+
+function App() {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const abortRef = useRef(null);
+  const endRef = useRef(null);
+  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages]);
+
+  async function send(e) {
+    e.preventDefault();
+    if (!input.trim() || busy) return;
+    const prompt = input; setInput(""); setBusy(true);
+    setMessages((m) => [...m, { role: "user", text: prompt }, { role: "assistant", text: "" }]);
+    const ctrl = new AbortController(); abortRef.current = ctrl;
+    try {
+      for await (const chunk of streamReply(prompt, ctrl.signal))
+        setMessages((m) => { const c = m.slice(); c[c.length - 1] = { ...c[c.length - 1], text: c[c.length - 1].text + chunk }; return c; });
+    } catch (err) {
+      setMessages((m) => [...m, { role: "error", text: "Something went wrong. Try again." }]);
+    } finally { setBusy(false); abortRef.current = null; }
+  }
+
+  return (
+    <div style={{ font: "14px system-ui", maxWidth: 520, margin: "0 auto", padding: 12 }}>
+      <div role="log" aria-live="polite" style={{ height: 230, overflow: "auto", border: "1px solid #ccc", borderRadius: 10, padding: 8 }}>
+        {messages.map((m, i) => (
+          <p key={i} style={{ margin: "6px 0", textAlign: m.role === "user" ? "right" : "left", color: m.role === "error" ? "#b00020" : "inherit" }}>
+            <b>{m.role === "user" ? "You" : m.role === "assistant" ? "AI" : "!"}:</b> {m.text}{busy && i === messages.length - 1 && m.role === "assistant" ? "▍" : ""}
+          </p>
+        ))}
+        <div ref={endRef} />
+      </div>
+      <form onSubmit={send} style={{ display: "flex", gap: 6, marginTop: 8 }}>
+        <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask something…" aria-label="Message" style={{ flex: 1, padding: 8 }} />
+        {busy ? <button type="button" onClick={() => abortRef.current?.abort()}>Stop</button> : <button>Send</button>}
+      </form>
+    </div>
+  );
+}
+</textarea>
+<textarea class="code" data-lang="js" data-file="client-stream.js">
+// Reading a real SSE-style stream from your backend
+const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages }), signal });
+const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+let buffer = "";
+while (true) {
+  const { value, done } = await reader.read();
+  if (done) break;
+  buffer += value;
+  const events = buffer.split("\n\n"); buffer = events.pop();                    // keep any partial event for the next read
+  for (const ev of events) {
+    const data = ev.replace(/^data: /, "");
+    if (data === "[DONE]") return;
+    appendToken(JSON.parse(data).t);
+  }
+}
+</textarea>
+<ul>
+<li>UX details: stop button (abort), retry, copy, regenerate, empty/error states, scroll anchoring, markdown rendering (sanitize it!), loading indicators, and clearly labeling AI content.</li>
+<li>Libraries: Vercel AI SDK (<code>useChat</code>), Anthropic/OpenAI SDKs, assistant-ui. Handle the model's partial markdown while streaming.</li>
+</ul>
+
+<h2>Structured output and tool use</h2>
+<p>For features that feed code (not just chat), have the model return validated structured data or call your functions.</p>
+<textarea class="code" data-lang="js" data-file="extract.js">
+const Invoice = z.object({ vendor: z.string(), total: z.number(), currency: z.string().length(3), dueDate: z.string().nullable() });
+
+const msg = await anthropic.messages.create({
+  model: "claude-sonnet-5-5",
+  max_tokens: 500,
+  tools: [{
+    name: "record_invoice",
+    description: "Record the fields extracted from an invoice",
+    input_schema: { type: "object", properties: { vendor: { type: "string" }, total: { type: "number" }, currency: { type: "string" }, dueDate: { type: ["string", "null"] } }, required: ["vendor", "total", "currency"] },
+  }],
+  tool_choice: { type: "tool", name: "record_invoice" },            // force structured output
+  messages: [{ role: "user", content: `Extract the invoice fields:\n\n<document>${text}</document>` }],
+});
+const call = msg.content.find((b) => b.type === "tool_use");
+const invoice = Invoice.parse(call.input);                          // STILL validate: never trust model output blindly
+</textarea>
+<h3>Agents: the tool loop</h3>
+<ol>
+<li>Send the user request plus tool definitions (search_orders, create_ticket, …).</li>
+<li>If the response contains a <code>tool_use</code> block, <strong>your server</strong> runs that function (with the end user's permissions), then sends the result back as a <code>tool_result</code>.</li>
+<li>Repeat until the model returns a final answer, with a max-iterations cap.</li>
+</ol>
+<div class="callout warn"><span class="label">Security</span>Treat model output as <strong>untrusted input</strong>. Authorize every tool call as the current user, validate arguments, require human confirmation for destructive actions, and never let retrieved text or user content override your system rules (<strong>prompt injection</strong>). Don't give an agent more privileges than the user has. Sanitize rendered output (XSS), and don't put secrets in prompts.</div>
+
+<h2>Retrieval-augmented generation (RAG)</h2>
+<p>Models don't know your private or fresh data. RAG fetches relevant snippets at question time and includes them in the prompt, so answers are grounded and cite sources.</p>
+<ol>
+<li><strong>Ingest</strong>: split documents into chunks (~300–800 tokens with overlap), store text + metadata.</li>
+<li><strong>Embed</strong>: convert chunks to vectors with an embeddings model; store in Postgres + <strong>pgvector</strong> (or Pinecone/Qdrant).</li>
+<li><strong>Retrieve</strong>: embed the question, find nearest chunks (cosine similarity), optionally combine with keyword search and re-rank. <strong>Filter by user permissions in the query</strong>.</li>
+<li><strong>Generate</strong>: prompt the model with the question + retrieved chunks, instruct it to answer only from them and cite ids; say "I don't know" when they don't contain the answer.</li>
+</ol>
+<textarea class="code" data-lang="js" data-file="rag.sql">
+CREATE EXTENSION vector;
+CREATE TABLE chunks (id bigserial PRIMARY KEY, doc_id bigint, owner_id bigint, content text, embedding vector(1024));
+CREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);
+
+-- retrieve top 5 for one user's documents
+SELECT id, content FROM chunks WHERE owner_id = $1 ORDER BY embedding &lt;=&gt; $2 LIMIT 5;
+</textarea>
+
+<h2>Prompting, cost and quality</h2>
+<ul>
+<li><strong>Prompt as code</strong>: version prompts, keep them in files, use clear structure (role, task, constraints, examples, output format), delimit untrusted content (<code>&lt;document&gt;…&lt;/document&gt;</code>).</li>
+<li><strong>Cost control</strong>: cap <code>max_tokens</code> and history length, cache identical requests, use <strong>prompt caching</strong> for long repeated context, pick smaller models where quality allows, rate limit per user, track tokens per feature.</li>
+<li><strong>Latency</strong>: stream, show progress, parallelize independent calls, pre-compute where possible.</li>
+<li><strong>Reliability</strong>: timeouts, retries with backoff on 429/5xx, fallbacks, graceful degradation when the API is down.</li>
+<li><strong>Evaluate</strong>: models are non-deterministic and change. Build an eval set of real inputs with expected properties; run it in CI on every prompt/model change; sample and review production outputs; collect thumbs up/down. Without evals you're guessing.</li>
+<li><strong>Safety and privacy</strong>: moderate inputs/outputs where needed, avoid sending unnecessary PII, check provider data-retention terms, disclose AI use, keep a human in the loop for high-stakes decisions.</li>
+</ul>
+
+<h2>AI in 3D and creative apps</h2>
+<ul>
+<li>Natural-language scene control: the model returns a validated JSON "scene command" (add object, change color) that your code applies, never raw code executed from the model.</li>
+<li>NPC dialogue with strict persona prompts, token caps and content filters; image/texture generation via a server-side job queue; semantic search of asset libraries with embeddings.</li>
+<li>On-device models (WebGPU with transformers.js, WebLLM) for private, offline inference when quality needs are modest.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build the streaming chat endpoint and UI against a real model (key on the server only). Add auth, a per-user daily token quota, abort on disconnect and error states.</li>
+<li>Build an "invoice/receipt extractor": upload text, force a tool call, validate with Zod, and let the user correct fields before saving.</li>
+<li>Implement a tool-using assistant for your Project 5 app (search items, create a task) with per-user authorization, confirmation for writes and an iteration cap.</li>
+<li>Build RAG over your own notes with pgvector: chunking, embeddings, permission-filtered retrieval, citations in the UI, and an "I don't know" path.</li>
+<li>Write 30 eval cases (inputs + checks) and a script that scores outputs; run it before and after a prompt change.</li>
+<li>Red-team your feature: attempt prompt injection through user content and retrieved documents; document and fix each hole.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why proxy model calls through a backend?</summary>It keeps the API key secret and lets you enforce auth, quotas, validation, logging and cost controls. A key in the browser can be copied and abused.</details>
+<details><summary>Why validate tool/structured output?</summary>Model output is untrusted and sometimes malformed or manipulated. Parse it with a schema and authorize actions like any other user input.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

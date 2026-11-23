@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 21 — Testing & TypeScript Primer</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="21-js-testing-ts">
+<main><article>
+<h1>Lesson 21 — Testing &amp; TypeScript primer</h1>
+<p class="lede">Two skills that separate hobby code from professional code: proving it works, and letting a type checker catch mistakes before you run anything.</p>
+
+<h2>Testing: the idea</h2>
+<p>A test calls your code with known input and checks the output. Write <strong>pure functions</strong> and they're trivial to test. Here's a mini test framework so you can see there's no magic:</p>
+<textarea class="code" data-lang="js" data-run>
+function test(name, fn) { try { fn(); console.log("✓", name); } catch (e) { console.log("✗", name, "-", e.message); } }
+const expect = (actual) => ({
+  toBe: (x) => { if (actual !== x) throw new Error(`expected ${x}, got ${actual}`); },
+  toEqual: (x) => { if (JSON.stringify(actual) !== JSON.stringify(x)) throw new Error(`expected ${JSON.stringify(x)}, got ${JSON.stringify(actual)}`); },
+  toThrow: () => { try { actual(); } catch { return; } throw new Error("expected to throw"); },
+});
+
+const capitalize = s => s.charAt(0).toUpperCase() + s.slice(1);
+const sum = (...n) => n.reduce((a, b) => a + b, 0);
+
+test("capitalize basics", () => expect(capitalize("hello")).toBe("Hello"));
+test("capitalize empty", () => expect(capitalize("")).toBe(""));
+test("sum", () => expect(sum(1, 2, 3)).toBe(6));
+test("sum is wrong on purpose", () => expect(sum()).toBe(1));
+test("throws", () => expect(() => null.x).toThrow());
+</textarea>
+
+<h2>Vitest in a real project</h2>
+<textarea class="code" data-lang="bash">
+npm install -D vitest
+# package.json: "scripts": { "test": "vitest" }
+npm test        # watch mode: re-runs on save
+</textarea>
+<textarea class="code" data-lang="js" data-file="cart.test.js">
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { addItem, total } from "./cart.js";
+
+describe("cart", () => {
+  let cart;
+  beforeEach(() => { cart = []; });
+
+  it("adds an item", () => {
+    expect(addItem(cart, { id: 1, price: 5 })).toEqual([{ id: 1, price: 5 }]);
+  });
+  it("totals prices", () => {
+    expect(total([{ price: 5 }, { price: 7.5 }])).toBeCloseTo(12.5);
+  });
+  it("calls a callback", () => {
+    const cb = vi.fn();
+    [1, 2].forEach(cb);
+    expect(cb).toHaveBeenCalledTimes(2);
+  });
+  it("rejects bad input", async () => {
+    await expect(fetchUser("")).rejects.toThrow("id required");
+  });
+});
+</textarea>
+<ul>
+<li><strong>Arrange → Act → Assert</strong> in every test.</li>
+<li>Test behavior, not implementation details. One reason to fail per test.</li>
+<li>Test pyramid: many unit tests, some integration tests, a few end-to-end tests (Playwright).</li>
+<li>Mock only the boundaries (network, clock, randomness).</li>
+<li>When you find a bug, first write a failing test that reproduces it.</li>
+</ul>
+
+<h2>TypeScript primer</h2>
+<p>TypeScript is JavaScript plus types, checked at build time and erased before running. It catches typos, wrong argument shapes, and missing null checks. Most React and Three.js code in the wild is TypeScript.</p>
+<textarea class="code" data-lang="bash">
+npm create vite@latest app -- --template vanilla-ts
+npx tsc --noEmit        # type-check only
+</textarea>
+<textarea class="code" data-lang="js" data-file="types-tour.ts">
+// Basic annotations (usually inferred; annotate function boundaries)
+let count: number = 0;
+const name = "Ada";                       // inferred: string
+const ids: number[] = [1, 2, 3];
+const pair: [string, number] = ["age", 36];   // tuple
+
+// Objects: interface or type
+interface User { id: number; name: string; email?: string; readonly created: Date }
+type Role = "admin" | "editor" | "viewer";          // union of literals
+type ID = number | string;
+
+function greet(u: User, role: Role = "viewer"): string {
+  return `${u.name} (${role})`;
+}
+greet({ id: 1, name: "Ada", created: new Date() });
+// greet({ id: "1" })  // ✖ compile error: wrong type, missing fields
+
+// Narrowing: the compiler tracks what you've checked
+function len(x: string | string[] | null) {
+  if (x === null) return 0;
+  return typeof x === "string" ? x.length : x.length;
+}
+
+// Generics: reusable and type-safe
+function first<T>(arr: T[]): T | undefined { return arr[0]; }
+const n = first([1, 2, 3]);       // number | undefined
+async function getJSON<T>(url: string): Promise<T> { return (await fetch(url)).json(); }
+
+// Utility types
+type Preview = Pick<User, "id" | "name">;
+type Draft = Partial<User>;
+type Dict = Record<string, number>;
+</textarea>
+<div class="callout"><span class="label">Tip</span>Turn on <code>"strict": true</code> in <code>tsconfig.json</code>. Avoid <code>any</code>; use <code>unknown</code> and narrow. Types at the edges (API responses, props) pay off most.</div>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Write 6 tests for a <code>slugify</code> function, including edge cases (empty string, emoji, multiple spaces). Fix the function until green.</li>
+<li>Write a failing test for a bug in your to-do app, then fix it.</li>
+<li>Convert a small JS utility module to TypeScript with strict mode and fix all errors.</li>
+<li>Type an API response (<code>Todo[]</code>) and a generic <code>fetchJson&lt;T&gt;</code>.</li>
+<li>Model a state machine with a discriminated union: <code>{status:"idle"} | {status:"loading"} | {status:"error", message:string} | {status:"ok", data:T}</code>.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Do TypeScript types exist at runtime?</summary>No. They're erased during compilation, so you still need runtime validation (e.g., zod) for external data.</details>
+<details><summary>What makes code easy to test?</summary>Pure functions with explicit inputs/outputs and dependencies passed in rather than hard-coded.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

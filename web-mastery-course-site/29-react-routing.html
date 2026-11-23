@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 29 — Routing & App Architecture</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="29-react-routing">
+<main><article>
+<h1>Lesson 29 — Routing &amp; app architecture</h1>
+<p class="lede">Real apps have multiple pages, shareable URLs and a folder structure that scales.</p>
+
+<h2>Client-side routing with React Router</h2>
+<p>A single-page app (SPA) swaps components when the URL changes, without full page reloads. Install: <code>npm install react-router-dom</code> (v6/v7 API shown).</p>
+<textarea class="code" data-lang="jsx" data-file="src/main.jsx">
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import Root from "./routes/Root";
+import Home from "./routes/Home";
+import Products, { productsLoader } from "./routes/Products";
+import ProductDetail, { productLoader } from "./routes/ProductDetail";
+import NotFound from "./routes/NotFound";
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Root />,                       // layout with <Outlet />
+    errorElement: <NotFound />,
+    children: [
+      { index: true, element: <Home /> },
+      { path: "products", element: <Products />, loader: productsLoader },
+      { path: "products/:id", element: <ProductDetail />, loader: productLoader },
+    ],
+  },
+]);
+
+createRoot(document.getElementById("root")).render(<RouterProvider router={router} />);
+</textarea>
+<textarea class="code" data-lang="jsx" data-file="src/routes/Root.jsx">
+import { NavLink, Outlet, useNavigation } from "react-router-dom";
+
+export default function Root() {
+  const navigation = useNavigation();                // "idle" | "loading" | "submitting"
+  return (
+    <>
+      <header>
+        <nav aria-label="Main">
+          <NavLink to="/" end>Home</NavLink>           {/* gets an "active" class automatically */}
+          <NavLink to="/products">Products</NavLink>
+        </nav>
+      </header>
+      <main aria-busy={navigation.state === "loading"}>
+        <Outlet />                                      {/* child route renders here */}
+      </main>
+    </>
+  );
+}
+</textarea>
+<textarea class="code" data-lang="jsx" data-file="src/routes/ProductDetail.jsx">
+import { useLoaderData, useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
+
+export async function productLoader({ params }) {
+  const res = await fetch(`/api/products/${params.id}`);
+  if (!res.ok) throw new Response("Not found", { status: 404 });   // → errorElement
+  return res.json();
+}
+
+export default function ProductDetail() {
+  const product = useLoaderData();               // data is ready before render
+  const { id } = useParams();
+  const navigate = useNavigate();                // imperative navigation (after actions)
+  const [params, setParams] = useSearchParams(); // ?tab=reviews  (state in the URL!)
+  return (
+    <article>
+      <h1>{product.name}</h1>
+      <Link to="..">← Back</Link>
+      <button onClick={() => setParams({ tab: "reviews" })}>Reviews</button>
+      <button onClick={() => navigate("/checkout")}>Buy</button>
+    </article>
+  );
+}
+</textarea>
+<ul>
+<li>Use <code>&lt;Link&gt;</code>/<code>&lt;NavLink&gt;</code> (not <code>&lt;a href&gt;</code>) for internal navigation.</li>
+<li>Put shareable state in the URL: filters, sort, page, tab (<code>useSearchParams</code>).</li>
+<li>Lazy-load route code: <code>{ path: "admin", lazy: () =&gt; import("./routes/Admin") }</code> to shrink the initial bundle.</li>
+<li>Host SPAs with a fallback so unknown paths serve <code>index.html</code> (Netlify <code>_redirects</code>, Vercel rewrites).</li>
+<li>Consider <strong>Next.js</strong> or <strong>React Router framework mode</strong> if you need server rendering, SEO, or server-side data.</li>
+</ul>
+
+<h2>Project structure that scales</h2>
+<textarea class="code" data-lang="bash">
+src/
+  main.jsx
+  app/                    # app-wide: router, providers, layout
+    router.jsx
+    providers.jsx
+  routes/ (or pages/)     # one file per screen
+  features/               # group by FEATURE, not by file type
+    cart/
+      CartPage.jsx
+      cartSlice.js / useCart.js
+      CartItem.jsx
+      cart.test.js
+    auth/
+  components/             # shared, dumb UI: Button, Modal, Card
+  hooks/                  # shared custom hooks
+  lib/                    # api client, utils, constants
+  styles/
+</textarea>
+<ul>
+<li><strong>Feature folders</strong> keep related code together; features import from <code>components/</code> and <code>lib/</code>, not each other's internals.</li>
+<li><strong>Container vs presentational</strong>: separate "gets data/handles logic" from "renders UI from props".</li>
+<li>Co-locate tests and styles with the component. Use CSS Modules (<code>Button.module.css</code>), Tailwind, or CSS-in-JS consistently.</li>
+<li>Centralize the API layer (<code>lib/api.js</code>) so URLs, headers and error handling live in one place.</li>
+<li>Environment variables: <code>VITE_API_URL</code> in <code>.env</code>, read via <code>import.meta.env.VITE_API_URL</code>. Never put secrets in frontend code.</li>
+</ul>
+
+<h2>Error handling &amp; loading UX</h2>
+<textarea class="code" data-lang="jsx" data-file="ErrorBoundary.jsx">
+import { Component, Suspense, lazy } from "react";
+
+class ErrorBoundary extends Component {              // still a class: catches render errors
+  state = { error: null };
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error, info) { console.error(error, info.componentStack); }
+  render() { return this.state.error ? this.props.fallback : this.props.children; }
+}
+
+const Chart = lazy(() => import("./Chart"));         // code-split heavy components
+
+export default function Dashboard() {
+  return (
+    <ErrorBoundary fallback={<p role="alert">Chart failed to load.</p>}>
+      <Suspense fallback={<p>Loading chart…</p>}>
+        <Chart />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+</textarea>
+
+<h2>Deploying</h2>
+<textarea class="code" data-lang="bash">
+npm run build            # outputs dist/ — static files
+npx vite preview         # test the production build locally
+# Deploy dist/ to Netlify, Vercel, Cloudflare Pages, or GitHub Pages.
+# GitHub Pages under a subpath needs: vite.config.js → base: "/repo-name/"
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Add routing to your app: Home, List, Detail (with <code>:id</code>), About, and a 404 page.</li>
+<li>Persist list filters in the URL so refresh/share keeps them.</li>
+<li>Add a protected route that redirects to <code>/login</code>, then back after login.</li>
+<li>Lazy-load a heavy route and verify the separate chunk in the Network tab.</li>
+<li>Restructure your project into feature folders and fix the imports.</li>
+<li>Deploy to Netlify or Vercel with correct SPA fallback; test a deep link refresh.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why does refreshing /products/5 give a 404 on some hosts?</summary>The server looks for that file. SPAs need a rewrite rule that serves index.html for all paths so the client router can take over.</details>
+<details><summary>Why organize by feature?</summary>Code that changes together lives together, making features easier to find, change, and delete.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

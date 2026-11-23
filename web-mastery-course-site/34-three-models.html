@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 34 — Textures, glTF Models & Environment</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="34-three-models">
+<main><article>
+<h1>Lesson 34 — Textures, glTF models &amp; environment</h1>
+<p class="lede">Photorealism comes from textures, imported models and image-based lighting rather than from more lights.</p>
+
+<h2>Textures</h2>
+<textarea class="code" data-lang="js">
+const loader = new THREE.TextureLoader();
+const color = loader.load("/textures/brick_color.jpg");
+color.colorSpace = THREE.SRGBColorSpace;            // color data → sRGB; normal/rough/metal maps stay linear
+color.wrapS = color.wrapT = THREE.RepeatWrapping;   // tile
+color.repeat.set(4, 4);
+color.anisotropy = renderer.capabilities.getMaxAnisotropy();   // crisp at grazing angles
+
+const material = new THREE.MeshStandardMaterial({
+  map: color,                    // base color
+  normalMap: normal,             // fake fine bumps
+  roughnessMap: rough,
+  metalnessMap: metal,
+  aoMap: ao,                     // baked ambient occlusion (needs a 2nd UV set in some setups)
+  displacementMap: disp, displacementScale: 0.1,   // real vertex displacement (needs many segments)
+  alphaMap: alpha, transparent: true,
+});
+</textarea>
+<ul>
+<li><strong>Power-of-two sizes</strong> (1024, 2048) are best for mipmaps; keep textures as small as quality allows. GPU memory ≈ width × height × 4 bytes × 1.33.</li>
+<li>Use compressed GPU formats (<strong>KTX2/Basis</strong>) for big scenes via <code>KTX2Loader</code>.</li>
+<li>Free PBR sets: <em>ambientCG</em>, <em>Poly Haven</em>. Free HDRIs and models at Poly Haven too.</li>
+<li>Generate textures procedurally with <code>CanvasTexture</code> (below) or in shaders.</li>
+</ul>
+
+<h2>Environment lighting (IBL) and procedural textures (live)</h2>
+<p>An <strong>environment map</strong> lights and reflects every PBR material using a surrounding image. Here we use Three's built-in <code>RoomEnvironment</code> and draw our own checker texture on a canvas, so no files are needed.</p>
+<textarea class="code" data-lang="html" data-run data-height="400px">
+<style>html,body{margin:0;overflow:hidden;background:#111}</style>
+<script type="importmap">{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.append(renderer.domElement);
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;   // lights + reflections
+scene.background = new THREE.Color("#1a1826");
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(3, 2, 5);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+// Procedural checker texture drawn on a 2D canvas
+const c = document.createElement("canvas"); c.width = c.height = 256;
+const g = c.getContext("2d");
+for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+  g.fillStyle = (x + y) % 2 ? "#f4f1ea" : "#3b2f63"; g.fillRect(x * 32, y * 32, 32, 32);
+}
+const checker = new THREE.CanvasTexture(c);
+checker.colorSpace = THREE.SRGBColorSpace;
+checker.wrapS = checker.wrapT = THREE.RepeatWrapping;
+checker.repeat.set(2, 1);
+checker.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+const ball = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 48), new THREE.MeshStandardMaterial({ map: checker, roughness: 0.35, metalness: 0.1 }));
+ball.position.x = -1.3;
+const chrome = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 48), new THREE.MeshStandardMaterial({ color: "#fff", roughness: 0.05, metalness: 1 }));
+chrome.position.x = 1.3;
+scene.add(ball, chrome);
+
+renderer.setAnimationLoop((t) => { ball.rotation.y = t * 0.0005; controls.update(); renderer.render(scene, camera); });
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+</script>
+</textarea>
+<p>For real HDRIs: <code>new RGBELoader().load("studio.hdr", tex =&gt; { tex.mapping = THREE.EquirectangularReflectionMapping; scene.environment = scene.background = tex; })</code> (or <code>EXRLoader</code>, <code>HDRLoader</code> in newer releases).</p>
+
+<h2>Loading 3D models (glTF)</h2>
+<p><strong>glTF / .glb</strong> is the "JPEG of 3D": the standard web format with meshes, PBR materials, textures, skeletons and animations. Export from Blender (File → Export → glTF 2.0) or download from Sketchfab/Poly Pizza. This demo loads a small sample model from the Khronos repository (needs internet).</p>
+<textarea class="code" data-lang="html" data-run data-height="400px">
+<style>html,body{margin:0;overflow:hidden;background:#111;color:#ccc;font:13px system-ui}#msg{position:fixed;left:10px;top:8px}</style>
+<div id="msg">Loading model…</div>
+<script type="importmap">{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.append(renderer.domElement);
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.background = new THREE.Color("#1a1826");
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.01, 1000);
+const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+
+const url = "https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Duck/glTF-Binary/Duck.glb";
+new GLTFLoader().load(
+  url,
+  (gltf) => {
+    const model = gltf.scene;
+    // Frame the model automatically, whatever its size
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
+    model.position.sub(center);
+    const dist = Math.max(size.x, size.y, size.z) * 2;
+    camera.position.set(dist, dist * 0.6, dist);
+    controls.update();
+    model.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
+    scene.add(model);
+    document.getElementById("msg").textContent = "Drag to orbit · animations in file: " + gltf.animations.length;
+  },
+  (e) => { if (e.total) document.getElementById("msg").textContent = "Loading " + Math.round(100 * e.loaded / e.total) + "%"; },
+  (err) => { document.getElementById("msg").textContent = "Load failed: " + (err.message || err); }
+);
+
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+</script>
+</textarea>
+
+<h2>Animations from glTF</h2>
+<textarea class="code" data-lang="js">
+const mixer = new THREE.AnimationMixer(gltf.scene);
+const clip = THREE.AnimationClip.findByName(gltf.animations, "Walk");
+const action = mixer.clipAction(clip);
+action.play();                       // also: .setLoop, .fadeIn(0.3), .crossFadeTo(other, 0.5), .timeScale
+// in the loop:
+mixer.update(clock.getDelta());
+</textarea>
+
+<h2>Production asset pipeline</h2>
+<ul>
+<li><strong>Draco / Meshopt</strong> compress geometry (<code>DRACOLoader</code>, <code>MeshoptDecoder</code>); <strong>KTX2</strong> compresses textures. <code>gltf-transform</code> or <code>gltfjsx</code> (for R3F) automate it: <code>npx gltf-transform optimize in.glb out.glb --compress draco</code>.</li>
+<li>Aim for under ~5 MB for a hero model on the web; fewer than 100k triangles; few materials (draw calls).</li>
+<li>Reuse via <code>model.clone()</code> or <code>InstancedMesh</code> for many copies (Lesson 38).</li>
+<li>Free up GPU memory: <code>geometry.dispose()</code>, <code>material.dispose()</code>, <code>texture.dispose()</code> when removing objects.</li>
+<li>Use <code>LoadingManager</code> to build a progress bar over many assets.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Texture a floor with a tiling PBR set (color + normal + roughness) from ambientCG; fix the color spaces.</li>
+<li>Download a free .glb from Poly Pizza, load it, center and scale it automatically, add shadows.</li>
+<li>Build a product viewer: model on a turntable, OrbitControls limits, HDRI environment, and color-variant buttons that change one material's <code>color</code>.</li>
+<li>Make a character play "Idle" and crossfade to "Walk" on a key press using <code>AnimationMixer</code>.</li>
+<li>Compress your model with gltf-transform and report the size difference.</li>
+<li>Add a loading progress bar using <code>LoadingManager</code>.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why does my textured model look washed out or too dark?</summary>Likely wrong color space. Color textures need <code>SRGBColorSpace</code>; data maps must stay linear. (GLTFLoader handles this for you.)</details>
+<details><summary>Why is glTF preferred?</summary>It's an open, compact, runtime-oriented format with PBR materials and animations, supported by every tool and loader.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

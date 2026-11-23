@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 69 — Game Architecture: ECS, Fixed Timestep, Physics</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="69-game-architecture">
+<main><article>
+<h1>Lesson 69 — Game architecture: loops, ECS, physics &amp; input</h1>
+<p class="lede">Interactive 3D is a real-time simulation. Games force you to solve timing, state, collisions and input properly, and these skills carry into any complex interactive app (editors, simulations, visualizations).</p>
+
+<h2>The game loop: fixed timestep</h2>
+<p>Rendering runs at whatever frame rate the display allows (30/60/120/144 Hz). If your simulation uses the raw frame <code>delta</code>, behavior varies with frame rate and physics becomes unstable. The standard fix: <strong>simulate at a fixed step</strong> (e.g., 1/60 s) using an accumulator, then <strong>render with interpolation</strong>.</p>
+<textarea class="code" data-lang="html" data-run data-height="360px">
+<style>body{margin:0;font-family:system-ui;background:#16151d;color:#ddd}canvas{display:block;width:100%;height:240px;background:#0e0d14}
+.row{padding:8px 12px;font-size:13px}label{margin-right:14px}</style>
+<div class="row">
+  <label>Simulated FPS: <select id="fps"><option>15</option><option selected>30</option><option>60</option><option>144</option></select></label>
+  <label><input type="checkbox" id="fixed" checked> fixed timestep + interpolation</label>
+  <span id="out"></span>
+</div>
+<canvas id="c" width="700" height="240"></canvas>
+<script>
+  const ctx = c.getContext("2d");
+  // A ball with gravity bouncing on the floor. Same code, different frame rates.
+  const G = 900, FLOOR = 220, DT = 1 / 60;
+  const state = { y: 40, vy: 0 }, prev = { y: 40 };
+  let acc = 0, last = performance.now(), peak = 0, bounces = 0;
+
+  function step(dt) {                         // physics at a fixed dt
+    prev.y = state.y;
+    state.vy += G * dt; state.y += state.vy * dt;
+    if (state.y > FLOOR) { state.y = FLOOR; state.vy = -state.vy * 0.9; bounces++; }
+  }
+  function stepVariable(dt) {                 // naive: use the frame delta directly
+    state.vy += G * dt; state.y += state.vy * dt;
+    if (state.y > FLOOR) { state.y = FLOOR; state.vy = -state.vy * 0.9; bounces++; }
+    prev.y = state.y;
+  }
+
+  function frame() {
+    const now = performance.now();
+    const frameDt = Math.min((now - last) / 1000, 0.25); last = now;   // clamp: avoid the "spiral of death" after tab switch
+    let alpha = 1;
+    if (fixed.checked) {
+      acc += frameDt;
+      while (acc >= DT) { step(DT); acc -= DT; }
+      alpha = acc / DT;                        // how far we are between the last two physics states
+    } else stepVariable(frameDt);
+    const y = prev.y + (state.y - prev.y) * alpha;                      // interpolate for smooth rendering
+    ctx.clearRect(0, 0, 700, 240);
+    ctx.fillStyle = "#333"; ctx.fillRect(0, FLOOR + 12, 700, 8);
+    ctx.fillStyle = "#14e0a3"; ctx.beginPath(); ctx.arc(350, y, 12, 0, 7); ctx.fill();
+    out.textContent = `bounces: ${bounces}`;
+  }
+  // simulate a chosen display frame rate by throttling how often we draw
+  let timer; function schedule() { clearInterval(timer); last = performance.now(); timer = setInterval(frame, 1000 / Number(fps.value)); }
+  fps.onchange = () => { bounces = 0; state.y = 40; state.vy = 0; schedule(); }; fixed.onchange = fps.onchange; schedule();
+</script>
+</textarea>
+<p>Compare 15 fps and 144 fps with the box unchecked: the bounce behavior changes (energy gain/loss from integration error). With a fixed step it is consistent. Run it to see.</p>
+
+<h2>Entity Component System (ECS)</h2>
+<ul>
+<li><strong>Entity</strong>: just an id. <strong>Component</strong>: plain data (<code>Position</code>, <code>Velocity</code>, <code>Health</code>, <code>MeshRef</code>). <strong>System</strong>: function that processes all entities having certain components (<code>MovementSystem</code>, <code>CollisionSystem</code>, <code>RenderSyncSystem</code>).</li>
+<li>Favors composition over deep inheritance (<code>Enemy extends Character extends GameObject…</code> collapses when you need a flying, exploding, friendly enemy).</li>
+<li>Data-oriented layout (arrays of components) is cache-friendly and easy to serialize, replay and sync over a network.</li>
+</ul>
+<textarea class="code" data-lang="js" data-run>
+// A minimal ECS to see the shape of it
+let nextId = 1;
+const world = { entities: new Set(), position: new Map(), velocity: new Map(), health: new Map() };
+const spawn = (components) => { const id = nextId++; world.entities.add(id); for (const [k, v] of Object.entries(components)) world[k].set(id, v); return id; };
+
+// Systems = plain functions over component sets
+function movement(dt) { for (const [id, v] of world.velocity) { const p = world.position.get(id); if (p) { p.x += v.x * dt; p.y += v.y * dt; } } }
+function damageZone(dt) {
+  for (const [id, h] of world.health) { const p = world.position.get(id); if (p && p.x > 5) { h.hp -= 20 * dt; if (h.hp <= 0) destroy(id); } }
+}
+function destroy(id) { world.entities.delete(id); for (const k of ["position", "velocity", "health"]) world[k].delete(id); console.log("entity", id, "destroyed"); }
+
+spawn({ position: { x: 0, y: 0 }, velocity: { x: 2, y: 0 }, health: { hp: 30 } });
+spawn({ position: { x: 9, y: 0 } });                                 // static prop (no velocity/health)
+for (let t = 0; t < 10; t += 0.5) { movement(0.5); damageZone(0.5); }
+console.log([...world.position].map(([id, p]) => `#${id} x=${p.x.toFixed(1)}`).join(", "));
+// Libraries: bitECS (very fast), miniplex, koota (works well with R3F), Becsy. Plain objects are fine for small games.
+</textarea>
+
+<h2>Physics</h2>
+<table>
+<tr><th>Engine</th><th>Notes</th></tr>
+<tr><td><strong>Rapier</strong> (<code>@dimforge/rapier3d-compat</code>, <code>@react-three/rapier</code>)</td><td>Rust → WASM, fast, deterministic option, good character controller, sensors, joints. Recommended default.</td></tr>
+<tr><td><strong>cannon-es</strong></td><td>Pure JS, simple, fine for small scenes (used in Lesson 38)</td></tr>
+<tr><td><strong>Jolt, Havok (WASM)</strong></td><td>High-end performance and features</td></tr>
+</table>
+<ul>
+<li><strong>Rigid bodies</strong>: dynamic (simulated), fixed (static world), kinematic (you move it, it pushes others). <strong>Colliders</strong>: use primitive shapes (box, sphere, capsule) or convex hulls; avoid per-triangle trimesh colliders for dynamic objects.</li>
+<li><strong>Collision events and sensors</strong> (trigger zones) drive game logic: pickups, damage, doors.</li>
+<li>Keep the physics world as the source of truth for positions of simulated bodies, and <em>copy</em> transforms to meshes each frame. Don't move both.</li>
+<li><strong>Character controllers</strong>: use the engine's kinematic controller (handles slopes, steps, sliding) instead of a dynamic box with forces.</li>
+<li><strong>Tunneling</strong> (fast objects passing through thin walls): use continuous collision detection (CCD), smaller steps or thicker colliders.</li>
+</ul>
+<textarea class="code" data-lang="jsx" data-file="Physics.tsx">
+import { Physics, RigidBody, CuboidCollider, BallCollider } from "@react-three/rapier";
+
+<Canvas>
+  <Physics gravity={[0, -9.81, 0]} timeStep="vary" /* or fixed: 1/60 */ debug={import.meta.env.DEV}>
+    <RigidBody colliders="ball" restitution={0.7}><mesh castShadow><sphereGeometry /><meshStandardMaterial /></mesh></RigidBody>
+    <RigidBody type="fixed"><CuboidCollider args={[20, 0.5, 20]} position={[0, -0.5, 0]} /></RigidBody>
+    <RigidBody sensor onIntersectionEnter={() => console.log("pickup!")}><BallCollider args={[1]} /></RigidBody>
+  </Physics>
+</Canvas>
+</textarea>
+
+<h2>Input handling</h2>
+<ul>
+<li>Track input <strong>state</strong> (which keys are down) via <code>keydown</code>/<code>keyup</code> into a map, then read it inside the loop. Use <code>event.code</code> (<code>KeyW</code>) for layout-independent controls.</li>
+<li><strong>Pointer events</strong> unify mouse, touch and pen. Use <code>setPointerCapture</code> for drags. <strong>Pointer Lock API</strong> for FPS mouse-look.</li>
+<li><strong>Gamepad API</strong> (<code>navigator.getGamepads()</code>) is polled each frame. On mobile, provide on-screen joysticks and design for thumbs.</li>
+<li>Add an <strong>input abstraction</strong> (actions like "jump", "move") so keyboard, gamepad and touch map to the same game logic and remapping is easy.</li>
+<li>Always respect accessibility: remappable keys, avoid flashing, reduced motion, pause on blur (<code>visibilitychange</code>).</li>
+</ul>
+
+<h2>Game state, scenes and structure</h2>
+<ul>
+<li><strong>State machines</strong> for game flow (menu → loading → playing → paused → game over) and for entity AI (idle, patrol, chase, attack).</li>
+<li><strong>Event bus</strong> for decoupled communication (<code>enemyKilled</code> → score, sound, particles).</li>
+<li><strong>Save/load</strong>: serialize plain data (ECS makes this easy); version your save format; use IndexedDB/localStorage.</li>
+<li><strong>Audio</strong> (Lesson 70), <strong>asset loading screens</strong>, <strong>settings</strong> (quality presets), <strong>object pooling</strong> for bullets/particles to avoid GC pauses, <strong>debug tools</strong> (stats, physics debug view, god mode, time scale).</li>
+<li><strong>Determinism</strong>: seeded random + fixed timestep + input recording gives replays and easier netcode/testing.</li>
+</ul>
+<textarea class="code" data-lang="js" data-file="loop.js">
+// A complete three.js-friendly main loop
+const STEP = 1 / 60;
+let acc = 0, prevTime = performance.now();
+const keys = new Set();
+addEventListener("keydown", (e) => keys.add(e.code));
+addEventListener("keyup", (e) => keys.delete(e.code));
+document.addEventListener("visibilitychange", () => { if (document.hidden) game.pause(); });
+
+renderer.setAnimationLoop((now) => {
+  acc += Math.min((now - prevTime) / 1000, 0.1); prevTime = now;
+  while (acc >= STEP) { readInput(keys); updateAI(STEP); stepPhysics(STEP); updateGameRules(STEP); acc -= STEP; }
+  syncMeshesFromState(acc / STEP);         // interpolate transforms for smooth rendering
+  updateCamera();
+  renderer.render(scene, camera);
+});
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Reproduce the loop demo, then add a third mode: semi-fixed timestep with a max of 5 sub-steps. Explain the "spiral of death" and how the clamp prevents it.</li>
+<li>Implement the mini-ECS with a <code>Collider</code> component and a <code>CollisionSystem</code>; make entities bounce off each other.</li>
+<li>Build a third-person character with Rapier's kinematic character controller: walk, jump, slopes, stairs, camera follow with damping.</li>
+<li>Add input abstraction: keyboard + gamepad + on-screen touch joystick all driving the same action map, with a rebinding UI.</li>
+<li>Implement enemy AI with a finite state machine (patrol → chase → attack → flee) using sensor colliders for vision.</li>
+<li>Add object pooling for 500 projectiles and compare GC pauses with and without pooling in the Performance panel.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why a fixed timestep for physics?</summary>Physics integration is only stable and reproducible with a constant dt. Variable frame deltas cause frame-rate dependent behavior, jitter and tunneling.</details>
+<details><summary>What does ECS give you over inheritance?</summary>Behavior is built by combining data components and systems, so new entity types don't need new class hierarchies; data is easier to serialize, test and process efficiently.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

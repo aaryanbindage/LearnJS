@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 17 — Asynchronous JavaScript</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="17-js-async">
+<main><article>
+<h1>Lesson 17 — Asynchronous JavaScript</h1>
+<p class="lede">JavaScript runs one thing at a time, yet it fetches data, waits for timers, and responds to clicks without freezing. Understand how, then use promises and async/await fluently.</p>
+
+<h2>The event loop</h2>
+<p>JS has a single <strong>call stack</strong>. Slow work (timers, network, I/O) is handled by the browser; when finished, a callback is queued. The <strong>event loop</strong> pushes queued callbacks onto the stack only when it's empty. Promise callbacks (<em>microtasks</em>) run before timer callbacks (<em>macrotasks</em>).</p>
+<textarea class="code" data-lang="js" data-run>
+console.log("1 sync");
+setTimeout(() => console.log("4 macrotask (timeout 0)"), 0);
+Promise.resolve().then(() => console.log("3 microtask"));
+queueMicrotask(() => console.log("3b microtask"));
+console.log("2 sync");
+// Predict the order, then run!
+</textarea>
+
+<h2>Promises</h2>
+<p>A promise represents a future value: <em>pending</em> → <em>fulfilled</em> (value) or <em>rejected</em> (error).</p>
+<textarea class="code" data-lang="js" data-run>
+const wait = (ms, value, fail = false) =>
+  new Promise((resolve, reject) => setTimeout(() => (fail ? reject(new Error("boom: " + value)) : resolve(value)), ms));
+
+wait(100, "first")
+  .then(v => { console.log("got", v); return wait(100, "second"); })   // returning a promise chains
+  .then(v => { console.log("got", v); return wait(50, "third", true); })
+  .then(v => console.log("never runs", v))
+  .catch(err => console.log("caught:", err.message))
+  .finally(() => console.log("cleanup always runs"));
+</textarea>
+
+<h2>async / await</h2>
+<p><code>async</code> functions always return a promise. <code>await</code> pauses <em>that function</em> (not the whole program) until a promise settles. Errors become normal <code>try/catch</code>.</p>
+<textarea class="code" data-lang="js" data-run>
+const wait = (ms, v) => new Promise(r => setTimeout(() => r(v), ms));
+
+async function main() {
+  console.time("sequential");
+  const a = await wait(200, "A");
+  const b = await wait(200, "B");          // waits for A first: slow
+  console.log(a, b);
+  console.timeEnd?.("sequential");
+
+  const t0 = Date.now();
+  const [x, y] = await Promise.all([wait(200, "X"), wait(200, "Y")]);   // parallel
+  console.log(x, y, "took ~" + Math.round((Date.now() - t0) / 100) * 100 + "ms");
+
+  try {
+    await Promise.reject(new Error("nope"));
+  } catch (e) {
+    console.log("caught", e.message);
+  }
+}
+main();
+</textarea>
+<table>
+<tr><th>Combinator</th><th>Resolves when…</th></tr>
+<tr><td><code>Promise.all([…])</code></td><td>all succeed (rejects on first failure)</td></tr>
+<tr><td><code>Promise.allSettled([…])</code></td><td>all finish; gives status of each</td></tr>
+<tr><td><code>Promise.race([…])</code></td><td>first to settle</td></tr>
+<tr><td><code>Promise.any([…])</code></td><td>first to succeed</td></tr>
+</table>
+<div class="callout warn"><span class="label">Common bug</span><code>array.forEach(async …)</code> does not wait. Use a <code>for…of</code> loop with <code>await</code> for sequential work, or <code>await Promise.all(array.map(async …))</code> for parallel.</div>
+
+<h2>fetch</h2>
+<p>These demos call a public JSON API (<code>jsonplaceholder.typicode.com</code>), so you need an internet connection.</p>
+<textarea class="code" data-lang="js" data-run>
+async function getTodo(id) {
+  const res = await fetch(`https://jsonplaceholder.typicode.com/todos/${id}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);   // fetch does NOT reject on 404/500!
+  return res.json();
+}
+
+try {
+  console.log(await getTodo(1));
+  console.log(await getTodo(999999));
+} catch (e) {
+  console.log("Failed:", e.message);
+}
+</textarea>
+<textarea class="code" data-lang="js">
+// POST JSON
+const res = await fetch("/api/items", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ title: "New" }),
+});
+
+// Cancel with AbortController (also used for timeouts and React effect cleanup)
+const ctrl = new AbortController();
+fetch(url, { signal: ctrl.signal }).catch(e => e.name === "AbortError" && console.log("cancelled"));
+ctrl.abort();
+</textarea>
+<div class="callout"><span class="label">CORS</span>Browsers block cross-origin requests unless the server sends the right <code>Access-Control-Allow-Origin</code> header. If you see a CORS error, the fix is on the server (or via a proxy), not in your fetch call.</div>
+
+<h2>Resilience patterns</h2>
+<textarea class="code" data-lang="js" data-run>
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function retry(fn, tries = 3, delay = 100) {
+  for (let i = 1; ; i++) {
+    try { return await fn(); }
+    catch (e) {
+      if (i >= tries) throw e;
+      console.log(`attempt ${i} failed, retrying…`);
+      await sleep(delay * 2 ** i);       // exponential backoff
+    }
+  }
+}
+let calls = 0;
+console.log(await retry(async () => { if (++calls < 3) throw new Error("flaky"); return "success after " + calls; }));
+
+const withTimeout = (p, ms) => Promise.race([p, sleep(ms).then(() => { throw new Error("timeout"); })]);
+try { await withTimeout(sleep(500), 100); } catch (e) { console.log(e.message); }
+</textarea>
+<p>Top-level <code>await</code> works in modules (and in these demos). In classic scripts, wrap it in an <code>async</code> function.</p>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Predict and verify the output order of a script mixing <code>setTimeout</code>, promises, and sync logs.</li>
+<li>Write <code>sleep(ms)</code>, then write a loop that logs a countdown 3…2…1 with one-second gaps.</li>
+<li>Fetch 5 todos in parallel and print only the completed ones.</li>
+<li>Build a user search box that fetches as you type, debounced, ignoring out-of-date responses (use <code>AbortController</code>).</li>
+<li>Write <code>promisify(fn)</code> for Node-style callbacks.</li>
+<li>Implement <code>Promise.all</code> yourself using <code>new Promise</code>.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why does fetch("/missing") not throw?</summary>fetch only rejects on network failure. HTTP error statuses still resolve; check <code>res.ok</code>.</details>
+<details><summary>Does await block the browser?</summary>No. It suspends only the current async function; the event loop keeps running other tasks.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

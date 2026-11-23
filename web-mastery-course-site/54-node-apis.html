@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 54 — Node.js & Building HTTP APIs</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="54-node-apis">
+<main><article>
+<h1>Lesson 54 — Node.js &amp; building HTTP APIs</h1>
+<p class="lede">Time to build the other half of the web. You already know JavaScript, so Node.js lets you write servers in the same language. Run every example locally with <code>node</code> (these need a terminal, not the browser sandbox).</p>
+
+<h2>What Node is</h2>
+<ul>
+<li>A JavaScript runtime (V8 + libuv) outside the browser: file system, network, processes. No DOM or <code>window</code>.</li>
+<li>Same single-threaded event loop model: <strong>non-blocking I/O</strong> makes it excellent at handling many concurrent connections. CPU-heavy work blocks everyone, so use worker threads or a queue for that.</li>
+<li>ES modules: set <code>"type": "module"</code> in <code>package.json</code> and use <code>import</code>. Use the <code>node:</code> prefix for built-ins.</li>
+<li>Alternatives with similar APIs: <strong>Bun</strong> and <strong>Deno</strong>. Everything here applies.</li>
+</ul>
+<textarea class="code" data-lang="js" data-file="files.js (run: node files.js)">
+import { readFile, writeFile, readdir } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+await writeFile(path.join(here, "out.json"), JSON.stringify({ hello: "world" }, null, 2));
+const data = JSON.parse(await readFile(path.join(here, "out.json"), "utf8"));
+console.log(data, await readdir(here));
+
+console.log(process.argv.slice(2), process.env.NODE_ENV ?? "development", process.cwd());
+// process.exit(1) signals failure to shells/CI.
+// Use streams (fs.createReadStream, pipeline) for big files instead of reading them whole.
+</textarea>
+
+<h2>A server from scratch</h2>
+<p>Frameworks are conveniences on top of this. Seeing the raw version makes everything else make sense.</p>
+<textarea class="code" data-lang="js" data-file="server.js">
+import { createServer } from "node:http";
+
+const server = createServer(async (req, res) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+
+  if (req.method === "GET" && url.pathname === "/api/hello") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({ message: "hi", query: Object.fromEntries(url.searchParams) }));
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/echo") {
+    let body = "";
+    for await (const chunk of req) body += chunk;          // request is an async-iterable stream
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(body || "{}");
+  }
+
+  res.writeHead(404, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "Not found" }));
+});
+
+server.listen(3000, () => console.log("http://localhost:3000"));
+</textarea>
+<textarea class="code" data-lang="bash">
+node server.js
+curl "http://localhost:3000/api/hello?name=Ada"
+curl -X POST http://localhost:3000/api/echo -H "Content-Type: application/json" -d '{"a":1}'
+</textarea>
+
+<h2>HTTP in 5 minutes</h2>
+<table>
+<tr><th>Method</th><th>Meaning</th><th>Safe / idempotent</th></tr>
+<tr><td><code>GET</code></td><td>Read</td><td>safe, idempotent</td></tr>
+<tr><td><code>POST</code></td><td>Create / run an action</td><td>neither</td></tr>
+<tr><td><code>PUT</code></td><td>Replace a resource</td><td>idempotent</td></tr>
+<tr><td><code>PATCH</code></td><td>Partially update</td><td>usually not guaranteed</td></tr>
+<tr><td><code>DELETE</code></td><td>Remove</td><td>idempotent</td></tr>
+</table>
+<table>
+<tr><th>Status</th><th>Use</th></tr>
+<tr><td>200 OK · 201 Created · 204 No Content</td><td>Success</td></tr>
+<tr><td>301/302/307/308</td><td>Redirects</td></tr>
+<tr><td>400 Bad Request · 401 Unauthenticated · 403 Forbidden · 404 Not Found · 409 Conflict · 422 Unprocessable · 429 Too Many Requests</td><td>Client errors</td></tr>
+<tr><td>500 Internal Error · 502/503/504</td><td>Server errors</td></tr>
+</table>
+<p>Headers carry metadata: <code>Content-Type</code>, <code>Authorization</code>, <code>Cache-Control</code>, <code>ETag</code>, <code>Set-Cookie</code>, CORS headers. Bodies are JSON in most APIs.</p>
+
+<h2>A real API with Fastify (or Express / Hono)</h2>
+<textarea class="code" data-lang="bash">
+mkdir api && cd api && npm init -y
+npm pkg set type=module
+npm i fastify @fastify/cors zod
+</textarea>
+<textarea class="code" data-lang="js" data-file="src/app.js">
+import Fastify from "fastify";
+import cors from "@fastify/cors";
+import { z } from "zod";
+
+export function buildApp() {
+  const app = Fastify({ logger: true });
+  app.register(cors, { origin: ["http://localhost:5173"] });     // allow-list, never "*" with credentials
+
+  const todos = new Map();       // in-memory for now; swap for a database in the next lesson
+  let nextId = 1;
+
+  const CreateTodo = z.object({ title: z.string().trim().min(1).max(200) });
+  const UpdateTodo = z.object({ title: z.string().trim().min(1).max(200).optional(), done: z.boolean().optional() });
+
+  app.get("/api/health", async () => ({ ok: true }));
+
+  app.get("/api/todos", async () => [...todos.values()]);
+
+  app.post("/api/todos", async (req, reply) => {
+    const parsed = CreateTodo.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid", issues: parsed.error.issues });
+    const todo = { id: nextId++, title: parsed.data.title, done: false };
+    todos.set(todo.id, todo);
+    return reply.code(201).header("Location", `/api/todos/${todo.id}`).send(todo);
+  });
+
+  app.patch("/api/todos/:id", async (req, reply) => {
+    const id = Number(req.params.id);
+    const todo = todos.get(id);
+    if (!todo) return reply.code(404).send({ error: "not found" });
+    const parsed = UpdateTodo.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid", issues: parsed.error.issues });
+    Object.assign(todo, parsed.data);
+    return todo;
+  });
+
+  app.delete("/api/todos/:id", async (req, reply) => {
+    return todos.delete(Number(req.params.id)) ? reply.code(204).send() : reply.code(404).send({ error: "not found" });
+  });
+
+  app.setErrorHandler((err, req, reply) => {                      // central error handling: never leak stack traces
+    req.log.error(err);
+    reply.code(err.statusCode ?? 500).send({ error: err.statusCode ? err.message : "internal error" });
+  });
+  return app;
+}
+</textarea>
+<textarea class="code" data-lang="js" data-file="src/server.js">
+import { buildApp } from "./app.js";
+const app = buildApp();
+const port = Number(process.env.PORT ?? 3000);
+await app.listen({ port, host: "0.0.0.0" });
+
+for (const sig of ["SIGINT", "SIGTERM"]) {
+  process.on(sig, async () => { await app.close(); process.exit(0); });   // graceful shutdown
+}
+</textarea>
+
+<h2>Architecture of a clean API</h2>
+<textarea class="code" data-lang="bash">
+src/
+  server.js          # start/stop only
+  app.js             # build the app (importable by tests)
+  routes/            # HTTP layer: parse input, call services, shape responses
+  services/          # business logic (no HTTP knowledge)
+  repositories/      # data access (SQL/ORM)
+  schemas/           # Zod schemas shared for validation and types
+  middleware|plugins/# auth, rate limiting, logging
+  config.js          # read and validate environment variables once
+</textarea>
+<ul>
+<li><strong>Validate all input</strong> at the edge with schemas; <strong>validate config</strong> at startup (fail fast).</li>
+<li><strong>Separate layers</strong> so business logic is testable without HTTP.</li>
+<li><strong>Consistent errors</strong>: <code>{ error, code, details }</code> with correct status codes.</li>
+<li><strong>Structured logging</strong> (pino, JSON lines) with a request id; never log secrets.</li>
+<li><strong>Pagination</strong> (<code>?limit=20&amp;cursor=…</code>), filtering, sorting; <strong>idempotency keys</strong> for payments; <strong>rate limiting</strong>.</li>
+<li><strong>Twelve-factor</strong>: config from env, stateless processes, logs to stdout, disposable processes.</li>
+</ul>
+
+<h2>Testing the API without a network</h2>
+<textarea class="code" data-lang="js" data-file="src/app.test.js">
+import { describe, it, expect } from "vitest";
+import { buildApp } from "./app.js";
+
+describe("todos API", () => {
+  it("creates and lists todos", async () => {
+    const app = buildApp();
+    const created = await app.inject({ method: "POST", url: "/api/todos", payload: { title: "Learn Node" } });
+    expect(created.statusCode).toBe(201);
+    const list = await app.inject({ method: "GET", url: "/api/todos" });
+    expect(list.json()).toEqual([{ id: 1, title: "Learn Node", done: false }]);
+  });
+
+  it("rejects invalid input", async () => {
+    const res = await buildApp().inject({ method: "POST", url: "/api/todos", payload: { title: "" } });
+    expect(res.statusCode).toBe(400);
+  });
+});
+</textarea>
+
+<h2>Calling it from your React app</h2>
+<textarea class="code" data-lang="js" data-file="vite.config.js">
+export default defineConfig({
+  plugins: [react()],
+  server: { proxy: { "/api": "http://localhost:3000" } },     // same-origin in dev: no CORS headaches
+});
+</textarea>
+
+<h2>Background work and other concerns</h2>
+<ul>
+<li><strong>Queues/jobs</strong> (BullMQ + Redis, pg-boss): emails, image processing, webhooks, anything slow or retryable.</li>
+<li><strong>File uploads</strong>: stream to object storage (S3/R2) with presigned URLs; never keep large files in memory.</li>
+<li><strong>Caching</strong>: HTTP caching, in-memory (LRU), Redis; invalidate carefully.</li>
+<li><strong>Scaling</strong>: stateless processes behind a load balancer; keep state in DB/Redis. Cluster/worker threads for CPU use.</li>
+<li><strong>Serverless / edge</strong> functions (Vercel, Cloudflare Workers, AWS Lambda) are an alternative to long-running servers: great for spiky or simple workloads.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build the raw <code>http</code> server version of a notes API with GET/POST/DELETE and manual routing; then rebuild with Fastify and compare.</li>
+<li>Add the API to your Project 2 todo app: replace localStorage with the API through the Vite proxy.</li>
+<li>Write a validation plugin that turns a Zod schema into route validation and typed handlers.</li>
+<li>Add request-id logging with pino and a global error handler that returns consistent errors.</li>
+<li>Implement cursor-based pagination and an <code>ETag</code>/<code>If-None-Match</code> conditional GET.</li>
+<li>Write 10 <code>inject</code> tests covering success, validation errors, 404 and conflict cases.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why can one Node process handle thousands of connections?</summary>I/O is non-blocking and event-driven: while waiting on the network or disk, the event loop serves other requests. CPU-bound work would block it.</details>
+<details><summary>PUT vs PATCH?</summary>PUT replaces the whole resource and is idempotent; PATCH applies a partial update.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project 2 — Weather & Todo App (Vanilla JS)</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="p2-vanilla-app">
+<main><article>
+<h1>Project 2 — Weather &amp; todo dashboard (vanilla JS)</h1>
+<p class="lede">Build a small dashboard with no frameworks. This project proves you understand the DOM, events, async, modules and storage, which is exactly what React will later abstract for you.</p>
+
+<h2>Requirements</h2>
+<h3>Todo panel</h3>
+<ol>
+<li>Add, complete-toggle, edit-in-place and delete todos. One delegated listener.</li>
+<li>Filter: All / Active / Done, with counts. Persist to <code>localStorage</code>.</li>
+<li>Keyboard accessible; announce changes via an <code>aria-live</code> region.</li>
+</ol>
+<h3>Weather panel</h3>
+<ol>
+<li>Search a city; fetch coordinates from Open-Meteo's geocoding API, then the forecast. No API key needed.</li>
+<li>Show loading, error and empty states. Cancel stale requests with <code>AbortController</code>.</li>
+<li>Remember the last city; debounce the search input.</li>
+</ol>
+<h3>Engineering</h3>
+<ol>
+<li>Vite + ES modules: <code>api.js</code>, <code>store.js</code>, <code>ui.js</code>, <code>main.js</code>. Pure logic in testable functions.</li>
+<li>At least 8 Vitest tests (filtering, store updates, API response mapping with a mocked <code>fetch</code>).</li>
+<li>Responsive and dark-mode aware using your CSS from Part 2.</li>
+</ol>
+
+<h2>Starter: the weather call</h2>
+<p>Try the API below, then structure it into your <code>api.js</code>.</p>
+<textarea class="code" data-lang="js" data-run>
+async function getJSON(url, signal) {
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function weatherFor(city, signal) {
+  const geo = await getJSON(
+    `https://geocoding-api.open-meteo.com/v1/search?count=1&name=${encodeURIComponent(city)}`, signal);
+  const place = geo.results?.[0];
+  if (!place) throw new Error(`No city named "${city}"`);
+
+  const w = await getJSON(
+    `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}` +
+    `&current=temperature_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto`, signal);
+  return { city: place.name, country: place.country, now: w.current, days: w.daily };
+}
+
+try {
+  const r = await weatherFor("Tokyo");
+  console.log(`${r.city}, ${r.country}: ${r.now.temperature_2m}°C, wind ${r.now.wind_speed_10m} km/h`);
+  console.log("Max temps:", r.days.temperature_2m_max);
+} catch (e) { console.log("Error:", e.message); }
+</textarea>
+
+<h2>Suggested architecture</h2>
+<textarea class="code" data-lang="bash">
+src/
+  main.js        # wires modules, registers event listeners
+  store.js       # state + pure update functions (addTodo, toggleTodo, filterTodos)
+  storage.js     # safe localStorage load/save
+  api.js         # fetch wrappers, mapping, errors
+  ui.js          # render functions: render(state) -> DOM
+  *.test.js      # Vitest
+</textarea>
+<div class="callout"><span class="label">Key idea</span>Keep a single <code>state</code> object, change it only through functions, and call one <code>render(state)</code> after each change. This "state → UI" loop is precisely what React automates in Part 4.</div>
+
+<h2>Stretch goals</h2>
+<ul>
+<li>Drag-and-drop reorder with the pointer events API.</li>
+<li>7-day forecast chart on a <code>&lt;canvas&gt;</code> (draw it yourself).</li>
+<li>Installable PWA: manifest + service worker for offline todos.</li>
+<li>Undo/redo using a history stack of immutable states.</li>
+</ul>
+
+<section class="checkpoint"><h2>Self-review checklist</h2>
+<details><summary>Ready for Part 4 if…</summary>
+<ul><li>No <code>innerHTML</code> with user data.</li>
+<li>Every async path has loading and error UI.</li>
+<li>Rapid typing never shows stale results.</li>
+<li>Tests pass and cover logic that isn't DOM-related.</li>
+<li>You can explain every line of the code.</li></ul></details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

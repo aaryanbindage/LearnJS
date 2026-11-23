@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 60 — React 19: Server Components, Actions, Suspense</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="60-react19">
+<main><article>
+<h1>Lesson 60 — React 19: Server Components, actions &amp; Suspense</h1>
+<p class="lede">Modern React is about <em>where</em> code runs and <em>when</em> UI is ready. This lesson goes deeper on the concurrent and server-oriented features you met in Lessons 57–58. The live demos elsewhere use React 18's browser build; these snippets need a React 19 project (Vite or Next.js).</p>
+<div class="callout warn"><span class="label">Verify against your version</span>React 19 stabilized many of these APIs, but frameworks differ in how they expose them. Treat this as the conceptual map and confirm details at react.dev.</div>
+
+<h2>Concurrent rendering</h2>
+<p>React can start rendering an update, pause to handle something more urgent (typing), and resume or discard the work. You opt in by marking updates as <strong>transitions</strong>:</p>
+<textarea class="code" data-lang="jsx" data-file="Search.tsx">
+import { useState, useTransition, useDeferredValue, Suspense } from "react";
+
+export function Search() {
+  const [query, setQuery] = useState("");
+  const deferred = useDeferredValue(query);           // lags behind `query` while React is busy
+  const stale = query !== deferred;
+  return (
+    <>
+      <input value={query} onChange={(e) => setQuery(e.target.value)} />   {/* always instant */}
+      <div style={{ opacity: stale ? 0.6 : 1 }}>
+        <Suspense fallback={<Spinner />}><Results query={deferred} /></Suspense>   {/* slow, interruptible */}
+      </div>
+    </>
+  );
+}
+
+function Tabs() {
+  const [tab, setTab] = useState("home");
+  const [isPending, startTransition] = useTransition();
+  return (
+    <nav aria-busy={isPending}>
+      <button onClick={() => startTransition(() => setTab("posts"))}>Posts</button>   {/* keeps old UI while loading */}
+    </nav>
+  );
+}
+</textarea>
+
+<h2>Suspense as the loading model</h2>
+<p>A component can <em>suspend</em> (wait for data); the nearest <code>&lt;Suspense&gt;</code> boundary shows a fallback. Boundaries let you design the loading experience: where spinners appear, what streams in, what stays visible.</p>
+<textarea class="code" data-lang="jsx" data-file="use.tsx">
+import { use, Suspense } from "react";
+
+// The `use` hook reads a promise (or context) and suspends until it resolves. It may be called conditionally.
+function Comments({ commentsPromise }: { commentsPromise: Promise<Comment[]> }) {
+  const comments = use(commentsPromise);              // create the promise in a parent / on the server, not during this render
+  return <ul>{comments.map((c) => <li key={c.id}>{c.text}</li>)}</ul>;
+}
+
+export function Post({ id }: { id: string }) {
+  const commentsPromise = fetchComments(id);          // in a Server Component this is fine; pass the promise down
+  return (
+    <ErrorBoundary fallback={<p>Couldn't load comments.</p>}>
+      <Suspense fallback={<p>Loading comments…</p>}><Comments commentsPromise={commentsPromise} /></Suspense>
+    </ErrorBoundary>
+  );
+}
+</textarea>
+<ul>
+<li>Nest boundaries around independent regions so one slow widget doesn't block the page. Pair each with an <strong>error boundary</strong> (<code>react-error-boundary</code>).</li>
+<li>Avoid <strong>waterfalls</strong> (fetch A, then B because B needs rendering of A): start fetches in parallel, high in the tree or on the server.</li>
+<li>Libraries (TanStack Query <code>useSuspenseQuery</code>, Relay, framework loaders) integrate with Suspense; don't hand-roll promise caching.</li>
+</ul>
+
+<h2>Actions, forms and optimistic UI</h2>
+<textarea class="code" data-lang="jsx" data-file="Likes.tsx">
+import { useOptimistic, useActionState, startTransition } from "react";
+
+function LikeButton({ likes, onLike }: { likes: number; onLike: () => Promise<void> }) {
+  const [optimisticLikes, addOptimistic] = useOptimistic(likes, (current, delta: number) => current + delta);
+  return (
+    <form action={async () => { addOptimistic(1); await onLike(); }}>    {/* UI updates instantly, reverts if it throws */}
+      <button>♥ {optimisticLikes}</button>
+    </form>
+  );
+}
+
+function Rename({ saveName }: { saveName: (name: string) => Promise<string | null> }) {
+  const [error, submit, pending] = useActionState(async (_prev: string | null, formData: FormData) => {
+    return saveName(String(formData.get("name")));       // returns an error message or null
+  }, null);
+  return (
+    <form action={submit}>
+      <input name="name" /> <button disabled={pending}>Save</button> {error && <p role="alert">{error}</p>}
+    </form>
+  );
+}
+</textarea>
+<p>An <strong>Action</strong> is an async function passed to a form's <code>action</code> or run inside <code>startTransition</code>. React tracks its pending state, handles errors via boundaries, and (with <code>useOptimistic</code>) reconciles optimistic UI. The form resets automatically on success.</p>
+
+<h2>Server Components, in depth</h2>
+<ul>
+<li><strong>RSC payload</strong>: the server renders the component tree to a special serialized format sent to the client, which merges it into the React tree. Client Components appear as references to JS chunks plus props.</li>
+<li><strong>Boundary rules</strong>: <code>"use client"</code> marks the entry into client code; everything it imports is client code. <code>"use server"</code> marks <em>server functions</em> callable from the client (not "server components").</li>
+<li><strong>Composition</strong>: a Server Component can pass Server Components as <code>children</code> to a Client Component; the client wrapper doesn't need to know what's inside (great for providers, layouts, animated shells).</li>
+<li><strong>Serialization limits</strong>: props crossing the boundary must be serializable: primitives, plain objects/arrays, Dates, Maps/Sets, promises, server functions. No class instances or event handlers.</li>
+<li><strong>Security</strong>: the <code>server-only</code> package makes importing secret-using modules into client code a build error. Don't pass sensitive fields in props; use a Data Access Layer returning only what the UI may see (and apply authorization there).</li>
+</ul>
+<textarea class="code" data-lang="jsx" data-file="dal.ts">
+import "server-only";
+import { cache } from "react";
+
+export const getCurrentUser = cache(async () => {          // `cache` dedupes within one request
+  const session = await verifySession();
+  if (!session) return null;
+  const u = await db.user.findUnique({ where: { id: session.userId }, select: { id: true, name: true, role: true } });
+  return u;                                                // never return passwordHash etc.
+});
+</textarea>
+
+<h2>The React Compiler and new ref/metadata APIs</h2>
+<ul>
+<li><strong>React Compiler</strong>: a build-time tool that automatically memoizes components and values, reducing the need for manual <code>useMemo</code>/<code>useCallback</code>/<code>memo</code>. It relies on you following the Rules of React (pure render, no mutation of props/state). Enable per project and check the docs; keep ESLint's <code>react-hooks</code> rules on.</li>
+<li><code>ref</code> as a regular prop (no more <code>forwardRef</code>); ref callbacks may return cleanup functions.</li>
+<li>Built-in <code>&lt;title&gt;</code>, <code>&lt;meta&gt;</code>, <code>&lt;link&gt;</code> hoisting from any component; stylesheet precedence and resource hints (<code>preload</code>, <code>preconnect</code>).</li>
+<li><code>&lt;Context&gt;</code> as a provider directly (no <code>.Provider</code>); improved error reporting and hydration diffs; custom elements support.</li>
+</ul>
+
+<h2>Rules of React (what keeps all this working)</h2>
+<ol>
+<li><strong>Components and hooks are pure</strong>: same props/state/context → same output; no side effects during render; don't mutate props, state, or values created earlier in render.</li>
+<li><strong>Side effects belong in event handlers or effects.</strong></li>
+<li><strong>Hooks only at the top level</strong>; only in components or custom hooks.</li>
+<li><strong>Treat state as immutable.</strong></li>
+</ol>
+<p>Concurrent features may render a component multiple times, or discard a render entirely; impure code shows up as flaky bugs. StrictMode double-invoking is a feature, not a nuisance.</p>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Take a slow filter UI (5,000 items with an expensive row component) and keep typing at 60 fps using <code>useDeferredValue</code> or <code>useTransition</code>. Record Profiler traces before and after.</li>
+<li>Build a page with three independent Suspense regions (fast, medium, slow data) that stream in at different times, each with its own error boundary and a retry button.</li>
+<li>Implement an optimistic "add comment" flow with <code>useOptimistic</code> + a Server Action that sometimes fails; show rollback and an error toast.</li>
+<li>Refactor a client-heavy page: move data fetching into Server Components, push <code>"use client"</code> down to the leaves, and compare the shipped JS with the bundle analyzer.</li>
+<li>Create a Data Access Layer with <code>server-only</code> that enforces authorization, and prove with a test that unauthorized callers get no data.</li>
+<li>Enable the React Compiler in a project, remove a few manual memoizations, and verify behavior and performance did not regress.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>What's the difference between "use client" and "use server"?</summary>"use client" marks a module boundary where code runs in the browser too. "use server" marks async functions that run only on the server but can be called from the client as RPC endpoints. Neither means "this is a Server Component"; that's the default.</details>
+<details><summary>Why do transitions improve responsiveness?</summary>React treats transition updates as low priority and interruptible, so urgent updates like typing render first and the expensive update yields or restarts instead of blocking the main thread.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 45 — SEO, Performance & Core Web Vitals</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="45-web-vitals">
+<main><article>
+<h1>Lesson 45 — SEO, performance &amp; Core Web Vitals</h1>
+<p class="lede">Fast pages convert better, rank better and work on cheap phones and slow networks. Performance is measured with real metrics, not feelings.</p>
+
+<h2>Core Web Vitals</h2>
+<table>
+<tr><th>Metric</th><th>Measures</th><th>Good</th></tr>
+<tr><td><strong>LCP</strong> Largest Contentful Paint</td><td>Loading: when the main content appears</td><td>≤ 2.5 s</td></tr>
+<tr><td><strong>INP</strong> Interaction to Next Paint</td><td>Responsiveness: delay from input to visual response</td><td>≤ 200 ms</td></tr>
+<tr><td><strong>CLS</strong> Cumulative Layout Shift</td><td>Visual stability: unexpected movement</td><td>≤ 0.1</td></tr>
+</table>
+<p>Others: <strong>TTFB</strong> (server response), <strong>FCP</strong>, <strong>TBT</strong> (lab proxy for INP). Thresholds are measured at the 75th percentile of real users. Check current definitions at web.dev/vitals.</p>
+<p><strong>Lab data</strong> (Lighthouse, WebPageTest) is reproducible for debugging. <strong>Field data</strong> (CrUX, your own RUM via the <code>web-vitals</code> library) shows what real users experience. You need both.</p>
+<textarea class="code" data-lang="js" data-file="rum.js">
+import { onLCP, onINP, onCLS } from "web-vitals";
+const send = (m) => navigator.sendBeacon("/analytics", JSON.stringify({ name: m.name, value: m.value, id: m.id }));
+onLCP(send); onINP(send); onCLS(send);
+</textarea>
+
+<h2>Improving LCP (loading)</h2>
+<ol>
+<li><strong>Fast server</strong>: CDN, caching (<code>Cache-Control</code>), compression (Brotli), HTTP/2/3, SSR/SSG instead of client-only rendering for content.</li>
+<li><strong>Prioritize the hero resource</strong>: <code>&lt;img fetchpriority="high"&gt;</code>, <code>&lt;link rel="preload" as="image"&gt;</code>; never lazy-load the LCP image.</li>
+<li><strong>Right-size images</strong>: AVIF/WebP, <code>srcset</code>/<code>sizes</code>, correct dimensions.</li>
+<li><strong>Cut render-blocking</strong>: inline critical CSS, defer scripts, avoid giant CSS bundles, no blocking third-party scripts.</li>
+<li><strong>Fonts</strong>: self-host, <code>woff2</code>, subset, <code>font-display: swap</code>, preload the key font, use <code>size-adjust</code> fallback to reduce shifts.</li>
+</ol>
+<textarea class="code" data-lang="html" data-file="head.html">
+<link rel="preconnect" href="https://cdn.example.com" crossorigin>
+<link rel="preload" as="image" href="/hero.avif" type="image/avif" fetchpriority="high">
+<link rel="preload" as="font" href="/fonts/inter.woff2" type="font/woff2" crossorigin>
+<script src="/app.js" defer></script>
+<img src="/hero.avif" width="1200" height="600" fetchpriority="high" alt="…">
+<img src="/below.avif" width="600" height="400" loading="lazy" decoding="async" alt="…">
+</textarea>
+
+<h2>Improving INP (responsiveness)</h2>
+<p>Long tasks (&gt; 50 ms) on the main thread block input. Break them up.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>body{font-family:system-ui;padding:1rem}button{font:inherit;padding:.5em 1em;margin-right:.5rem}#o{margin-top:1rem}</style>
+<button id="bad">Block main thread (3s)</button>
+<button id="good">Yield to the browser</button>
+<button id="ping">Click me quickly</button> <span id="c">0</span>
+<div id="o"></div>
+<script>
+  let n=0; ping.onclick=()=>c.textContent=++n;
+  const work = () => { const t=performance.now(); while(performance.now()-t<5){} };   // ~5ms chunk
+
+  bad.onclick = () => {                      // one 3 s task: UI frozen, clicks queue up
+    o.textContent="Blocking…"; const s=performance.now();
+    while(performance.now()-s<3000){}
+    o.textContent="Done (UI was frozen)";
+  };
+  good.onclick = async () => {               // many small tasks, yielding between them
+    o.textContent="Working (still responsive)…"; const s=performance.now();
+    while(performance.now()-s<3000){
+      work();
+      await (globalThis.scheduler?.yield?.() ?? new Promise(r=>setTimeout(r)));
+    }
+    o.textContent="Done";
+  };
+</script>
+</textarea>
+<ul>
+<li>Yield with <code>scheduler.yield()</code> (fallback <code>setTimeout</code>), move heavy work to a <strong>Web Worker</strong>, debounce handlers, use <code>requestIdleCallback</code> for non-urgent work.</li>
+<li>In React: <code>useTransition</code>/<code>useDeferredValue</code>, virtualize long lists, avoid re-rendering huge trees, code-split.</li>
+<li>Reduce JavaScript: audit bundles, remove unused dependencies, lazy-load below-the-fold widgets, defer third-party tags.</li>
+</ul>
+
+<h2>Improving CLS (stability)</h2>
+<ul>
+<li>Always set <code>width</code>/<code>height</code> (or <code>aspect-ratio</code>) on images, video and iframes.</li>
+<li>Reserve space for ads, embeds and late-loaded content with <code>min-height</code>/skeletons.</li>
+<li>Don't insert content above existing content after load; animate with <code>transform</code>, not layout properties.</li>
+<li>Avoid font swap jumps (matching fallback metrics).</li>
+</ul>
+
+<h2>The JavaScript budget</h2>
+<textarea class="code" data-lang="bash">
+npx vite build                     # note chunk sizes in the output
+npx vite-bundle-visualizer         # treemap of what's in your bundle
+npm ls --all | wc -l               # how many packages?
+# Replace heavy libs: moment → date-fns/Intl, lodash → native or lodash-es per-function, big icon packs → per-icon imports
+</textarea>
+<p>Rough budget for good mobile experience: under ~170 KB of compressed JavaScript for the initial route. Code-split routes, import only what you use, and prefer platform features (<code>Intl</code>, <code>fetch</code>, <code>structuredClone</code>, CSS) over libraries.</p>
+
+<h2>Caching</h2>
+<textarea class="code" data-lang="bash">
+# Hashed static assets (app.3f9a1c.js): cache forever
+Cache-Control: public, max-age=31536000, immutable
+# HTML: always revalidate so new deploys appear
+Cache-Control: no-cache
+# API data: short cache + stale-while-revalidate
+Cache-Control: public, max-age=60, stale-while-revalidate=600
+</textarea>
+
+<h2>SEO essentials</h2>
+<ul>
+<li><strong>Crawlable content</strong>: important text must be in the HTML a crawler receives. Use SSR/SSG for content sites; client-only SPAs risk delayed or incomplete indexing.</li>
+<li><strong>Per-page</strong> <code>&lt;title&gt;</code> (≈ 50–60 chars), <code>&lt;meta name="description"&gt;</code>, one <code>h1</code>, logical headings, descriptive link text, <code>alt</code> text, canonical URL.</li>
+<li><strong>Social cards</strong>: Open Graph and Twitter tags.</li>
+<li><strong>Structured data</strong> (JSON-LD) for rich results; <code>sitemap.xml</code>, <code>robots.txt</code>; clean, stable URLs; correct status codes (404 vs 200); HTTPS; mobile-friendly; fast.</li>
+</ul>
+<textarea class="code" data-lang="html" data-file="seo-head.html">
+<title>Handmade Ceramic Mugs | Clay &amp; Co</title>
+<meta name="description" content="Dishwasher-safe stoneware mugs, made in small batches.">
+<link rel="canonical" href="https://clay.example/mugs">
+<meta property="og:title" content="Handmade Ceramic Mugs">
+<meta property="og:image" content="https://clay.example/og/mugs.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{ "@context": "https://schema.org", "@type": "Product", "name": "Stoneware Mug",
+  "offers": { "@type": "Offer", "price": "24.00", "priceCurrency": "USD", "availability": "https://schema.org/InStock" } }
+</script>
+</textarea>
+
+<h2>Performance for 3D pages</h2>
+<p>Don't ship a 20 MB model on first paint. Show real HTML content and a poster image immediately, lazy-load the WebGL scene after the main content (<code>IntersectionObserver</code> or <code>requestIdleCallback</code>), and treat the 3D as an enhancement. LCP should be text/image, not the canvas.</p>
+
+<h2>Measure like a professional</h2>
+<ol>
+<li>Lighthouse (mobile, throttled) for a first look; WebPageTest for waterfalls and filmstrips on real devices.</li>
+<li>Chrome DevTools Performance panel: record the interaction, find long tasks and layout thrash.</li>
+<li>Network panel with throttling ("Slow 4G") and CPU throttling (4–6× slowdown).</li>
+<li>CrUX / PageSpeed Insights field data; RUM via <code>web-vitals</code>.</li>
+<li>Performance budgets in CI (Lighthouse CI, <code>size-limit</code>).</li>
+</ol>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Run Lighthouse on your Project 3 app; list the top 5 opportunities; fix at least 3 and re-measure.</li>
+<li>Find your LCP element in DevTools and make it load faster (priority hints, right-sized AVIF).</li>
+<li>Trigger an INP problem (a 300 ms handler), find it in the Performance panel, then fix it by yielding or a worker.</li>
+<li>Eliminate every layout shift on a page (use the "Layout Shift Regions" rendering option).</li>
+<li>Add <code>web-vitals</code> reporting to a small backend endpoint and chart the numbers.</li>
+<li>Add a size budget (<code>size-limit</code>) to CI so a PR fails if the bundle grows too much.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why not lazy-load the hero image?</summary>The hero is usually the LCP element. Lazy-loading delays its fetch until layout, hurting LCP. Load it eagerly with high priority.</details>
+<details><summary>Lab vs field data?</summary>Lab is controlled and reproducible for debugging; field is what real users on real devices and networks experience, and is what Google uses for ranking signals.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

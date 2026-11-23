@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 55 — Databases & SQL</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="55-databases-sql">
+<main><article>
+<h1>Lesson 55 — Databases &amp; SQL</h1>
+<p class="lede">Almost every real application is a user interface over a database. SQL is more than 50 years old and still the most valuable data skill you can learn. Practice below with a real SQLite database running in your browser.</p>
+
+<h2>Relational model</h2>
+<ul>
+<li>Data lives in <strong>tables</strong> (rows × columns) with a defined schema. A <strong>primary key</strong> uniquely identifies a row; a <strong>foreign key</strong> references another table's row, linking them.</li>
+<li><strong>Normalize</strong>: store each fact once (users in <code>users</code>, not repeated in every order) and join when reading.</li>
+<li><strong>ACID transactions</strong>: Atomic (all or nothing), Consistent, Isolated, Durable. Wrap multi-step changes (transfer money) in a transaction.</li>
+<li><strong>Constraints</strong> (<code>NOT NULL</code>, <code>UNIQUE</code>, <code>CHECK</code>, foreign keys) make bad data impossible. Put integrity in the database, not just in app code.</li>
+</ul>
+
+<h2>SQL playground (live)</h2>
+<p>This runs SQLite compiled to WebAssembly (sql.js) in your browser. It needs an internet connection to load the library. Edit the SQL in the box and press <strong>Run</strong>; the last statement's result is shown as a table.</p>
+<textarea class="code" data-lang="html" data-run data-height="520px">
+<style>
+  body{font:14px system-ui;margin:0;padding:10px;background:#fff;color:#222}
+  #sql{height:230px;overflow:auto;white-space:pre;font:13px ui-monospace,Menlo,monospace;padding:8px;box-sizing:border-box;border:1px solid #ccc;border-radius:8px;background:#fafafa}
+  button{font:inherit;padding:.4em 1em;margin:6px 0;cursor:pointer}
+  table{border-collapse:collapse;margin-top:6px;font-size:13px}td,th{border:1px solid #ccc;padding:3px 8px;text-align:left}th{background:#f1eefc}
+  .err{color:#b00020;white-space:pre-wrap}
+</style>
+<div id="sql" contenteditable="plaintext-only" spellcheck="false">-- Schema
+CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL, country TEXT);
+CREATE TABLE orders (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
+                     total REAL NOT NULL CHECK (total >= 0), created TEXT);
+INSERT INTO users VALUES (1,'Ada','UK'),(2,'Linus','FI'),(3,'Grace','US'),(4,'Alan','UK');
+INSERT INTO orders VALUES (1,1,30,'2026-01-03'),(2,1,50,'2026-02-10'),(3,2,20,'2026-02-11'),(4,3,100,'2026-03-01');
+
+-- Query: revenue per country, including users with no orders
+SELECT u.country, COUNT(DISTINCT u.id) AS users, COUNT(o.id) AS orders, COALESCE(SUM(o.total),0) AS revenue
+FROM users u LEFT JOIN orders o ON o.user_id = u.id
+GROUP BY u.country
+HAVING users >= 1
+ORDER BY revenue DESC;
+</div>
+<button id="run">Run</button> <span id="status">loading SQLite…</span>
+<div id="result"></div>
+<script src="https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/sql-wasm.js"></script>
+<script>
+  let SQL;
+  initSqlJs({ locateFile: f => "https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/" + f }).then(m => { SQL = m; status.textContent = "ready"; run.click(); })
+    .catch(e => status.textContent = "failed to load sql.js: " + e);
+  run.onclick = () => {
+    if (!SQL) return;
+    result.innerHTML = "";
+    const db = new SQL.Database();                        // fresh in-memory DB each run
+    try {
+      const sets = db.exec(sql.innerText);
+      const last = sets[sets.length - 1];
+      if (!last) { result.textContent = "OK (no rows returned)"; return; }
+      const esc = s => String(s ?? "NULL").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      result.innerHTML = "<table><tr>" + last.columns.map(c => "<th>" + esc(c) + "</th>").join("") + "</tr>" +
+        last.values.map(r => "<tr>" + r.map(v => "<td>" + esc(v) + "</td>").join("") + "</tr>").join("") + "</table>";
+    } catch (e) { result.innerHTML = '<div class="err">' + String(e.message).replace(/</g, "&lt;") + "</div>"; }
+    db.close();
+  };
+</script>
+</textarea>
+<p>Experiments to try: remove the <code>LEFT</code> in the join (becomes inner) and see which rows vanish; insert an order with a negative total to hit the <code>CHECK</code>; reference a nonexistent <code>user_id</code> (note: SQLite needs <code>PRAGMA foreign_keys = ON;</code> to enforce it).</p>
+
+<h2>Core SQL, in order of use</h2>
+<textarea class="code" data-lang="js" data-file="cheatsheet.sql">
+-- READ
+SELECT name, country FROM users WHERE country = 'UK' AND name LIKE 'A%' ORDER BY name LIMIT 10 OFFSET 0;
+SELECT DISTINCT country FROM users;
+SELECT country, COUNT(*) FROM users GROUP BY country HAVING COUNT(*) > 1;   -- HAVING filters groups
+
+-- JOIN: combine tables
+SELECT o.id, u.name FROM orders o INNER JOIN users u ON u.id = o.user_id;   -- only matching rows
+SELECT u.name, o.id FROM users u LEFT JOIN orders o ON o.user_id = u.id;    -- all users, NULL if no order
+
+-- WRITE
+INSERT INTO users (name, country) VALUES ('Ken', 'US');
+UPDATE users SET country = 'GB' WHERE country = 'UK';       -- ALWAYS include WHERE (try it in a transaction first)
+DELETE FROM orders WHERE created < '2025-01-01';
+
+-- Subqueries, CTEs, window functions
+WITH big AS (SELECT user_id, SUM(total) AS spent FROM orders GROUP BY user_id)
+SELECT u.name, big.spent, RANK() OVER (ORDER BY big.spent DESC) AS rnk
+FROM big JOIN users u ON u.id = big.user_id;
+
+-- Transactions
+BEGIN;
+UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+COMMIT;      -- or ROLLBACK if anything failed
+</textarea>
+
+<h2>Schema design: one-to-many and many-to-many</h2>
+<textarea class="code" data-lang="js" data-file="schema.sql">
+-- One-to-many: a user has many posts → foreign key on the "many" side
+CREATE TABLE posts (
+  id          BIGSERIAL PRIMARY KEY,
+  user_id     BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  body        TEXT NOT NULL,
+  published   BOOLEAN NOT NULL DEFAULT false,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Many-to-many: posts have many tags, tags have many posts → join table
+CREATE TABLE tags (id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL);
+CREATE TABLE post_tags (
+  post_id BIGINT REFERENCES posts(id) ON DELETE CASCADE,
+  tag_id  INT    REFERENCES tags(id)  ON DELETE CASCADE,
+  PRIMARY KEY (post_id, tag_id)
+);
+</textarea>
+<ul>
+<li>Pick types carefully: money as integer cents or <code>NUMERIC</code>, never float; timestamps as <code>TIMESTAMPTZ</code> (UTC); ids as <code>BIGINT</code> or UUIDv7.</li>
+<li>Migrations: version-control schema changes (Prisma Migrate, Drizzle Kit, Flyway). Never edit production by hand.</li>
+<li>Soft delete (<code>deleted_at</code>) vs real delete: decide deliberately; GDPR may require real deletion.</li>
+</ul>
+
+<h2>Indexes and performance</h2>
+<p>An index is a sorted structure (usually a B-tree) letting the database find rows without scanning the whole table: reads get much faster, writes slightly slower, and storage grows.</p>
+<textarea class="code" data-lang="js" data-file="perf.sql">
+CREATE INDEX idx_orders_user ON orders (user_id);                 -- speeds up joins and WHERE user_id = ?
+CREATE UNIQUE INDEX idx_users_email ON users (lower(email));      -- enforce case-insensitive uniqueness
+CREATE INDEX idx_posts_pub ON posts (created_at DESC) WHERE published;   -- partial index (Postgres)
+
+EXPLAIN ANALYZE SELECT * FROM orders WHERE user_id = 42;          -- see the plan: "Index Scan" good, "Seq Scan" on big tables bad
+</textarea>
+<ul>
+<li>Index columns used in <code>WHERE</code>, <code>JOIN</code> and <code>ORDER BY</code>; composite index column order matters (leftmost prefix).</li>
+<li><strong>The N+1 problem</strong>: fetching a list then querying once per item (101 queries for 100 posts). Fix with a join, <code>IN (…)</code>, or ORM eager loading.</li>
+<li>Always paginate; prefer keyset pagination (<code>WHERE id &lt; $last ORDER BY id DESC LIMIT 20</code>) over large <code>OFFSET</code>.</li>
+<li>Use connection pooling (PgBouncer, built-in pools) because connections are expensive.</li>
+</ul>
+
+<h2>NoSQL in depth: documents, key-value and when to use them</h2>
+<p>"NoSQL" means several different designs. The big shift: <strong>you model data around your queries</strong> (access patterns) instead of normalizing first, and you often trade joins and strict schemas for flexibility and horizontal scale.</p>
+<table>
+<tr><th>Family</th><th>Shape</th><th>Examples</th><th>Best at</th></tr>
+<tr><td>Document</td><td>JSON-like documents in collections</td><td>MongoDB, Firestore, CouchDB</td><td>Nested, varying records read together (profiles, carts, CMS content)</td></tr>
+<tr><td>Key-value</td><td><code>key → value</code></td><td>Redis, Valkey, DynamoDB, Cloudflare KV</td><td>Caching, sessions, counters, rate limits, queues, leaderboards</td></tr>
+<tr><td>Wide-column</td><td>Rows with flexible columns, partitioned</td><td>Cassandra, DynamoDB, Bigtable</td><td>Massive write throughput, time series, known access patterns</td></tr>
+<tr><td>Graph</td><td>Nodes and edges</td><td>Neo4j</td><td>Relationship traversal (social, recommendations)</td></tr>
+</table>
+<h3>Embed or reference?</h3>
+<p>In a document database, data that is read together is <strong>embedded</strong> in one document (fast, one read, atomic update). Data that is large, shared or unbounded is <strong>referenced</strong> by id (like a foreign key, but joined in your code or with <code>$lookup</code>).</p>
+<textarea class="code" data-lang="js" data-run>
+// A tiny in-memory document store with Mongo-style queries, to learn the model without installing anything.
+const users = [
+  { _id: 1, name: "Ada", country: "UK", tags: ["admin", "dev"], address: { city: "London" }, orders: [{ total: 30 }, { total: 50 }] },
+  { _id: 2, name: "Linus", country: "FI", tags: ["dev"], address: { city: "Helsinki" }, orders: [{ total: 20 }] },
+  { _id: 3, name: "Grace", country: "US", tags: [], address: { city: "NYC" }, orders: [] },
+];
+const get = (o, path) => path.split(".").reduce((v, k) => v?.[k], o);
+const ops = { $gt: (a, b) => a > b, $gte: (a, b) => a >= b, $lt: (a, b) => a < b, $in: (a, b) => b.includes(a) };
+function matches(doc, q) {
+  return Object.entries(q).every(([k, cond]) => {
+    const v = get(doc, k);
+    if (cond && typeof cond === "object" && !Array.isArray(cond))
+      return Object.entries(cond).every(([op, arg]) => ops[op](v, arg));
+    return Array.isArray(v) ? v.includes(cond) : v === cond;     // arrays match if they contain the value, like MongoDB
+  });
+}
+const find = (q) => users.filter((d) => matches(d, q));
+
+console.log("dev tag:", find({ tags: "dev" }).map((u) => u.name));                // db.users.find({ tags: "dev" })
+console.log("London:", find({ "address.city": "London" }).map((u) => u.name));    // dot notation reaches nested fields
+console.log("country in UK/US:", find({ country: { $in: ["UK", "US"] } }).map((u) => u.name));
+
+// Aggregation = pipeline of stages (like SQL GROUP BY)
+const revenue = users.flatMap((u) => u.orders.map((o) => ({ country: u.country, total: o.total })))
+  .reduce((acc, o) => ((acc[o.country] = (acc[o.country] ?? 0) + o.total), acc), {});
+console.log("revenue by country:", revenue);
+// Real MongoDB: db.users.aggregate([{ $unwind: "$orders" }, { $group: { _id: "$country", revenue: { $sum: "$orders.total" } } }])
+</textarea>
+<h3>MongoDB from Node</h3>
+<textarea class="code" data-lang="js" data-file="mongo.js">
+import { MongoClient } from "mongodb";
+import { z } from "zod";
+
+const client = new MongoClient(process.env.MONGODB_URI);       // Atlas free tier or docker run -p 27017:27017 mongo
+const db = client.db("shop");
+const users = db.collection("users");
+
+await users.createIndex({ email: 1 }, { unique: true });        // indexes matter just as much as in SQL
+await users.createIndex({ "address.city": 1, createdAt: -1 });
+
+const NewUser = z.object({ email: z.string().email(), name: z.string().min(1) }).strict();   // schema validation lives in YOUR code (or $jsonSchema)
+await users.insertOne({ ...NewUser.parse(input), createdAt: new Date(), orders: [] });
+
+const page = await users.find({ tags: "dev" }).project({ name: 1, email: 1 }).sort({ createdAt: -1 }).limit(20).toArray();
+await users.updateOne({ _id }, { $push: { orders: { total: 50, at: new Date() } }, $inc: { orderCount: 1 } });   // atomic single-document update
+
+// NEVER pass raw request JSON as a query: { "email": { "$ne": null } } is NoSQL injection. Validate to strings first.
+</textarea>
+<h3>Redis patterns</h3>
+<textarea class="code" data-lang="js" data-file="redis.js">
+import { createClient } from "redis";
+const r = await createClient({ url: process.env.REDIS_URL }).connect();
+
+await r.set("session:abc", JSON.stringify({ userId: 7 }), { EX: 3600 });    // value with expiry (TTL)
+const hits = await r.incr(`rate:${ip}:${Math.floor(Date.now() / 60000)}`);  // atomic counter → fixed-window rate limit
+await r.expire(`rate:${ip}:${Math.floor(Date.now() / 60000)}`, 60);
+await r.zAdd("leaderboard", [{ score: 4200, value: "ada" }]);              // sorted set: ranked leaderboards
+const top = await r.zRangeWithScores("leaderboard", 0, 9, { REV: true });
+await r.publish("chat:room1", JSON.stringify({ text: "hi" }));              // pub/sub backplane for WebSockets (Lesson 59)
+// Redis is memory-first: treat it as a cache or fast store with a known recovery story, not your only copy of important data.
+</textarea>
+<h3>SQL vs NoSQL: choosing</h3>
+<ul>
+<li>Choose <strong>SQL</strong> when data is relational, you need transactions across entities, ad-hoc queries and reporting, or you aren't sure of your access patterns yet.</li>
+<li>Choose <strong>document/key-value</strong> when records are self-contained, shapes vary, access patterns are known and simple, or you need very high scale or a managed serverless store.</li>
+<li>Mixed ("polyglot") is normal: Postgres as the source of truth, Redis for cache/queues, a search engine for text. Postgres <code>JSONB</code> columns also give you document flexibility inside SQL.</li>
+<li>NoSQL traps: duplicated data that drifts out of sync, unbounded arrays inside documents, missing indexes, and "schemaless" turning into undocumented schemas. Validate and version your document shapes.</li>
+</ul>
+
+<h2>Choosing a database</h2>
+<table>
+<tr><th>Type</th><th>Examples</th><th>Use when</th></tr>
+<tr><td>Relational</td><td><strong>PostgreSQL</strong> (default choice), MySQL, SQLite</td><td>Most apps: structured data, relationships, transactions. SQLite for embedded/small/edge (Turso, D1)</td></tr>
+<tr><td>Document</td><td>MongoDB, Firestore</td><td>Flexible nested documents; rapidly changing shapes (still think about access patterns)</td></tr>
+<tr><td>Key-value / cache</td><td>Redis, Valkey, Upstash</td><td>Caching, sessions, rate limits, queues, leaderboards</td></tr>
+<tr><td>Search</td><td>Elasticsearch, Meilisearch, Typesense, Postgres full-text</td><td>Relevance-ranked text search</td></tr>
+<tr><td>Vector</td><td>pgvector, Pinecone, Qdrant</td><td>Embeddings and semantic search for AI features</td></tr>
+<tr><td>Time-series / analytics</td><td>TimescaleDB, ClickHouse</td><td>Metrics, events, big aggregations</td></tr>
+</table>
+<div class="callout"><span class="label">Default advice</span>Start with <strong>PostgreSQL</strong> (hosted: Neon, Supabase, Railway, RDS). It handles relational data, JSON, full-text search and vectors; most "I need X database" needs are met by Postgres until you have a measured reason otherwise.</div>
+
+<h2>Use from Node</h2>
+<textarea class="code" data-lang="js" data-file="db.js">
+import pg from "pg";
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+
+export async function getOrders(userId, limit = 20) {
+  const { rows } = await pool.query(
+    "SELECT id, total, created_at FROM orders WHERE user_id = $1 ORDER BY id DESC LIMIT $2",
+    [userId, limit]                                   // parameters, never string concatenation (SQL injection!)
+  );
+  return rows;
+}
+
+export async function transfer(from, to, amount) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("UPDATE accounts SET balance = balance - $1 WHERE id = $2", [amount, from]);
+    await client.query("UPDATE accounts SET balance = balance + $1 WHERE id = $2", [amount, to]);
+    await client.query("COMMIT");
+  } catch (e) { await client.query("ROLLBACK"); throw e; }
+  finally { client.release(); }
+}
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>In the playground, add a <code>products</code> table and an <code>order_items</code> join table; write a query for the top 3 best-selling products and each customer's lifetime value.</li>
+<li>Write queries using each of: <code>INNER JOIN</code>, <code>LEFT JOIN</code>, <code>GROUP BY/HAVING</code>, a CTE and a window function (<code>ROW_NUMBER</code>, <code>RANK</code>).</li>
+<li>Design a schema for a blog with users, posts, comments, tags and likes. Draw the ER diagram and add constraints and indexes.</li>
+<li>Install PostgreSQL (Docker or Neon free tier), load 1 million generated rows, and use <code>EXPLAIN ANALYZE</code> to speed a slow query by adding an index. Record before/after times.</li>
+<li>Wire your Fastify API to Postgres with the <code>pg</code> driver and parameterized queries; write an integration test against a test database.</li>
+<li>Reproduce and fix an N+1 query in a small script.</li>
+<li>Model the same blog twice: in Postgres (normalized) and in MongoDB (embedded comments, referenced users). List one query each design makes easy and one it makes hard. Add Redis caching in front.</li>
+<li>Do the free SQLBolt and "SQL Murder Mystery"/PGExercises practice sets.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>INNER vs LEFT JOIN?</summary>INNER returns only rows that match on both sides. LEFT keeps every row from the left table and fills NULLs where nothing matches.</details>
+<details><summary>Why are parameterized queries safer?</summary>The driver sends the SQL text and the values separately, so input can never change the query's structure, which prevents SQL injection.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

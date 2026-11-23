@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 6 — Flexbox</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="06-css-flexbox">
+<main><article>
+<h1>Lesson 6 — Flexbox</h1>
+<p class="lede">Flexbox lays items out along <strong>one axis</strong> and distributes the leftover space. It is the tool for navbars, toolbars, card rows and centering.</p>
+
+<h2>Play with the container</h2>
+<p>Change <code>flex-direction</code>, <code>justify-content</code>, <code>align-items</code> and <code>flex-wrap</code> and watch the boxes move.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body { font-family: system-ui; margin: 8px; }
+  .row {
+    display: flex;
+    flex-direction: row;          /* row | row-reverse | column | column-reverse */
+    flex-wrap: nowrap;            /* wrap */
+    gap: 10px;
+    justify-content: flex-start;  /* flex-end | center | space-between | space-around | space-evenly */
+    align-items: stretch;         /* center | flex-start | flex-end | baseline */
+    height: 220px;
+    background: #f1eefc; padding: 10px; border-radius: 12px;
+  }
+  .row > div { background: rebeccapurple; color: #fff; padding: 10px 16px; border-radius: 8px; }
+  .row > div:nth-child(2) { font-size: 1.6rem; }
+</style>
+<div class="row"><div>1</div><div>2</div><div>3</div></div>
+</textarea>
+<div class="callout"><span class="label">Mental model</span>The <strong>main axis</strong> follows <code>flex-direction</code>; the <strong>cross axis</strong> is perpendicular. <code>justify-*</code> works on the main axis, <code>align-*</code> on the cross axis. Switch to <code>column</code> and they swap meaning visually.</div>
+
+<h2>Item properties</h2>
+<textarea class="code" data-lang="css">
+.item {
+  flex: 1;              /* shorthand for grow shrink basis: 1 1 0 */
+  flex-grow: 1;         /* share leftover space */
+  flex-shrink: 0;       /* refuse to shrink */
+  flex-basis: 200px;    /* starting size before growing/shrinking */
+  align-self: flex-end;
+  order: -1;            /* visual reorder (DOM order unchanged: a11y caution) */
+  margin-left: auto;    /* push this item to the far end */
+}
+</textarea>
+<p>Common values: <code>flex: 1</code> (equal share), <code>flex: none</code> (don't flex), <code>flex: 0 0 300px</code> (fixed width).</p>
+
+<h2>Classic patterns</h2>
+<h3>Navbar with a pushed-right button</h3>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body { margin: 0; font-family: system-ui; }
+  .nav { display: flex; align-items: center; gap: 1.5rem; padding: 1rem; background: #1d1b2e; color: #fff; }
+  .nav a { color: inherit; text-decoration: none; }
+  .logo { margin-right: auto; font-weight: 800; }
+  .cta { background: #7c5cff; padding: .5rem 1rem; border-radius: 8px; }
+</style>
+<nav class="nav"><a class="logo" href="#">Logo</a><a href="#">Home</a><a href="#">About</a><a class="cta" href="#">Sign up</a></nav>
+</textarea>
+
+<h3>Wrapping cards that grow</h3>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body { font-family: system-ui; margin: 8px; }
+  .cards { display: flex; flex-wrap: wrap; gap: 1rem; }
+  .cards > * { flex: 1 1 200px; background: #eee; padding: 1rem; border-radius: 10px;
+    display: flex; flex-direction: column; }
+  .btn { margin-top: auto; }   /* every button sits at the bottom */
+</style>
+<div class="cards">
+  <div><h3>Short</h3><p>Hi.</p><button class="btn">Buy</button></div>
+  <div><h3>Longer</h3><p>This card has a lot more text than the others so it is taller.</p><button class="btn">Buy</button></div>
+  <div><h3>Medium</h3><p>Some text here.</p><button class="btn">Buy</button></div>
+</div>
+</textarea>
+
+<h3>Centering and sticky footer</h3>
+<textarea class="code" data-lang="css">
+.center { display: flex; justify-content: center; align-items: center; min-height: 100dvh; }
+
+body { min-height: 100dvh; display: flex; flex-direction: column; }
+main { flex: 1; }          /* footer is pushed to the bottom */
+</textarea>
+
+<h2>Gotchas</h2>
+<ul>
+<li>Flex items default to <code>min-width: auto</code>, so long text can overflow. Add <code>min-width: 0</code>.</li>
+<li>Margins don't collapse in flex containers.</li>
+<li><code>flex-basis</code> beats <code>width</code> on the main axis.</li>
+<li><code>order</code> changes visual order only. Keyboard and screen-reader order stay the same.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Build the navbar; stack the links vertically below 600px (use a media query, covered in Lesson 8).</li>
+<li>Create a 3-column pricing layout where the middle card is larger and all buttons align at the bottom.</li>
+<li>Build the holy-grail layout: header, footer, and a middle row with sidebar and content.</li>
+<li>Play <strong>Flexbox Froggy</strong> and <strong>Flexbox Zombies</strong>.</li>
+<li>Toggle <code>flex-direction</code> in DevTools and explain how <code>justify-content</code> changes direction.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>What does flex: 1 1 250px mean?</summary>The item may grow (1) and shrink (1) from a starting size of 250px, so it fills available space but wraps when it can't fit.</details>
+<details><summary>A long word overflows a flex child. Fix?</summary>Set <code>min-width: 0</code> on the child and use <code>overflow-wrap: anywhere</code> or <code>overflow: hidden; text-overflow: ellipsis</code>.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 46 — SVG & Canvas 2D</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="46-svg-canvas">
+<main><article>
+<h1>Lesson 46 — SVG &amp; Canvas 2D graphics</h1>
+<p class="lede">Before and beside 3D, the web has two 2D graphics systems with opposite strengths. SVG is a <em>retained</em> scene of DOM elements; Canvas is an <em>immediate-mode</em> pixel surface. Knowing which to use is half the skill.</p>
+
+<h2>SVG</h2>
+<p>SVG is XML drawn in resolution-independent vector shapes. Every shape is a real DOM element you can style with CSS, animate, make clickable and describe for screen readers.</p>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  body{font-family:system-ui;padding:1rem}
+  svg{width:100%;max-width:420px;border:1px solid #ddd;border-radius:12px}
+  .bar{fill:#7c5cff;transition:fill .2s, transform .2s;transform-origin:bottom;transform-box:fill-box;cursor:pointer}
+  .bar:hover{fill:#e0457b;transform:scaleY(1.08)}
+  .line{fill:none;stroke:#14a38b;stroke-width:3;stroke-linecap:round;stroke-dasharray:400;stroke-dashoffset:400;animation:draw 1.5s ease forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+</style>
+<svg viewBox="0 0 400 220" role="img" aria-labelledby="t d">
+  <title id="t">Sales by quarter</title>
+  <desc id="d">Bar chart: Q1 80, Q2 140, Q3 110, Q4 180.</desc>
+  <g>
+    <rect class="bar" x="30"  y="120" width="60" height="80"  rx="6"/>
+    <rect class="bar" x="120" y="60"  width="60" height="140" rx="6"/>
+    <rect class="bar" x="210" y="90"  width="60" height="110" rx="6"/>
+    <rect class="bar" x="300" y="20"  width="60" height="180" rx="6"/>
+  </g>
+  <path class="line" d="M60 110 C 150 40, 240 140, 330 15"/>
+  <line x1="15" y1="200" x2="385" y2="200" stroke="#999"/>
+  <text x="60" y="215" text-anchor="middle" font-size="11">Q1</text>
+</svg>
+</textarea>
+<ul>
+<li><code>viewBox="minX minY width height"</code> defines the internal coordinate system; the SVG scales to its CSS size. Always set it.</li>
+<li>Shapes: <code>rect circle ellipse line polyline polygon path text</code>; structure: <code>g</code> (group), <code>defs</code>, <code>use</code>, <code>symbol</code>, <code>clipPath</code>, <code>mask</code>, <code>linearGradient</code>, <code>filter</code>.</li>
+<li><code>path</code> commands: <code>M</code> move, <code>L</code> line, <code>C</code> cubic Bézier, <code>Q</code> quadratic, <code>A</code> arc, <code>Z</code> close (lowercase = relative).</li>
+<li>Style with CSS (<code>fill</code>, <code>stroke</code>, <code>currentColor</code>); animate with CSS, WAAPI, GSAP; draw-on effects with <code>stroke-dasharray/offset</code>.</li>
+<li>Inline SVG icons inherit text color via <code>fill="currentColor"</code>. Optimize files with SVGO/SVGOMG.</li>
+<li>Add <code>role="img"</code> + <code>&lt;title&gt;</code>, or <code>aria-hidden="true"</code> for decorative graphics.</li>
+</ul>
+<textarea class="code" data-lang="js" data-run>
+// Generate SVG from data (this is what D3 does under the hood)
+const data = [30, 80, 45, 120, 90];
+const W = 300, H = 120, bw = W / data.length;
+const max = Math.max(...data);
+const svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">` +
+  data.map((v, i) => {
+    const h = (v / max) * (H - 10);
+    return `<rect x="${i * bw + 6}" y="${H - h}" width="${bw - 12}" height="${h}" fill="hsl(${i * 50 + 240} 70% 55%)"/>`;
+  }).join("") + "</svg>";
+console.log(svg.length + " chars of SVG generated:");
+console.log(svg.slice(0, 160) + "…");
+</textarea>
+
+<h2>Canvas 2D</h2>
+<p>A <code>&lt;canvas&gt;</code> is a bitmap you draw on with JavaScript. It has no objects: once drawn, pixels are just pixels. That makes it fast for thousands of moving things (particles, games, image processing) and awkward for interaction and accessibility.</p>
+<textarea class="code" data-lang="html" data-run data-height="360px">
+<style>body{margin:0;background:#0e0d14}canvas{display:block;width:100vw;height:100vh}</style>
+<canvas id="c"></canvas>
+<script>
+  const canvas = document.getElementById("c"), ctx = canvas.getContext("2d");
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  function resize() {                                   // sharp on retina: backing store × dpr, CSS size unchanged
+    canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resize(); addEventListener("resize", resize);
+
+  const mouse = { x: innerWidth / 2, y: innerHeight / 2 };
+  addEventListener("pointermove", e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+  const P = Array.from({ length: 120 }, () => ({
+    x: Math.random() * innerWidth, y: Math.random() * innerHeight,
+    vx: (Math.random() - .5) * 60, vy: (Math.random() - .5) * 60, r: 1 + Math.random() * 2,
+  }));
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, .05); last = now;
+    ctx.fillStyle = "rgba(14,13,20,.25)";                // translucent clear = motion trails
+    ctx.fillRect(0, 0, innerWidth, innerHeight);
+    for (const p of P) {
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.x < 0 || p.x > innerWidth) p.vx *= -1;
+      if (p.y < 0 || p.y > innerHeight) p.vy *= -1;
+      const d = Math.hypot(p.x - mouse.x, p.y - mouse.y);
+      if (d < 140) { ctx.strokeStyle = `rgba(124,92,255,${1 - d / 140})`; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(mouse.x, mouse.y); ctx.stroke(); }
+      ctx.fillStyle = "#cbbcff"; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+</script>
+</textarea>
+<table>
+<tr><th>Task</th><th>API</th></tr>
+<tr><td>Rectangles, paths</td><td><code>fillRect, strokeRect, beginPath, moveTo, lineTo, arc, bezierCurveTo, closePath, fill, stroke</code></td></tr>
+<tr><td>Text</td><td><code>fillText, measureText, font, textAlign</code></td></tr>
+<tr><td>State</td><td><code>save()/restore()</code>, <code>translate, rotate, scale, setTransform</code>, <code>clip</code></td></tr>
+<tr><td>Images/pixels</td><td><code>drawImage, getImageData/putImageData</code> (per-pixel filters), <code>createPattern</code>, gradients</td></tr>
+<tr><td>Compositing</td><td><code>globalAlpha, globalCompositeOperation</code> ("lighter" for glow)</td></tr>
+<tr><td>Performance</td><td><code>OffscreenCanvas</code> in a Worker, pre-render to an offscreen canvas, avoid state changes, batch paths, layered canvases</td></tr>
+</table>
+
+<h2>SVG vs Canvas vs WebGL</h2>
+<table>
+<tr><th></th><th>SVG</th><th>Canvas 2D</th><th>WebGL / WebGPU</th></tr>
+<tr><td>Model</td><td>DOM elements (retained)</td><td>Pixels (immediate)</td><td>GPU triangles</td></tr>
+<tr><td>Scales to</td><td>~ a few thousand elements</td><td>tens of thousands of shapes</td><td>millions of primitives</td></tr>
+<tr><td>Interaction</td><td>Native events, CSS, a11y</td><td>Manual hit-testing</td><td>Raycasting</td></tr>
+<tr><td>Resolution</td><td>Infinitely sharp</td><td>Fixed (handle DPR)</td><td>Fixed (handle DPR)</td></tr>
+<tr><td>Best for</td><td>Icons, logos, charts, diagrams, illustrations</td><td>Games, particles, image editing, dense charts</td><td>3D, massive datasets, shader effects</td></tr>
+</table>
+<p>Libraries: <strong>D3</strong> (data-driven SVG/canvas), <strong>Observable Plot</strong>, <strong>Chart.js</strong>/<strong>ECharts</strong> (canvas charts), <strong>Konva</strong>/<strong>PixiJS</strong> (2D scene graph and WebGL-accelerated 2D), <strong>p5.js</strong> (creative coding), <strong>Rough.js</strong>, <strong>GSAP</strong>.</p>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Draw an analog clock in SVG with CSS-animated hands driven by the real time.</li>
+<li>Write a function that turns an array of numbers into a smooth SVG line chart <code>path</code> (use Catmull-Rom or cubic curves), with hover tooltips and accessible labels.</li>
+<li>Animate a self-drawing logo using <code>stroke-dasharray</code> and <code>getTotalLength()</code>.</li>
+<li>Build a canvas drawing app: brush, eraser, color, undo (keep a stroke list and redraw), and export to PNG.</li>
+<li>Build Pong or Snake with a fixed-timestep game loop on canvas.</li>
+<li>Apply a per-pixel grayscale/blur filter to an image using <code>getImageData</code>, then move it into a Worker with <code>OffscreenCanvas</code>.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>When SVG, when Canvas?</summary>SVG for crisp, interactive, accessible graphics with modest element counts; Canvas when you draw very many items or need pixel-level control and animation performance.</details>
+<details><summary>Why multiply canvas.width by devicePixelRatio?</summary>The canvas backing store is in device pixels; without scaling it, graphics are upscaled and blurry on high-DPI screens.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

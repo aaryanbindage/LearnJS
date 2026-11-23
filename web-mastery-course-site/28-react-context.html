@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 28 — Context & Global State</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="28-react-context">
+<main><article>
+<h1>Lesson 28 — Context &amp; global state</h1>
+<p class="lede">Passing props through ten layers ("prop drilling") is painful. Context lets distant components share values; dedicated stores handle the harder cases.</p>
+
+<h2>Context</h2>
+<textarea class="code" data-lang="jsx" data-run>
+const ThemeContext = createContext("light");           // default value (used with no Provider)
+
+function ThemeProvider({ children }) {
+  const [theme, setTheme] = useState("light");
+  const toggle = useCallback(() => setTheme(t => (t === "light" ? "dark" : "light")), []);
+  const value = useMemo(() => ({ theme, toggle }), [theme, toggle]);   // stable identity
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
+function useTheme() {                                   // custom hook = nicer API + safety check
+  const ctx = useContext(ThemeContext);
+  if (!ctx || typeof ctx === "string") throw new Error("useTheme must be inside <ThemeProvider>");
+  return ctx;
+}
+
+function Toolbar() { return <div><ThemeButton /></div>; }     // no props drilled through here!
+function ThemeButton() {
+  const { theme, toggle } = useTheme();
+  return <button onClick={toggle}>Theme: {theme}</button>;
+}
+function Panel() {
+  const { theme } = useTheme();
+  return <div style={{ padding: 16, marginTop: 8, borderRadius: 8,
+    background: theme === "dark" ? "#222" : "#eee", color: theme === "dark" ? "#fff" : "#000" }}>I follow the theme.</div>;
+}
+function App() { return <ThemeProvider><Toolbar /><Panel /></ThemeProvider>; }
+</textarea>
+<div class="callout warn"><span class="label">Performance caveat</span>Every component that calls <code>useContext(X)</code> re-renders whenever the Provider's <code>value</code> changes (by reference). Memoize the value, and split frequently-changing data into separate contexts. Context is great for low-frequency data: theme, locale, auth user. It's a poor fit for rapidly changing state.</div>
+
+<h2>Context + reducer = a small global store</h2>
+<textarea class="code" data-lang="jsx" data-run>
+const CartContext = createContext(null);
+
+function cartReducer(state, a) {
+  switch (a.type) {
+    case "add": {
+      const found = state.find(i => i.id === a.item.id);
+      return found ? state.map(i => i.id === a.item.id ? { ...i, qty: i.qty + 1 } : i) : [...state, { ...a.item, qty: 1 }];
+    }
+    case "remove": return state.filter(i => i.id !== a.id);
+    case "clear": return [];
+    default: return state;
+  }
+}
+function CartProvider({ children }) {
+  const [cart, dispatch] = useReducer(cartReducer, []);
+  return <CartContext.Provider value={{ cart, dispatch }}>{children}</CartContext.Provider>;
+}
+const useCart = () => useContext(CartContext);
+
+const PRODUCTS = [{ id: 1, name: "Keyboard", price: 80 }, { id: 2, name: "Mouse", price: 35 }, { id: 3, name: "Monitor", price: 220 }];
+
+function Shop() {
+  const { dispatch } = useCart();
+  return <ul>{PRODUCTS.map(p => <li key={p.id}>{p.name} ${p.price} <button onClick={() => dispatch({ type: "add", item: p })}>Add</button></li>)}</ul>;
+}
+function CartSummary() {
+  const { cart, dispatch } = useCart();
+  const total = cart.reduce((s, i) => s + i.price * i.qty, 0);        // derived
+  return (
+    <aside style={{ borderTop: "1px solid #ccc", marginTop: 8 }}>
+      <h3>Cart ({cart.reduce((n, i) => n + i.qty, 0)})</h3>
+      {cart.map(i => <div key={i.id}>{i.name} × {i.qty} <button onClick={() => dispatch({ type: "remove", id: i.id })}>✕</button></div>)}
+      <strong>Total: ${total}</strong>
+    </aside>
+  );
+}
+function App() { return <CartProvider><Shop /><CartSummary /></CartProvider>; }
+</textarea>
+
+<h2>When to reach for a state library</h2>
+<table>
+<tr><th>Kind of state</th><th>Best tool</th></tr>
+<tr><td>Local UI state (open/closed, input text)</td><td><code>useState</code> in the component</td></tr>
+<tr><td>Shared between a few nearby components</td><td>Lift state up</td></tr>
+<tr><td>Low-frequency app-wide (theme, user, locale)</td><td>Context</td></tr>
+<tr><td>Server data (lists, details, caching)</td><td><strong>TanStack Query</strong> / SWR / framework loaders</td></tr>
+<tr><td>Complex client state, frequent updates</td><td><strong>Zustand</strong> (simple), Redux Toolkit (large teams), Jotai</td></tr>
+<tr><td>URL-representable state (filters, page, tab)</td><td>The URL (search params)</td></tr>
+</table>
+<textarea class="code" data-lang="jsx" data-file="store.js">
+// Zustand: a global store in ~10 lines, with selector-based re-rendering
+import { create } from "zustand";
+
+export const useCounter = create((set) => ({
+  count: 0,
+  inc: () => set((s) => ({ count: s.count + 1 })),
+  reset: () => set({ count: 0 }),
+}));
+
+// In any component (re-renders ONLY when `count` changes):
+const count = useCounter((s) => s.count);
+const inc = useCounter((s) => s.inc);
+</textarea>
+<p>This matters later: in React Three Fiber, a Zustand store lets 3D objects and UI share state without re-rendering the whole scene 60 times a second.</p>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Add a <code>ThemeProvider</code> to your app that also persists the choice with <code>useLocalStorage</code> and respects <code>prefers-color-scheme</code> initially.</li>
+<li>Build an <code>AuthContext</code> (<code>user</code>, <code>login</code>, <code>logout</code>) and a <code>&lt;RequireAuth&gt;</code> wrapper component.</li>
+<li>Build a toast notification system: <code>useToast().show("Saved")</code> from anywhere; toasts auto-dismiss.</li>
+<li>Rebuild the cart with Zustand and compare the code.</li>
+<li>Show unnecessary re-renders in the Profiler, then fix them by splitting contexts.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why is context not a general state manager?</summary>Any change to the value re-renders all consumers and there are no selectors. Fine for rarely-changing values, wasteful for rapidly changing state.</details>
+<details><summary>Where should server data live?</summary>In a server-state cache (TanStack Query etc.), not copied into useState/Redux.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

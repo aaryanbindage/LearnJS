@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 64 — React Three Fiber Architecture</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="64-r3f-architecture">
+<main><article>
+<h1>Lesson 64 — React Three Fiber architecture</h1>
+<p class="lede">React Three Fiber (R3F) is a React renderer for Three.js: JSX elements map to Three objects, and React's state and component model manage the scene. Used well, it scales to large apps. Used carelessly, it re-renders at 60 fps and tanks performance. This lesson is about the right structure. The snippets need a Vite or Next.js project with <code>three</code>, <code>@react-three/fiber</code> and <code>@react-three/drei</code>.</p>
+
+<h2>How R3F maps to Three.js</h2>
+<textarea class="code" data-lang="jsx" data-file="Scene.tsx">
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { OrbitControls, Environment, useGLTF } from "@react-three/drei";
+import { useRef } from "react";
+import * as THREE from "three";
+
+function Spinner() {
+  const ref = useRef<THREE.Mesh>(null!);
+  useFrame((state, delta) => { ref.current.rotation.y += delta; });   // per-frame work mutates objects directly: NO setState
+  return (
+    <mesh ref={ref} position={[0, 1, 0]} castShadow onClick={(e) => { e.stopPropagation(); console.log("hit", e.point); }}>
+      <boxGeometry args={[1, 1, 1]} />                                 {/* args = constructor arguments */}
+      <meshStandardMaterial color="hotpink" roughness={0.4} />         {/* props map to properties; nested = attach */}
+    </mesh>
+  );
+}
+
+export default function App() {
+  return (
+    <Canvas shadows camera={{ position: [3, 3, 6], fov: 50 }} dpr={[1, 2]}>
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[5, 8, 3]} castShadow intensity={2} />
+      <Spinner />
+      <OrbitControls makeDefault />
+      <Environment preset="city" />
+    </Canvas>
+  );
+}
+</textarea>
+<ul>
+<li>Lowercase JSX tags are Three classes (<code>&lt;mesh&gt;</code> → <code>new THREE.Mesh()</code>). <code>args</code> feed the constructor; changing <code>args</code> recreates the object.</li>
+<li>Pierced props: <code>position-x={1}</code>, <code>rotation={[0, Math.PI, 0]}</code>. Events (<code>onClick</code>, <code>onPointerOver</code>) use raycasting and bubble through the scene graph.</li>
+<li><code>&lt;Canvas&gt;</code> creates its own React root; <strong>context does not cross it</strong>. Re-provide any context inside, or use Zustand stores.</li>
+</ul>
+
+<h2>The one rule: never put frame-rate data in React state</h2>
+<table>
+<tr><th>Wrong</th><th>Right</th></tr>
+<tr><td><code>const [x,setX]=useState(0); useFrame(()=>setX(x=>x+.01))</code> re-renders React 60×/sec</td><td><code>useFrame((_,dt)=>{ ref.current.position.x += dt })</code> mutates the Three object directly</td></tr>
+<tr><td>Passing <code>position={[x, y, z]}</code> from changing state each frame</td><td>Keep rapidly changing values in refs or a store accessed with <code>getState()</code> inside <code>useFrame</code></td></tr>
+<tr><td>Creating <code>new THREE.Vector3()</code> inside <code>useFrame</code></td><td>Allocate once outside (module scope or <code>useMemo</code>) and reuse: no GC churn</td></tr>
+</table>
+<textarea class="code" data-lang="jsx" data-file="Player.tsx">
+const tmp = new THREE.Vector3();                           // reused scratch vector
+
+function Follower({ target }: { target: React.RefObject<THREE.Object3D> }) {
+  const ref = useRef<THREE.Group>(null!);
+  useFrame((_, dt) => {
+    target.current.getWorldPosition(tmp);
+    ref.current.position.lerp(tmp, 1 - Math.exp(-5 * dt));  // frame-rate independent smoothing
+  });
+  return <group ref={ref}><mesh><sphereGeometry args={[0.2]} /><meshBasicMaterial color="cyan" /></mesh></group>;
+}
+</textarea>
+
+<h2>State architecture: React for structure, store for runtime</h2>
+<textarea class="code" data-lang="jsx" data-file="store.ts">
+import { create } from "zustand";
+export const useGame = create<{ score: number; selected: string | null; add: (n: number) => void; select: (id: string | null) => void }>((set) => ({
+  score: 0, selected: null,
+  add: (n) => set((s) => ({ score: s.score + n })),
+  select: (id) => set({ selected: id }),
+}));
+
+// Low-frequency UI state: subscribe with a selector → component re-renders only when this slice changes
+const selected = useGame((s) => s.selected);
+// High-frequency: read imperatively in useFrame, no subscription, no re-render
+useFrame(() => { const { score } = useGame.getState(); });
+</textarea>
+<ul>
+<li><strong>HTML UI outside the Canvas</strong> (menus, HUD) reads the same store. For labels in 3D use drei's <code>&lt;Html&gt;</code> sparingly (each is a DOM node).</li>
+<li><strong>Scene graph as components</strong>: <code>&lt;Level&gt;</code>, <code>&lt;Player&gt;</code>, <code>&lt;Enemy id&gt;</code>. Data (entities) lives in the store; components render them.</li>
+<li><strong>Reuse</strong> geometries and materials: define once (<code>useMemo</code> or module scope) and share across many meshes. Use <code>&lt;Instances&gt;</code> / <code>InstancedMesh</code> for hundreds or thousands of copies.</li>
+</ul>
+
+<h2>Loading assets: Suspense, preload, glTF to components</h2>
+<textarea class="code" data-lang="jsx" data-file="Model.tsx">
+import { Suspense } from "react";
+import { useGLTF, useProgress, Html, Clone } from "@react-three/drei";
+
+useGLTF.preload("/models/robot.glb");                      // start fetching before it's rendered
+
+function Robot(props) {
+  const { scene, animations } = useGLTF("/models/robot.glb");   // suspends until loaded; cached per URL
+  return <Clone object={scene} {...props} />;               // Clone allows many independent copies
+}
+function Loader() { const { progress } = useProgress(); return <Html center>{progress.toFixed(0)}%</Html>; }
+
+<Canvas><Suspense fallback={<Loader />}><Robot position={[0, 0, 0]} /></Suspense></Canvas>;
+
+// gltfjsx converts a model into a typed JSX component so you can target individual meshes and materials:
+//   npx gltfjsx robot.glb --transform --types    (--transform also compresses with Draco/meshopt and resizes textures)
+</textarea>
+
+<h2>drei, helpers and the ecosystem</h2>
+<table>
+<tr><th>Need</th><th>Reach for</th></tr>
+<tr><td>Camera controls</td><td><code>OrbitControls</code>, <code>CameraControls</code>, <code>PointerLockControls</code>, <code>ScrollControls</code></td></tr>
+<tr><td>Environment and lighting</td><td><code>Environment</code>, <code>Lightformer</code>, <code>ContactShadows</code>, <code>AccumulativeShadows</code>, <code>SoftShadows</code></td></tr>
+<tr><td>Text and UI</td><td><code>Text</code> (SDF, troika), <code>Html</code>, <code>Billboard</code></td></tr>
+<tr><td>Performance</td><td><code>Instances</code>, <code>Bvh</code>, <code>AdaptiveDpr</code>, <code>PerformanceMonitor</code>, <code>Preload</code>, <code>Detailed</code> (LOD)</td></tr>
+<tr><td>Post-processing</td><td><code>@react-three/postprocessing</code> (Bloom, SSAO, DOF, Outline)</td></tr>
+<tr><td>Physics</td><td><code>@react-three/rapier</code> (Rapier WASM), <code>@react-three/cannon</code></td></tr>
+<tr><td>Animation</td><td><code>useAnimations</code> (glTF clips), <code>@react-spring/three</code>, <code>maath</code> damping helpers</td></tr>
+<tr><td>Debug</td><td><code>Stats</code>, <code>r3f-perf</code>, <code>leva</code> (tweak panels), React DevTools + <code>three-devtools</code></td></tr>
+<tr><td>XR</td><td><code>@react-three/xr</code> (Lesson 70)</td></tr>
+</table>
+
+<h2>Render loop control and performance</h2>
+<textarea class="code" data-lang="jsx">
+<Canvas frameloop="demand">          {/* render only when something changes: great for static product viewers */}
+  {/* call invalidate() from useThree() after mutating things outside React */}
+</Canvas>
+
+<Canvas dpr={[1, 2]} gl={{ powerPreference: "high-performance", antialias: false }}>
+  <PerformanceMonitor onDecline={() => setDpr(1)} onIncline={() => setDpr(2)} />   {/* adaptive quality */}
+</Canvas>
+</textarea>
+<ul>
+<li>Check <code>renderer.info</code> (draw calls, triangles, textures). Target &lt; 100–200 draw calls on mobile. Merge static geometry, instance repeated objects, atlas textures, compress with KTX2/Basis.</li>
+<li><strong>Dispose</strong> GPU resources you create manually (R3F auto-disposes objects it created when unmounted; shared/cached assets stay).</li>
+<li>Don't conditionally mount heavy components during interactions; precompile with <code>&lt;Preload all /&gt;</code> or <code>gl.compile()</code> to avoid hitches.</li>
+</ul>
+
+<h2>Structuring a real app</h2>
+<textarea class="code" data-lang="bash">
+src/
+  App.tsx                 # layout: HTML UI + <Canvas>
+  ui/                     # HUD, menus, inspector (plain React DOM)
+  scene/
+    World.tsx             # composes the scene
+    entities/             # Player, Enemy, Pickup components
+    systems/              # useFrame-based logic hooks: useMovement, useSpawner (pure logic where possible)
+    materials/            # shared/custom materials
+  store/                  # zustand stores (game, ui, settings)
+  assets/                 # glb, textures (compressed), hdr
+  lib/                    # math helpers, pure functions (unit-tested)
+</textarea>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Rebuild the Lesson 36 scene in R3F: lights, shadows, orbit controls, a clickable object that changes color via a store.</li>
+<li>Take a version that uses <code>setState</code> in <code>useFrame</code>, profile it with the React Profiler, then refactor to refs and show the render count drop.</li>
+<li>Render 5,000 animated cubes with <code>&lt;Instances&gt;</code> and update them in <code>useFrame</code>; display draw calls with <code>r3f-perf</code>.</li>
+<li>Load a glTF with <code>gltfjsx --transform</code>, make individual parts clickable and recolor materials through leva.</li>
+<li>Build a product configurator: HTML color/option pickers (outside Canvas) update 3D materials through a shared store; add <code>frameloop="demand"</code>.</li>
+<li>Add <code>PerformanceMonitor</code> to downgrade DPR and shadows automatically when FPS drops; test with CPU/GPU throttling.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Why avoid setState inside useFrame?</summary>It triggers a React re-render every frame. Mutating Three objects through refs (or reading a store with getState) updates the scene without React's reconciliation cost.</details>
+<details><summary>Why doesn't React context work inside Canvas?</summary>Canvas renders in a separate React reconciler/root, so providers outside it aren't visible within it; re-wrap the providers inside or use a store.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

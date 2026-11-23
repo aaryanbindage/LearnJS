@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project 1 — Responsive Portfolio</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="p1-portfolio">
+<main><article>
+<h1>Project 1 — Responsive portfolio</h1>
+<p class="lede">Combine everything from HTML and CSS into a real, deployable personal site. No JavaScript needed.</p>
+
+<h2>Requirements</h2>
+<ol>
+<li><strong>Semantic structure</strong>: <code>header</code> + <code>nav</code>, <code>main</code> with sections (Hero, About, Projects, Contact), <code>footer</code>. One <code>h1</code>.</li>
+<li><strong>Design tokens</strong> in <code>:root</code>: colors, spacing scale, radius, font sizes via <code>clamp()</code>.</li>
+<li><strong>Layout</strong>: grid for the page and the project gallery (<code>auto-fit/minmax</code>), flex for the navbar and cards.</li>
+<li><strong>Responsive</strong>: mobile-first, looks right from 320px to 1600px; at least one container query.</li>
+<li><strong>Dark mode</strong> through <code>prefers-color-scheme</code> and a manual override.</li>
+<li><strong>Motion</strong>: hover/focus transitions, one keyframe animation, and a reduced-motion fallback.</li>
+<li><strong>Accessibility</strong>: skip link, labeled contact form, visible focus, contrast ≥ 4.5:1. Lighthouse Accessibility = 100.</li>
+<li><strong>Performance</strong>: sized images, lazy-loading, modern formats. Lighthouse Performance ≥ 90.</li>
+</ol>
+
+<h2>Starter</h2>
+<textarea class="code" data-lang="html" data-run>
+<style>
+  :root { --bg:#fbfaf8; --text:#1d1d1f; --brand:#5b3df5; --radius:14px; --s:1rem; }
+  @media (prefers-color-scheme: dark){ :root{ --bg:#131217; --text:#ecebf1; --brand:#9b86ff; } }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:1rem/1.6 system-ui}
+  .skip{position:absolute;left:-999px} .skip:focus{left:8px;top:8px;background:var(--brand);color:#fff;padding:.5rem 1rem;z-index:9}
+  header{display:flex;align-items:center;gap:1.5rem;padding:var(--s) 5vw}
+  header strong{margin-right:auto}
+  nav a{color:inherit;margin-left:1rem;text-underline-offset:4px}
+  .hero{padding:12vh 5vw;max-width:60rem}
+  .hero h1{font-size:clamp(2.2rem,7vw,4.5rem);line-height:1.05;letter-spacing:-.03em;margin:0 0 .4em;text-wrap:balance}
+  .projects{display:grid;gap:var(--s);padding:0 5vw 10vh;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr))}
+  .project{border:1px solid #8884;border-radius:var(--radius);padding:var(--s);transition:transform .2s,box-shadow .2s}
+  .project:hover{transform:translateY(-4px);box-shadow:0 12px 30px #0002}
+</style>
+<a class="skip" href="#main">Skip to content</a>
+<header><strong>Your Name</strong><nav aria-label="Main"><a href="#work">Work</a><a href="#contact">Contact</a></nav></header>
+<main id="main">
+  <section class="hero"><h1>I design and build things for the web.</h1><p>Replace this starter with your own story.</p></section>
+  <section id="work" class="projects" aria-label="Projects">
+    <article class="project"><h2>Project One</h2><p>What it is and what you did.</p></article>
+    <article class="project"><h2>Project Two</h2><p>What it is and what you did.</p></article>
+    <article class="project"><h2>Project Three</h2><p>What it is and what you did.</p></article>
+  </section>
+</main>
+</textarea>
+
+<h2>Stretch goals</h2>
+<ul>
+<li>Scroll-driven reading-progress bar.</li>
+<li>Smooth page transitions with <code>@view-transition</code>.</li>
+<li>Deploy to GitHub Pages or Netlify and share the link.</li>
+</ul>
+
+<section class="checkpoint"><h2>Self-review checklist</h2>
+<details><summary>Can I answer yes to all of these?</summary>
+<ul><li>Resizing from 320px to 1600px never causes horizontal scroll.</li>
+<li>I can tab through everything and always see where focus is.</li>
+<li>Changing one token (e.g., <code>--brand</code>) re-themes the whole site.</li>
+<li>No <code>!important</code>, no id selectors for styling, no inline styles.</li>
+<li>HTML validates with zero errors.</li></ul></details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 36 — Shaders (GLSL)</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="36-three-shaders">
+<main><article>
+<h1>Lesson 36 — Shaders (GLSL)</h1>
+<p class="lede">Shaders are tiny programs that run on the GPU, in parallel, for every vertex and every pixel. They are the source of most "wow" effects on the web.</p>
+
+<h2>The GPU pipeline</h2>
+<ol>
+<li><strong>Vertex shader</strong>: runs once per vertex. Its job: output the vertex's final screen position (<code>gl_Position</code>). You can also move vertices here (waves, wind, morphing).</li>
+<li>The GPU turns triangles into pixels (<em>rasterization</em>) and <strong>interpolates</strong> values (<em>varyings</em>) between vertices.</li>
+<li><strong>Fragment shader</strong>: runs once per pixel covered. Its job: output a color (<code>gl_FragColor</code> / an <code>out</code> variable).</li>
+</ol>
+<table>
+<tr><th>Kind</th><th>Meaning</th><th>Set from</th></tr>
+<tr><td><code>uniform</code></td><td>same for all vertices/pixels in a draw call (time, color, mouse)</td><td>JavaScript</td></tr>
+<tr><td><code>attribute</code></td><td>per-vertex data (<code>position</code>, <code>uv</code>, <code>normal</code>)</td><td>geometry</td></tr>
+<tr><td><code>varying</code></td><td>passed from vertex to fragment, interpolated</td><td>vertex shader</td></tr>
+</table>
+
+<h2>GLSL in 2 minutes</h2>
+<textarea class="code" data-lang="js">
+float a = 1.0;               // floats need a decimal point! 1 ≠ 1.0
+vec2 uv = vec2(0.5, 0.5);    // vec2/3/4
+vec3 col = vec3(1.0, 0.2, 0.4);
+col.rg;  col.xyz;  col.bgr;  // "swizzling": rearrange components freely
+vec3 mixed = mix(colA, colB, 0.5);           // linear blend
+float s = smoothstep(0.2, 0.8, x);           // smooth 0→1 ramp between edges
+float f = step(0.5, x);                      // 0 below, 1 above
+sin(), cos(), pow(), abs(), fract(), floor(), clamp(), length(), distance(), dot(), normalize()
+// No dynamic typing, no recursion; keep branches simple. Everything runs per pixel, in parallel.
+</textarea>
+
+<h2>ShaderMaterial in Three.js (live)</h2>
+<p>A wavy plane: the vertex shader displaces <code>z</code> with a sine; the fragment shader colors by height and UV. Edit the shaders as strings and see the result immediately. Errors appear in the browser console.</p>
+<textarea class="code" data-lang="html" data-run data-height="440px">
+<style>html,body{margin:0;overflow:hidden;background:#000}</style>
+<script type="importmap">{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.append(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(0, 3, 5);
+const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+
+const vertexShader = /* glsl */`
+  uniform float uTime;
+  uniform float uAmp;
+  varying vec2 vUv;
+  varying float vHeight;
+  void main() {
+    vUv = uv;
+    vec3 p = position;
+    float wave = sin(p.x * 2.5 + uTime * 1.5) * 0.5 + sin(p.y * 3.0 + uTime) * 0.5;
+    p.z += wave * uAmp;
+    vHeight = wave;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+  }
+`;
+
+const fragmentShader = /* glsl */`
+  uniform vec3 uLow;
+  uniform vec3 uHigh;
+  uniform float uTime;
+  varying vec2 vUv;
+  varying float vHeight;
+  void main() {
+    float h = vHeight * 0.5 + 0.5;                       // -1..1 → 0..1
+    vec3 col = mix(uLow, uHigh, smoothstep(0.1, 0.9, h));
+    float grid = step(0.96, fract(vUv.x * 40.0)) + step(0.96, fract(vUv.y * 40.0));  // grid lines
+    col += grid * 0.15;
+    gl_FragColor = vec4(col, 1.0);
+    #include <colorspace_fragment>                       // correct output color space
+  }
+`;
+
+const material = new THREE.ShaderMaterial({
+  vertexShader, fragmentShader,
+  uniforms: {
+    uTime: { value: 0 },
+    uAmp: { value: 0.6 },
+    uLow:  { value: new THREE.Color("#2d1b69") },
+    uHigh: { value: new THREE.Color("#00e5c3") },
+  },
+  side: THREE.DoubleSide,
+});
+
+const plane = new THREE.Mesh(new THREE.PlaneGeometry(6, 6, 200, 200), material);   // many vertices to displace
+plane.rotation.x = -Math.PI / 2.4;
+scene.add(plane);
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  material.uniforms.uTime.value = clock.getElapsedTime();    // update uniforms each frame
+  controls.update(); renderer.render(scene, camera);
+});
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+</script>
+</textarea>
+<p><code>ShaderMaterial</code> prepends built-ins (<code>projectionMatrix</code>, <code>modelViewMatrix</code>, <code>position</code>, <code>uv</code>, <code>normal</code>). <code>RawShaderMaterial</code> doesn't.</p>
+
+<h2>Pure fragment art: a full-screen shader (live)</h2>
+<p>Skip geometry. Draw one quad covering the screen and compute every pixel from its coordinate and time. This is how Shadertoy-style demos work.</p>
+<textarea class="code" data-lang="html" data-run data-height="400px">
+<style>html,body{margin:0;overflow:hidden;background:#000}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from "three";
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(innerWidth, innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.append(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const uniforms = {
+  uTime: { value: 0 },
+  uRes: { value: new THREE.Vector2(innerWidth, innerHeight) },
+  uMouse: { value: new THREE.Vector2(0.5, 0.5) },
+};
+const mat = new THREE.ShaderMaterial({
+  uniforms,
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader: `
+    uniform float uTime; uniform vec2 uRes; uniform vec2 uMouse; varying vec2 vUv;
+
+    vec3 palette(float t) {                                  // cosine palette (Inigo Quilez)
+      return 0.5 + 0.5 * cos(6.28318 * (vec3(0.0, 0.33, 0.67) + t));
+    }
+    void main() {
+      vec2 p = (vUv - 0.5) * vec2(uRes.x / uRes.y, 1.0) * 2.0;     // centered, aspect-corrected
+      vec2 m = (uMouse - 0.5) * 2.0;
+      vec3 col = vec3(0.0);
+      vec2 q = p;
+      for (float i = 0.0; i < 4.0; i++) {                          // fractal-ish folding
+        q = fract(q * 1.5) - 0.5;
+        float d = length(q) * exp(-length(p));
+        d = sin(d * 8.0 + uTime) / 8.0;
+        d = abs(d);
+        d = pow(0.012 / d, 1.2);
+        col += palette(length(p) + i * 0.4 + uTime * 0.3 + m.x * 0.5) * d;
+      }
+      gl_FragColor = vec4(col, 1.0);
+    }`,
+});
+scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat));     // 2x2 plane fills clip space
+
+addEventListener("pointermove", e => uniforms.uMouse.value.set(e.clientX / innerWidth, 1 - e.clientY / innerHeight));
+renderer.setAnimationLoop((t) => { uniforms.uTime.value = t * 0.001; renderer.render(scene, camera); });
+addEventListener("resize", () => { renderer.setSize(innerWidth, innerHeight); uniforms.uRes.value.set(innerWidth, innerHeight); });
+</script>
+</textarea>
+
+<h2>Extending built-in materials</h2>
+<textarea class="code" data-lang="js">
+// Keep PBR lighting but inject your own vertex/fragment code
+material.onBeforeCompile = (shader) => {
+  shader.uniforms.uTime = { value: 0 };
+  material.userData.shader = shader;
+  shader.vertexShader = shader.vertexShader.replace(
+    "#include <begin_vertex>",
+    `#include <begin_vertex>
+     transformed.y += sin(position.x * 4.0 + uTime) * 0.1;`
+  ).replace("void main() {", "uniform float uTime;\nvoid main() {");
+};
+// Also: three-custom-shader-material (CSM) does this ergonomically.
+</textarea>
+
+<h2>Where to go next</h2>
+<ul>
+<li><strong>The Book of Shaders</strong> (thebookofshaders.com) and <strong>Shadertoy</strong> for fundamentals and inspiration.</li>
+<li>Noise (simplex/perlin/fbm), SDFs (signed distance fields), domain warping, fresnel, dissolve, toon outlines, water, hologram, god-rays.</li>
+<li><strong>GPGPU</strong>: simulate particles in textures. <strong>TSL / WebGPU</strong>: Three's node-based shader language (<code>three/tsl</code>) that compiles to GLSL or WGSL.</li>
+</ul>
+
+<section class="exercises"><h2>Exercises</h2><ol>
+<li>Make the fragment shader output <code>vec4(vUv, 0.0, 1.0)</code> and confirm you understand each corner's color.</li>
+<li>Draw a circle in the fragment shader using <code>length(vUv - 0.5)</code> and <code>smoothstep</code>; animate its radius with time.</li>
+<li>Build a fresnel rim-light: <code>pow(1.0 - dot(normalize(vNormal), normalize(vViewDir)), 3.0)</code> added to the color.</li>
+<li>Build a dissolve effect with noise and a <code>uProgress</code> uniform you control with a lil-gui slider (use <code>discard</code>).</li>
+<li>Make a sphere "breathe" by displacing vertices along their normals with time.</li>
+<li>Port one Shadertoy shader into the full-screen template above.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Checkpoint</h2>
+<details><summary>Uniform vs varying?</summary>A uniform is one value shared by every vertex and pixel in a draw call (set from JS). A varying is computed per vertex and interpolated to each pixel.</details>
+<details><summary>Why can't I write <code>float x = 1;</code> in GLSL ES?</summary>GLSL is strictly typed: an integer literal can't initialize a float. Write <code>1.0</code>.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>
