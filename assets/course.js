@@ -90,7 +90,7 @@
   // ---- quizzes: <div class="quiz"><p>Question</p><button data-correct>A</button><button>B</button><p class="why">…</p></div>
   function upgradeQuizzes() {
     document.querySelectorAll(".quiz").forEach(q => {
-      const opts = q.querySelectorAll("button");
+      const opts = q.querySelectorAll(":scope > button");
       const why = q.querySelector(".why");
       opts.forEach(b => b.addEventListener("click", () => {
         const ok = b.hasAttribute("data-correct");

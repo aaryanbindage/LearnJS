@@ -155,13 +155,13 @@ h2.ts-head::before { content: "TS"; display: inline-block; vertical-align: .18em
 .quiz { border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius); padding: 14px 18px; margin: 1.4em 0; }
 .quiz > p:first-child { margin-top: 0; font-weight: 650; }
 .quiz > button { margin: 4px 6px 4px 0; }
-.quiz button { font: 15px/1.4 var(--mono); padding: 7px 14px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer; }
-.quiz button:hover:not(:disabled) { border-color: var(--accent); }
-.quiz button.right { background: color-mix(in srgb, var(--good) 18%, var(--surface)); border-color: var(--good); opacity: 1; }
-.quiz button.right::after { content: "  ✓ correct"; font-family: var(--font); font-weight: 700; color: var(--good); }
-.quiz button.wrong { text-decoration: line-through; opacity: .55; }
-.quiz button.wrong::after { content: "  ✗ not quite"; font-family: var(--font); }
-.quiz.solved button:not(.right) { opacity: .45; }
+.quiz > button { font: 15px/1.4 var(--mono); padding: 7px 14px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer; }
+.quiz > button:hover:not(:disabled) { border-color: var(--accent); }
+.quiz > button.right { background: color-mix(in srgb, var(--good) 18%, var(--surface)); border-color: var(--good); opacity: 1; }
+.quiz > button.right::after { content: "  ✓ correct"; font-family: var(--font); font-weight: 700; color: var(--good); }
+.quiz > button.wrong { text-decoration: line-through; opacity: .55; }
+.quiz > button.wrong::after { content: "  ✗ not quite"; font-family: var(--font); }
+.quiz.solved > button:not(.right) { opacity: .45; }
 .quiz .why { margin: .7em 0 0; padding-top: .6em; border-top: 1px solid var(--border); }
 dfn { font-style: normal; font-weight: 700; }
 .glossary dt { font-weight: 700; margin-top: .6em; } .glossary dd { margin: 0 0 0 1.2em; }
