@@ -3,119 +3,383 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 18 — Classes, this & Prototypes</title>
+<title>Classes &amp; this</title>
 <link rel="stylesheet" href="assets/course.css">
 </head>
 <body data-slug="18-js-classes">
 <main><article>
-<h1>Lesson 18 — Classes, <code>this</code> &amp; prototypes</h1>
-<p class="lede">Three.js is built on classes, and <code>this</code> trips up everyone at least once. Learn both properly.</p>
+<h1>Classes &amp; <code>this</code></h1>
+<p class="lede">When you need many objects of the same kind, each with its own data and the same abilities, a class is a blueprint for making them. This lesson covers classes, the keyword <code>this</code>, and the extra safety TypeScript adds to them.</p>
 
-<h2>Classes</h2>
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Understand <code>this</code> inside methods.</li>
+<li>Write a class with a <code>constructor</code>, properties and methods, and create objects from it with <code>new</code>.</li>
+<li>Build on a class with <code>extends</code> and <code>super</code>.</li>
+<li>Hide internal details with private fields.</li>
+<li>Use TypeScript's <code>private</code>, <code>readonly</code>, and <code>implements</code>.</li>
+</ul><p class="time">About 50 minutes.</p></section>
+
+<h2>Methods and <code>this</code></h2>
+<p>In the objects lesson you put functions inside objects. Often a method needs to use the object's <em>own</em> data. Inside a method, the keyword <code>this</code> means "the object this method was called on":</p>
 <textarea class="code" data-lang="js" data-run>
-class Animal {
-  #energy = 10;                      // private field (truly private)
-  static count = 0;                  // belongs to the class
-
-  constructor(name) { this.name = name; Animal.count++; }
-
-  speak() { return `${this.name} makes a sound`; }
-  eat(n = 1) { this.#energy += n; return this; }     // return this → chaining
-  get energy() { return this.#energy; }              // getter
-  set nickname(v) { this._nick = v.trim(); }         // setter
-  static create(name) { return new this(name); }     // static factory
-}
-
-class Dog extends Animal {
-  constructor(name, breed) { super(name); this.breed = breed; }   // call parent first
-  speak() { return super.speak() + ": Woof!"; }                   // override + reuse
-}
-
-const d = new Dog("Rex", "Lab");
-console.log(d.speak(), d.eat(5).eat().energy, Animal.count);
-console.log(d instanceof Dog, d instanceof Animal, Dog.create("Fido").name);
-// console.log(d.#energy);   // SyntaxError: private
-</textarea>
-<p>Prefer <strong>composition</strong> over deep inheritance: build behavior by combining small objects/functions rather than long <code>extends</code> chains.</p>
-
-<h2><code>this</code></h2>
-<p><code>this</code> is decided by <em>how a function is called</em>, not where it's written (except arrow functions, which inherit it from the surrounding scope).</p>
-<textarea class="code" data-lang="js" data-run>
-const user = {
-  name: "Ada",
-  regular() { return this?.name; },
-  arrow: () => typeof this,           // arrows don't have their own this
-  later() { setTimeout(() => console.log("arrow keeps this:", this.name), 10); },
-  laterBroken() { setTimeout(function () { console.log("regular fn loses this:", this?.name); }, 10); },
+const dog = {
+  name: "Rex",
+  tricks: 0,
+  bark() {
+    console.log(`${this.name} says woof!`);
+  },
+  learnTrick() {
+    this.tricks++;
+    console.log(`${this.name} now knows ${this.tricks} tricks`);
+  },
 };
 
-console.log(user.regular());            // "Ada": called as a method, this = user
-const detached = user.regular;
-console.log(detached());                // undefined: called plain, this lost
-console.log(detached.call({ name: "Bob" }), detached.apply({ name: "Cy" }));
-const bound = detached.bind(user);
-console.log(bound());                   // "Ada" forever
-user.later(); user.laterBroken();
+dog.bark();
+dog.learnTrick();
+dog.learnTrick();
 </textarea>
-<table>
-<tr><th>Call style</th><th><code>this</code> is…</th></tr>
-<tr><td><code>obj.method()</code></td><td><code>obj</code></td></tr>
-<tr><td><code>fn()</code></td><td><code>undefined</code> (strict) / global (sloppy)</td></tr>
-<tr><td><code>new Fn()</code></td><td>the new object</td></tr>
-<tr><td><code>fn.call(x)</code>, <code>apply</code>, <code>bind</code></td><td><code>x</code></td></tr>
-<tr><td>arrow function</td><td>inherited lexically</td></tr>
-<tr><td>DOM event handler (regular fn)</td><td>the element (<code>currentTarget</code>)</td></tr>
-</table>
+<p>When you call <code>dog.bark()</code>, the thing before the dot is <code>dog</code>, so inside <code>bark</code>, <code>this</code> is <code>dog</code>, and <code>this.name</code> is <code>"Rex"</code>.</p>
+<p>Now imagine you need 50 dogs. Copying that object 50 times, methods and all, would be silly. That's what classes are for.</p>
 
-<h2>Prototypes (what classes really are)</h2>
-<p>Every object has a hidden link to a <strong>prototype</strong> object. When you read a property that isn't on the object itself, JS walks up the prototype chain. <code>class</code> is cleaner syntax over this mechanism.</p>
+<h2>Your first class</h2>
+<div class="callout analogy"><span class="label">Analogy</span>A class is like a cookie cutter, and objects are the cookies. The cutter defines the shape once; each cookie made from it is separate, and can have different toppings (data).</div>
 <textarea class="code" data-lang="js" data-run>
-const animal = { speak() { return this.name + " makes a sound"; } };
-const dog = Object.create(animal);        // dog's prototype is animal
-dog.name = "Rex";
-console.log(dog.speak(), Object.getPrototypeOf(dog) === animal);
-console.log(dog.hasOwnProperty("speak"), "speak" in dog);
+class Dog {
+  constructor(name, breed) {
+    this.name = name;       // each new dog gets its own name...
+    this.breed = breed;     // ...and breed
+    this.tricks = 0;
+  }
 
-function Cat(name) { this.name = name; }            // old-style constructor
-Cat.prototype.meow = function () { return this.name + " meows"; };
-console.log(new Cat("Tom").meow());
+  bark() {
+    console.log(`${this.name} the ${this.breed} says woof!`);
+  }
 
-class A { m() {} }
-console.log(typeof A, A.prototype.m === new A().m, Object.getPrototypeOf([]) === Array.prototype);
-</textarea>
-
-<h2>Other useful patterns</h2>
-<textarea class="code" data-lang="js" data-run>
-// Factory function: no `this`, no `new`, real privacy via closure
-function createStack() {
-  const items = [];
-  return { push: x => items.push(x), pop: () => items.pop(), get size() { return items.length; } };
+  learnTrick() {
+    this.tricks++;
+  }
 }
-const s = createStack(); s.push(1); s.push(2); console.log(s.pop(), s.size);
 
-// Mixins
-const Serializable = Base => class extends Base { toJSON() { return { ...this }; } };
-class Point { constructor(x, y) { this.x = x; this.y = y; } }
-class SPoint extends Serializable(Point) {}
-console.log(JSON.stringify(new SPoint(1, 2)));
+const rex = new Dog("Rex", "beagle");
+const fido = new Dog("Fido", "poodle");
 
-// Symbols, getters, Object.freeze
-const frozen = Object.freeze({ a: 1 });
-try { frozen.a = 2; } catch (e) { console.log("strict mode throws:", e.message); }   // sloppy mode would silently ignore it
-console.log(frozen.a);
+rex.bark();
+fido.bark();
+rex.learnTrick();
+console.log(rex.tricks, fido.tricks);   // 1 0: each dog has its own data
+console.log(rex);
+</textarea>
+<p>Let's go through it:</p>
+<ul>
+<li><code>class Dog { ... }</code> defines the blueprint. Class names use PascalCase.</li>
+<li><code>constructor(name, breed)</code> is a special method that runs once whenever a new dog is made. Its job is to set up the new object's properties, using <code>this</code>.</li>
+<li><code>bark()</code> and <code>learnTrick()</code> are methods that every dog shares. (Note: no commas between methods in a class, unlike in an object.)</li>
+<li><code>new Dog("Rex", "beagle")</code> creates a new object from the blueprint, runs the constructor with those arguments, and gives you the object. An object made from a class is called an <dfn>instance</dfn> of that class.</li>
+</ul>
+<div class="try"><span class="label">Try it</span>Add a method <code>describe()</code> that returns a string like <code>"Rex is a beagle who knows 1 trick(s)"</code>, and print it for both dogs.</div>
+
+<h2>A more useful example</h2>
+<p>Classes shine when an object has data that should only change in controlled ways. Here's a bank account:</p>
+<textarea class="code" data-lang="js" data-run>
+class BankAccount {
+  #balance = 0;            // the # makes this field PRIVATE: only code inside the class can touch it
+
+  constructor(owner) {
+    this.owner = owner;
+  }
+
+  deposit(amount) {
+    if (amount <= 0) {
+      throw new Error("Deposit must be positive");
+    }
+    this.#balance += amount;
+  }
+
+  withdraw(amount) {
+    if (amount > this.#balance) {
+      throw new Error("Not enough money");
+    }
+    this.#balance -= amount;
+  }
+
+  get balance() {          // a "getter": read it like a property, no ()
+    return this.#balance;
+  }
+}
+
+const acct = new BankAccount("Ada");
+acct.deposit(100);
+acct.withdraw(30);
+console.log(acct.owner, acct.balance);   // Ada 70
+
+// try/catch lets us see an error and carry on (more on this in the errors lesson)
+try {
+  acct.balance = 1000000;  // not allowed: balance only has a getter, no way to set it
+} catch (e) {
+  console.log("Error:", e.message);
+}
+console.log(acct.balance); // still 70
+acct.withdraw(500);        // throws: Not enough money
+</textarea>
+<p>The private field <code>#balance</code> means the only way to change the balance is through <code>deposit</code> and <code>withdraw</code>, which check the rules. No other code can accidentally (or deliberately) set it to a million. Keeping data safe behind methods like this is called <dfn>encapsulation</dfn>.</p>
+<p><code>get balance()</code> is a <dfn>getter</dfn>: a method that you read like a property (<code>acct.balance</code>, not <code>acct.balance()</code>).</p>
+
+<h2>Inheritance: <code>extends</code></h2>
+<p>A class can be based on another class. It gets all the parent's properties and methods, and can add its own or replace some:</p>
+<textarea class="code" data-lang="js" data-run>
+class Animal {
+  constructor(name) {
+    this.name = name;
+  }
+  speak() {
+    return `${this.name} makes a sound.`;
+  }
+}
+
+class Cat extends Animal {
+  constructor(name, indoor) {
+    super(name);            // run the parent's constructor first
+    this.indoor = indoor;
+  }
+  speak() {                 // replace the parent's version
+    return `${this.name} meows.`;
+  }
+  scratch() {               // add something new
+    return `${this.name} scratches the sofa.`;
+  }
+}
+
+const tom = new Cat("Tom", true);
+console.log(tom.speak());
+console.log(tom.scratch());
+console.log(new Animal("Generic").speak());
+console.log(tom instanceof Cat, tom instanceof Animal);   // true true
+</textarea>
+<ul>
+<li><code>extends Animal</code>: a Cat is a kind of Animal.</li>
+<li><code>super(name)</code> calls the parent's constructor. In a child class constructor, you must call it before using <code>this</code>.</li>
+<li><code>instanceof</code> checks whether an object was made from a class (or a child of it). You used this in the DOM lesson: <code>HTMLInputElement</code> is a class that extends <code>HTMLElement</code>.</li>
+</ul>
+<div class="callout tip"><span class="label">Use inheritance sparingly</span>Long chains (<code>Animal</code> → <code>Mammal</code> → <code>Pet</code> → <code>Dog</code> → …) become hard to change. One level is usually plenty. Many modern codebases, including React, use very little inheritance.</div>
+
+<h2>Static members</h2>
+<p>A <code>static</code> method or property belongs to the class itself, not to each instance. You've used one: <code>Math.max</code> and <code>Number.isNaN</code> work like this.</p>
+<textarea class="code" data-lang="js" data-run>
+class Temperature {
+  static fromFahrenheit(f) {
+    return new Temperature((f - 32) * 5 / 9);
+  }
+  constructor(celsius) {
+    this.celsius = celsius;
+  }
+}
+
+const t = Temperature.fromFahrenheit(212);   // called on the class, not an instance
+console.log(t.celsius);   // 100
 </textarea>
 
-<section class="exercises"><h2>Exercises</h2><ol>
-<li>Build a <code>Vector2</code> class with <code>add</code>, <code>scale</code>, <code>length</code> (getter), and <code>static fromAngle</code>. (You'll meet <code>THREE.Vector3</code> in Part 5.)</li>
-<li>Build <code>Shape</code> → <code>Circle</code>/<code>Rect</code> with <code>area()</code> overrides, and a function summing areas.</li>
-<li>Fix: <code>class Btn { constructor(){ this.n=0; el.addEventListener("click", this.inc) } inc(){ this.n++ } }</code> three different ways (bind, arrow field, wrapper).</li>
-<li>Implement a tiny <code>EventEmitter</code> class with <code>on</code>, <code>off</code>, <code>emit</code>.</li>
-<li>Re-implement <code>new</code> as a function using <code>Object.create</code> and <code>apply</code>.</li>
+<h2>The <code>this</code> trap</h2>
+<p><code>this</code> is set by <em>how a function is called</em>: it's the thing before the dot. If you pass a method somewhere as a callback, there's no dot anymore when it's called, so <code>this</code> is lost:</p>
+<textarea class="code" data-lang="js" data-run>
+class Counter {
+  count = 0;                 // a property can also be set up here, outside the constructor
+  increment() {
+    this.count++;
+    console.log(this.count);
+  }
+}
+
+const c = new Counter();
+c.increment();               // works: "c." is in front
+
+const fn = c.increment;      // take the method out on its own...
+try {                        // try/catch: show the error instead of stopping
+  fn();                      // ...and call it with no dot: this is undefined!
+} catch (e) {
+  console.log("Error:", e.message);
+}
+
+setTimeout(() => c.increment(), 100);   // fix: wrap it in an arrow function, keeping the dot
+</textarea>
+<p>This matters most for event handlers: <code>button.addEventListener("click", c.increment)</code> breaks for the same reason. Wrap it: <code>() =&gt; c.increment()</code>. Arrow functions don't have their own <code>this</code>; they use the <code>this</code> from where they were written, which is usually what you want.</p>
+
+<h2>Classes or plain objects?</h2>
+<p>You don't need classes for everything. A good rule:</p>
+<ul>
+<li><strong>Plain objects and functions</strong> for data: users, products, settings. Most data in web apps is plain objects (that's what comes back from servers, too).</li>
+<li><strong>Classes</strong> when something has data that must be protected by rules (a bank account), or you need many objects with the same behaviour and internal state (enemies in a game, a 3D scene in Three.js).</li>
+</ul>
+
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Forgetting <code>new</code></strong>: <code>Dog("Rex")</code> throws "Class constructor cannot be invoked without 'new'".</li>
+<li><strong>Forgetting <code>this.</code></strong> inside a method: <code>name</code> on its own refers to some other variable, not the property.</li>
+<li><strong>Commas between class methods</strong> (that's object syntax).</li>
+<li><strong>Passing a method as a callback</strong> and losing <code>this</code>. Wrap it in an arrow function.</li>
+<li><strong>Using <code>this</code> before <code>super()</code></strong> in a child constructor.</li>
+</ul></div>
+
+<h2 class="ts-head">In TypeScript</h2>
+<h3>Declaring properties</h3>
+<p>In TypeScript, a class must declare its properties and their types up front. (In JavaScript you could just assign <code>this.anything</code> in the constructor.)</p>
+<textarea class="code" data-lang="ts" data-run>
+class Dog {
+  name: string;
+  breed: string;
+  tricks = 0;            // type inferred from the starting value: number
+
+  constructor(name: string, breed: string) {
+    this.name = name;
+    this.breed = breed;
+  }
+
+  bark(): string {
+    return `${this.name} says woof!`;
+  }
+}
+
+const rex = new Dog("Rex", "beagle");
+console.log(rex.bark());
+rex.tricks = "lots";     // ✖ tricks is a number
+rex.age = 3;             // ✖ Dog has no 'age' property
+new Dog("Fido");         // ✖ the constructor needs 2 arguments
+</textarea>
+<p>Every rule you learned about functions applies to methods and constructors too.</p>
+
+<h3><code>private</code>, <code>public</code>, <code>readonly</code></h3>
+<p>TypeScript adds keywords that control who can touch each property:</p>
+<textarea class="code" data-lang="ts" data-run>
+class BankAccount {
+  readonly owner: string;          // can be set in the constructor, never changed after
+  private balance = 0;             // only code inside this class can use it
+
+  constructor(owner: string) {
+    this.owner = owner;
+  }
+
+  deposit(amount: number): void {
+    if (amount <= 0) throw new Error("Deposit must be positive");
+    this.balance += amount;
+  }
+
+  getBalance(): number {
+    return this.balance;
+  }
+}
+
+const acct = new BankAccount("Ada");
+acct.deposit(50);
+console.log(acct.getBalance());
+acct.balance = 1000000;    // ✖ Property 'balance' is private
+acct.owner = "Mallory";    // ✖ owner is readonly
+</textarea>
+<div class="callout ts"><span class="label">private vs #private</span>TypeScript's <code>private</code> is only checked by TypeScript; once compiled to JavaScript, the property is accessible. JavaScript's <code>#balance</code> is enforced when the code runs. Both are fine. <code>private</code> is more common in TypeScript code you'll read; <code>#</code> is the stricter choice.</div>
+
+<h3>A shortcut: parameter properties</h3>
+<p>Declaring a property and then assigning it in the constructor is repetitive. TypeScript lets you do both at once by putting <code>public</code>, <code>private</code> or <code>readonly</code> in front of a constructor parameter:</p>
+<textarea class="code" data-lang="ts" data-run>
+class Point {
+  constructor(public readonly x: number, public readonly y: number) {}
+  // ↑ that one line declares x and y, and assigns them
+
+  distanceTo(other: Point): number {
+    return Math.hypot(this.x - other.x, this.y - other.y);
+  }
+}
+
+const a = new Point(0, 0);
+const b = new Point(3, 4);
+console.log(a.distanceTo(b));   // 5
+</textarea>
+
+<h3><code>implements</code>: promising a shape</h3>
+<p>A class can promise to match a type or interface. TypeScript then checks that it really does:</p>
+<textarea class="code" data-lang="ts" data-run>
+interface Shape {
+  name: string;
+  area(): number;
+}
+
+class Circle implements Shape {
+  name = "circle";
+  constructor(private radius: number) {}
+  area(): number {
+    return Math.PI * this.radius ** 2;
+  }
+}
+
+class Square implements Shape {   // ✖ forgot area()
+  name = "square";
+  constructor(private side: number) {}
+}
+
+const shapes: Shape[] = [new Circle(1), new Circle(2)];
+for (const s of shapes) {
+  console.log(s.name, s.area().toFixed(2));
+}
+</textarea>
+<p>Any function that accepts a <code>Shape</code> can now be given a <code>Circle</code>, or anything else that matches. In fact, TypeScript only cares about the shape: even a plain object with a <code>name</code> and an <code>area</code> method would count as a <code>Shape</code>. <code>implements</code> just makes TypeScript check the class while you write it.</p>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li>Inside a method, <code>this</code> is the object before the dot.</li>
+<li><code>class X { constructor() {...} method() {...} }</code> is a blueprint; <code>new X()</code> makes an instance.</li>
+<li><code>#field</code> is private; <code>get prop()</code> is read like a property; <code>static</code> belongs to the class.</li>
+<li><code>extends</code> builds on a class; call <code>super()</code> first in the constructor.</li>
+<li>Passing a method as a callback loses <code>this</code>: wrap it, <code>() =&gt; obj.method()</code>.</li>
+<li>TypeScript: declare property types; use <code>private</code>, <code>readonly</code>, parameter properties, and <code>implements</code>.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space
+
+</textarea>
+<ol>
+<li>Write a <code>Rectangle</code> class with <code>width</code> and <code>height</code>, and methods <code>area()</code> and <code>isSquare()</code>.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+class Rectangle {
+  constructor(public width: number, public height: number) {}
+  area(): number { return this.width * this.height; }
+  isSquare(): boolean { return this.width === this.height; }
+}
+const r = new Rectangle(3, 3);
+console.log(r.area(), r.isSquare());
+</textarea></details></li>
+<li>Write a <code>Stopwatch</code> class with a private <code>seconds</code> count, a <code>tick()</code> method that adds one, a <code>reset()</code> method, and a getter for the time as <code>"m:ss"</code>.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+class Stopwatch {
+  private seconds = 0;
+  tick(): void { this.seconds++; }
+  reset(): void { this.seconds = 0; }
+  get time(): string {
+    const m = Math.floor(this.seconds / 60);
+    const s = String(this.seconds % 60).padStart(2, "0");
+    return `${m}:${s}`;
+  }
+}
+const sw = new Stopwatch();
+for (let i = 0; i < 75; i++) sw.tick();
+console.log(sw.time);   // 1:15
+</textarea></details></li>
+<li>Make a <code>Shape</code> interface with <code>area(): number</code>, implement it with <code>Circle</code> and <code>Rectangle</code>, and print the total area of an array of mixed shapes.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+interface Shape { area(): number }
+class Circle implements Shape {
+  constructor(private r: number) {}
+  area() { return Math.PI * this.r ** 2; }
+}
+class Rect implements Shape {
+  constructor(private w: number, private h: number) {}
+  area() { return this.w * this.h; }
+}
+const shapes: Shape[] = [new Circle(1), new Rect(2, 3)];
+console.log(shapes.reduce((sum, s) => sum + s.area(), 0).toFixed(2));
+</textarea></details></li>
 </ol></section>
 
-<section class="checkpoint"><h2>Checkpoint</h2>
-<details><summary>Why does passing obj.method as a callback lose this?</summary>Passing detaches the function from its object; when called plain, there's no receiver. Use bind, an arrow wrapper, or an arrow class field.</details>
-<details><summary>What is a prototype chain?</summary>The sequence of objects JS searches for a property, from the object itself up through its prototypes until null.</details>
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>What does the constructor do?</summary>It runs once each time you call <code>new</code>, and sets up the new instance's properties.</details>
+<details><summary>Why does <code>setTimeout(obj.method, 100)</code> break when the method uses <code>this</code>?</summary>When <code>setTimeout</code> later calls the function, there's no object before the dot, so <code>this</code> is undefined. Use <code>setTimeout(() =&gt; obj.method(), 100)</code>.</details>
+<details><summary>What does <code>implements</code> do in TypeScript?</summary>It makes TypeScript check that the class has everything the interface (or type) requires.</details>
 </section>
 </article></main>
 <script src="assets/lessons.js"></script>

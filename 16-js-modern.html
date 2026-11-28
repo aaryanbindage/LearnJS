@@ -3,116 +3,320 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 16 — Modern JS: Destructuring, Spread, Modules</title>
+<title>Destructuring, spread &amp; modules</title>
 <link rel="stylesheet" href="assets/course.css">
 </head>
 <body data-slug="16-js-modern">
 <main><article>
-<h1>Lesson 16 — Modern JS: destructuring, spread &amp; modules</h1>
-<p class="lede">ES2015+ syntax you will read and write every day, especially in React.</p>
+<h1>Destructuring, spread &amp; modules</h1>
+<p class="lede">Modern JavaScript has some compact syntax that you'll see on nearly every line of real code, especially React code. None of it lets you do anything new; it lets you write common things more briefly. This lesson goes through each piece slowly, then shows how to split a program into files with modules.</p>
 
-<h2>Destructuring</h2>
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Unpack arrays and objects into variables with <strong>destructuring</strong>.</li>
+<li>Copy and combine with <strong>spread</strong> (<code>...</code>), and collect leftovers with <strong>rest</strong>.</li>
+<li>Update objects and arrays without changing the original.</li>
+<li>Split code into files with <code>import</code> and <code>export</code>.</li>
+<li>Type destructured parameters and share types between files in TypeScript.</li>
+</ul><p class="time">About 50 minutes.</p></section>
+
+<h2>Destructuring objects</h2>
+<p>You often want to pull a few properties out of an object into their own variables:</p>
 <textarea class="code" data-lang="js" data-run>
-const user = { id: 7, name: "Ada", address: { city: "London", zip: "N1" }, tags: ["a", "b"] };
+const user = { name: "Ada", age: 36, city: "London" };
 
-const { name, id } = user;                       // pick properties
-const { name: fullName, role = "guest" } = user; // rename + default
-const { address: { city } } = user;              // nested
-const [first, , third = "none", ...others] = ["x", "y", undefined, "p", "q"];
-console.log(name, id, fullName, role, city, first, third, others);
+// The long way
+const name1 = user.name;
+const age1 = user.age;
 
-// Swap without a temp
-let a = 1, b = 2; [a, b] = [b, a]; console.log(a, b);
+// With destructuring: same result, one line
+const { name, age } = user;
 
-// In function parameters (this is the React props pattern)
-function show({ name, age = 18, ...rest }) { return `${name} ${age} ${JSON.stringify(rest)}`; }
-console.log(show({ name: "Grace", city: "NYC" }));
+console.log(name, age);
+</textarea>
+<p>Read <code>const { name, age } = user;</code> as "make variables <code>name</code> and <code>age</code>, taken from the properties with those names in <code>user</code>". The curly braces on the <em>left</em> of <code>=</code> mean "unpack", not "make an object".</p>
+<p>A few extras:</p>
+<textarea class="code" data-lang="js" data-run>
+const user = { name: "Ada", age: 36 };
 
-// Returning multiple values
-const [min, max] = [Math.min(3, 1, 2), Math.max(3, 1, 2)];
-console.log(min, max);
+const { name: fullName } = user;       // rename: take "name", call the variable fullName
+const { country = "Unknown" } = user;  // default value if the property is missing
+console.log(fullName, country);
+
+const settings = { theme: { color: "purple", font: "serif" } };
+const { theme: { color } } = settings; // reach inside a nested object
+console.log(color);
 </textarea>
 
-<h2>Spread &amp; rest</h2>
+<h3>Destructuring in function parameters</h3>
+<p>This is where you'll see it most. When a function takes an object, it can unpack it right in the parameter list:</p>
 <textarea class="code" data-lang="js" data-run>
-const a = [1, 2], b = [3, 4];
-console.log([...a, ...b, 5], Math.max(...a, ...b));
+// Without destructuring
+function describe(user) {
+  return `${user.name} lives in ${user.city}`;
+}
 
-const base = { color: "red", size: 1 };
-const merged = { ...base, size: 2, extra: true };   // later keys win
-console.log(merged);
+// With destructuring
+function describe2({ name, city }) {
+  return `${name} lives in ${city}`;
+}
 
-const { color, ...restOfObj } = merged;             // rest in destructuring
-console.log(color, restOfObj);
+const ada = { name: "Ada", city: "London", age: 36 };
+console.log(describe(ada));
+console.log(describe2(ada));
+</textarea>
+<p>Taking one object instead of many separate parameters also means callers can't mix up the order, since every value is labelled:</p>
+<textarea class="code" data-lang="js" data-run>
+function createButton({ label, color = "grey", size = "medium" }) {
+  return `[${size} ${color} button: ${label}]`;
+}
 
-function sum(...nums) { return nums.reduce((s, n) => s + n, 0); }
-console.log(sum(1, 2, 3, 4));
+console.log(createButton({ label: "Save", color: "green" }));
+console.log(createButton({ size: "large", label: "Cancel" }));   // any order
 </textarea>
 
-<h2>More modern features</h2>
+<h2>Destructuring arrays</h2>
+<p>Arrays can be unpacked too, using square brackets. With arrays, it's by <strong>position</strong> instead of by name:</p>
 <textarea class="code" data-lang="js" data-run>
-// Optional chaining, nullish coalescing (Lesson 10)
-const data = { user: null };
-console.log(data.user?.profile?.name ?? "anonymous", data.list?.[0], data.fn?.());
+const rgb = [255, 128, 0];
+const [red, green, blue] = rgb;
+console.log(red, green, blue);
 
-// Short-circuit assignment
-const opts = {}; opts.retries ??= 3; opts.debug ||= false; console.log(opts);
+const [first, , third] = ["a", "b", "c"];   // skip an item with an empty slot
+console.log(first, third);
 
-// Array helpers
-const arr = [5, 1, 4];
-console.log(arr.toSorted(), arr.toReversed(), arr.with(0, 99), arr.at(-1), arr);
-console.log(Object.groupBy([1, 2, 3, 4, 5], n => (n % 2 ? "odd" : "even")));
-console.log([1, [2, [3, [4]]]].flat(Infinity), [1, 2].flatMap(x => [x, x * 10]));
+// A neat trick: swap two variables
+let x = 1, y = 2;
+[x, y] = [y, x];
+console.log(x, y);   // 2 1
+</textarea>
+<p>You saw array destructuring already, in <code>for (const [key, value] of Object.entries(obj))</code>. Each entry is a two-item array, unpacked by position. And you'll see it constantly in React: <code>const [count, setCount] = useState(0)</code>.</p>
 
-// Numeric separators, exponent, labels
-console.log(1_000_000, 2 ** 8, "abc".padEnd(6, "."), "a-b-c".replaceAll("-", "+"));
+<h2>Spread: <code>...</code> spills things out</h2>
+<p>You met spread briefly with arrays and objects. Three dots in front of an array or object mean "spill all its contents out here":</p>
+<textarea class="code" data-lang="js" data-run>
+const fruits = ["apple", "banana"];
+const veg = ["carrot"];
 
-// Tagged template, Symbol, Date, Intl
-console.log(new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(1234.5));
-console.log(new Intl.DateTimeFormat("en-GB", { dateStyle: "long" }).format(new Date(2026, 0, 15)));
+const food = [...fruits, ...veg, "bread"];   // combine
+const copy = [...fruits];                    // copy
+console.log(food, copy);
+
+console.log(Math.max(...[3, 9, 2]));         // spread an array into function arguments
+</textarea>
+<p>With objects, spread copies all the properties, and later properties overwrite earlier ones with the same key:</p>
+<textarea class="code" data-lang="js" data-run>
+const defaults = { theme: "light", fontSize: 16 };
+const saved = { fontSize: 20 };
+
+const settings = { ...defaults, ...saved };
+console.log(settings);   // { theme: "light", fontSize: 20 }
 </textarea>
 
-<h2>Modules (import / export)</h2>
-<p>Modules split code into files with their own scope. Load them with <code>&lt;script type="module"&gt;</code>. Modules are strict mode and deferred by default.</p>
+<h3>Updating without changing the original</h3>
+<p>This pattern is essential in React, which requires that you never change ("mutate") data in place. Instead you make an updated <strong>copy</strong>:</p>
+<textarea class="code" data-lang="js" data-run>
+const user = { name: "Ada", age: 36 };
+
+const older = { ...user, age: 37 };       // copy everything, then override age
+console.log(user.age, older.age);         // 36 37: the original is untouched
+
+const todos = [{ id: 1, done: false }, { id: 2, done: false }];
+
+const added = [...todos, { id: 3, done: false }];               // add an item
+const removed = todos.filter((t) => t.id !== 1);                // remove one
+const toggled = todos.map((t) => t.id === 2 ? { ...t, done: true } : t);  // update one
+
+console.log(todos.length, added.length, removed.length);
+console.log(toggled);
+</textarea>
+<p>The <code>toggled</code> line is worth reading twice: "go through every todo; if it's the one with id 2, return a copy with <code>done: true</code>, otherwise return it unchanged". You'll write this exact line many times in React.</p>
+<div class="callout warn"><span class="label">Spread copies one level deep</span><code>{ ...user }</code> copies the top-level properties. If a property holds another object or array, both copies share that inner object. For a full deep copy, use <code>structuredClone(obj)</code>.</div>
+
+<h2>Rest: <code>...</code> collects things up</h2>
+<p>The same three dots, used on the <em>left</em> side or in parameters, do the opposite: they collect "the rest" into an array or object.</p>
+<textarea class="code" data-lang="js" data-run>
+// In parameters: any number of arguments, collected into an array
+function sum(...numbers) {
+  return numbers.reduce((total, n) => total + n, 0);
+}
+console.log(sum(1, 2), sum(1, 2, 3, 4, 5));
+
+// In destructuring: everything you didn't name
+const [winner, ...others] = ["Ada", "Grace", "Linus"];
+console.log(winner, others);
+
+const { password, ...safeUser } = { name: "Ada", email: "a@x.com", password: "hunter2" };
+console.log(safeUser);   // everything except password
+</textarea>
+<div class="callout"><span class="label">Spread or rest?</span>Same dots, opposite jobs. If <code>...</code> is where values are <em>being used</em> (inside <code>[ ]</code>, <code>{ }</code> or a function call), it's spread: it spills out. If it's where values are <em>being received</em> (left of <code>=</code>, or in a parameter list), it's rest: it collects.</div>
+
+<h2>Modules: splitting code into files</h2>
+<p>Real programs are too big for one file. <dfn>Modules</dfn> let each file share specific things (<code>export</code>) and use things from other files (<code>import</code>).</p>
 <textarea class="code" data-lang="js" data-file="math.js">
-// Named exports
+// Anything not exported stays private to this file.
+const secret = 42;
+
 export const PI = 3.14159;
-export function area(r) { return PI * r * r; }
 
-// One default export per file
-export default class Circle { constructor(r) { this.r = r; } }
+export function circleArea(r) {
+  return PI * r * r;
+}
 
-const internal = 42;   // not exported = private to the module
+export default function add(a, b) {   // one "default" export per file (optional)
+  return a + b;
+}
 </textarea>
 <textarea class="code" data-lang="js" data-file="main.js">
-import Circle, { PI, area as circleArea } from "./math.js";   // default + named, with rename
-import * as math from "./math.js";                            // namespace import
-import { debounce } from "https://cdn.jsdelivr.net/npm/lodash-es@4.17.21/lodash.js";
+import add, { PI, circleArea } from "./math.js";   // default first, named ones in { }
+import * as math from "./math.js";                 // or: everything, as one object
 
-console.log(circleArea(2), new Circle(3), math.PI);
-
-// Dynamic import: load on demand (code splitting)
-button.addEventListener("click", async () => {
-  const { openEditor } = await import("./editor.js");
-  openEditor();
-});
+console.log(add(2, 3));
+console.log(circleArea(2));
+console.log(math.PI);
+// console.log(secret);  // ✖ not exported, so not available here
 </textarea>
+<ul>
+<li><strong>Named exports</strong> (<code>export const</code>, <code>export function</code>) are imported with curly braces, using the same name.</li>
+<li>A <strong>default export</strong> is imported without braces, and you can give it any name.</li>
+<li>The path starts with <code>./</code> for files next to this one. In the browser you include the <code>.js</code> extension.</li>
+</ul>
+<p>To use modules in a web page, load the entry file with <code>type="module"</code>. (Modules only work when the page is served by a web server, such as VS Code's Live Server, not when opened directly as a file.)</p>
 <textarea class="code" data-lang="html" data-file="index.html">
 <script type="module" src="main.js"></script>
 </textarea>
-<div class="callout warn"><span class="label">Note</span>Modules need to be served over HTTP (use Live Server or <code>npx vite</code>); opening the file with <code>file://</code> blocks them. Include the <code>.js</code> extension in browser imports. Bundlers like Vite let you import npm packages by bare name: <code>import confetti from "canvas-confetti"</code>.</div>
+<p>You'll also import code other people have written, installed with npm. Those imports use the package name instead of a path:</p>
+<textarea class="code" data-lang="js">
+import confetti from "canvas-confetti";   // from node_modules, set up by a tool like Vite
+</textarea>
 
-<section class="exercises"><h2>Exercises</h2><ol>
-<li>Rewrite a function taking 5 positional arguments to take one options object with destructured defaults.</li>
-<li>Write <code>pick(obj, ...keys)</code> and <code>omit(obj, ...keys)</code> using destructuring/spread/<code>Object.fromEntries</code>.</li>
-<li>Merge two config objects deeply (write <code>deepMerge</code>).</li>
-<li>Split your Lesson 15 to-do app into modules: <code>store.js</code> (data), <code>view.js</code> (DOM), <code>main.js</code> (wiring).</li>
-<li>Use dynamic <code>import()</code> to load a module only when a button is clicked and watch the Network tab.</li>
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Destructuring something that's undefined</strong>: <code>const { name } = undefined</code> crashes. Use a default: <code>function f({ name } = {})</code>.</li>
+<li><strong>Thinking spread is a deep copy</strong>: nested objects are still shared.</li>
+<li><strong>Braces mismatch on imports</strong>: a default export imported with <code>{ }</code>, or a named one without, gives <code>undefined</code> or an error.</li>
+<li><strong>Opening a module page by double-clicking the file</strong>: modules need a server.</li>
+</ul></div>
+
+<h2 class="ts-head">In TypeScript</h2>
+<h3>Destructured variables keep their types</h3>
+<textarea class="code" data-lang="ts" data-run>
+const user = { name: "Ada", age: 36 };
+const { name, age } = user;          // name: string, age: number
+const { email } = user;              // ✖ Property 'email' does not exist
+
+const [first, second] = ["a", "b"];  // first: string
+console.log(name, age, first, second);
+</textarea>
+
+<h3>Typing destructured parameters</h3>
+<p>This trips people up: the type goes <strong>after the whole pattern</strong>, not inside it. Inside the braces, a colon means "rename", as you saw above.</p>
+<textarea class="code" data-lang="ts" data-run>
+// ✖ Wrong: this means "take name and call the variable string"
+// function greet({ name: string }) { ... }
+
+// ✔ Right: the type describes the whole object, after the pattern
+function greet({ name, age }: { name: string; age: number }): string {
+  return `${name} is ${age}`;
+}
+
+// Usually clearer with a named type:
+type ButtonProps = { label: string; color?: string; size?: "small" | "medium" | "large" };
+
+function createButton({ label, color = "grey", size = "medium" }: ButtonProps): string {
+  return `[${size} ${color} button: ${label}]`;
+}
+
+console.log(greet({ name: "Ada", age: 36 }));
+console.log(createButton({ label: "Save" }));
+console.log(createButton({ label: "Go", size: "huge" }));   // ✖ not an allowed size
+</textarea>
+<p>Look at <code>ButtonProps</code>. This is exactly how React components are typed, as you'll see in Part 5: a type for the "props" object, destructured in the parameter list, with defaults for the optional ones.</p>
+
+<h3>Rest parameters and spread are typed</h3>
+<textarea class="code" data-lang="ts" data-run>
+function sum(...numbers: number[]): number {    // rest parameter: an array type
+  return numbers.reduce((t, n) => t + n, 0);
+}
+console.log(sum(1, 2, 3));
+console.log(sum(1, "2"));   // ✖
+
+type User = { name: string; email: string; password: string };
+const u: User = { name: "Ada", email: "a@x.com", password: "hunter2" };
+const { password, ...safe } = u;   // hover over safe: { name: string; email: string }
+console.log(safe);
+
+const updated: User = { ...u, email: 42 };   // ✖ spread copies are checked too
+</textarea>
+<p>Hover over <code>safe</code>: TypeScript worked out its type as <code>User</code> without <code>password</code>. It tracks spread and rest precisely.</p>
+
+<h3>Sharing types between files</h3>
+<p>Types can be exported and imported just like values:</p>
+<textarea class="code" data-lang="ts" data-file="types.ts">
+export type Todo = { id: number; text: string; done: boolean };
+export type Filter = "all" | "active" | "done";
+</textarea>
+<textarea class="code" data-lang="ts" data-file="todos.ts">
+import type { Todo, Filter } from "./types";   // "import type": only types, removed when compiled
+
+export function visible(todos: Todo[], filter: Filter): Todo[] {
+  if (filter === "active") return todos.filter((t) => !t.done);
+  if (filter === "done") return todos.filter((t) => t.done);
+  return todos;
+}
+</textarea>
+<p><code>import type</code> makes it clear that you're only importing types, which disappear completely when TypeScript converts to JavaScript. In TypeScript projects, imports usually leave off the extension (<code>"./types"</code>), and the build tool works it out.</p>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li><strong>Destructuring</strong>: <code>const { a, b } = obj</code> (by name), <code>const [x, y] = arr</code> (by position). Rename with <code>{ a: newName }</code>, default with <code>{ a = 1 }</code>.</li>
+<li><strong>Spread</strong> <code>...</code> spills out: copy and combine arrays and objects, update with <code>{ ...obj, key: newValue }</code>.</li>
+<li><strong>Rest</strong> <code>...</code> collects: <code>function f(...args)</code>, <code>const [first, ...others] = arr</code>.</li>
+<li><strong>Modules</strong>: <code>export</code> what a file shares, <code>import</code> it elsewhere. Named imports use <code>{ }</code>.</li>
+<li>TypeScript: type a destructured parameter after the whole pattern: <code>({ a, b }: Props)</code>. Use <code>import type</code> for types.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space
+
+</textarea>
+<ol>
+<li>Given <code>const point = { x: 3, y: 4, z: 0 }</code>, use destructuring to get <code>x</code> and <code>y</code>, and print the distance from the origin (<code>Math.hypot(x, y)</code>).
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const point = { x: 3, y: 4, z: 0 };
+const { x, y } = point;
+console.log(Math.hypot(x, y));   // 5
+</textarea></details></li>
+<li>Write <code>formatName({ first, last, title })</code> where <code>title</code> is optional, with a type. <code>{ first: "Ada", last: "Lovelace", title: "Countess" }</code> → "Countess Ada Lovelace".
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+type Name = { first: string; last: string; title?: string };
+function formatName({ first, last, title }: Name): string {
+  return title ? `${title} ${first} ${last}` : `${first} ${last}`;
+}
+console.log(formatName({ first: "Ada", last: "Lovelace", title: "Countess" }));
+</textarea></details></li>
+<li>Given an array of todos, write <code>rename(todos, id, text)</code> that returns a new array where the todo with that id has the new text, without changing the original.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+type Todo = { id: number; text: string; done: boolean };
+function rename(todos: Todo[], id: number, text: string): Todo[] {
+  return todos.map((t) => (t.id === id ? { ...t, text } : t));
+}
+const before: Todo[] = [{ id: 1, text: "old", done: false }];
+const after = rename(before, 1, "new");
+console.log(before[0].text, after[0].text);   // old new
+</textarea></details></li>
+<li>Write <code>average(...nums: number[])</code> that returns 0 when called with no numbers.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function average(...nums: number[]): number {
+  if (nums.length === 0) return 0;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+console.log(average(), average(2, 4, 6));
+</textarea></details></li>
 </ol></section>
 
-<section class="checkpoint"><h2>Checkpoint</h2>
-<details><summary>Named vs default exports?</summary>Named: many per file, imported with braces by exact name. Default: one per file, imported under any name. Named exports are easier to refactor and tree-shake.</details>
-<details><summary>Does spread deep-copy?</summary>No. It copies one level; nested objects stay shared.</details>
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>What does <code>const { name: n } = user</code> do?</summary>It takes <code>user.name</code> and stores it in a variable called <code>n</code>.</details>
+<details><summary>How do you change one property of an object without changing the original?</summary>Make a copy with the change: <code>const updated = { ...original, prop: newValue };</code></details>
+<details><summary>Where does the type go on a destructured parameter?</summary>After the whole pattern: <code>function f({ a, b }: { a: string; b: number })</code>. Inside the braces, <code>:</code> means rename.</details>
 </section>
 </article></main>
 <script src="assets/lessons.js"></script>
