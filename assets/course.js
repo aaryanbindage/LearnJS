@@ -182,7 +182,7 @@
     [/(\S+) is not a function/, m => `You put () after “${m[1]}”, but it isn't a function. Check the spelling, or log it to see what it really is.`],
     [/Cannot read propert(?:y|ies) of (undefined|null)/, m => `You used a dot (.) on something that is ${m[1]}. The thing before the dot doesn't exist yet. Log it to check.`],
     [/Cannot set propert(?:y|ies) of (undefined|null)/, m => `You tried to set a property on something that is ${m[1]}.`],
-    [/Unexpected token|Unexpected end of input|missing \) after|Invalid or unexpected token/, () => "This is a typing (syntax) mistake: a missing or extra bracket, quote or comma. The red squiggle in the editor shows where."],
+    [/Unexpected token|Unexpected identifier|Unexpected string|Unexpected number|Unexpected end of input|missing \) after|Invalid or unexpected token/, () => "This is a typing (syntax) mistake: a missing or extra bracket, quote or comma. The red squiggle in the editor shows where."],
     [/Identifier '(\w+)' has already been declared/, m => `“${m[1]}” was created twice. Create each name once with let/const, then just reuse it.`],
     [/Maximum call stack/, () => "A function kept calling itself forever. Recursive functions need a stopping condition."],
     [/Loop ran for over/, () => "Look at your loop's condition: it probably never becomes false. Make sure the counter moves toward the end."],
