@@ -53,7 +53,7 @@ function App() {
 <div class="callout"><span class="label">Rule</span>When the next state depends on the previous, use the <strong>updater form</strong>: <code>setX(prev =&gt; …)</code>.</div>
 
 <h2>Objects and arrays: never mutate</h2>
-<p>React compares state by reference. Mutating in place means React sees "the same object" and may skip updating. Always create new objects/arrays (spread, <code>map</code>, <code>filter</code>), exactly as in Lesson 13.</p>
+<p>React compares state by reference. Mutating in place means React sees "the same object" and may skip updating. Always create new objects/arrays (spread, <code>map</code>, <code>filter</code>), exactly as in “<a href="js-array-methods.html">Array methods: map, filter, find &amp; reduce</a>”.</p>
 <textarea class="code" data-lang="jsx" data-run>
 function App() {
   const [form, setForm] = useState({ name: "Ada", city: "London", tags: ["js"] });

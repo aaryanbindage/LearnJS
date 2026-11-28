@@ -134,7 +134,7 @@ const module = device.createShaderModule({ code: /* wgsl */`
 
 <section class="exercises"><h2>Exercises</h2><ol>
 <li>Run the official Three.js <code>webgpu_compute_particles</code> and <code>webgpu_tsl_*</code> examples locally for your pinned version; read the source and annotate the API differences from this lesson.</li>
-<li>Port the Lesson 66 displaced-fresnel material to a <code>MeshStandardNodeMaterial</code> with TSL nodes.</li>
+<li>Port the “<a href="66-shaders-advanced.html">Advanced shaders: SDFs, raymarching, GPGPU</a>” displaced-fresnel material to a <code>MeshStandardNodeMaterial</code> with TSL nodes.</li>
 <li>Build a GPU particle fountain (compute): emit, apply gravity and floor bounce, recycle dead particles. Show the FPS at 100k, 1M and 5M.</li>
 <li>Do the "double values in a storage buffer" compute example in raw WebGPU following webgpufundamentals.org, then read the results back and verify.</li>
 <li>Add feature detection so your app uses <code>WebGPURenderer</code> when available and otherwise a simpler WebGL scene; test by disabling WebGPU in browser flags.</li>

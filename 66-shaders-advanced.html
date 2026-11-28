@@ -93,7 +93,7 @@ mat.onBeforeCompile = (shader) => {
 <tr><td><strong>Toon / cel shading</strong></td><td>Quantize <code>dot(normal, light)</code> with <code>step</code>/gradient texture; add outlines with inverted-hull or post-process</td></tr>
 <tr><td><strong>Water</strong></td><td>Sum of sines or noise for waves; normal maps scrolling; fresnel blend of reflection/refraction; depth-based foam</td></tr>
 <tr><td><strong>Triplanar mapping</strong></td><td>Texture by world position along 3 axes: no UV stretching on terrain/cliffs</td></tr>
-<tr><td><strong>GPU particles</strong></td><td>Store state in textures; update with a ping-pong render target (<code>GPUComputationRenderer</code>) or compute shaders (Lesson 67)</td></tr>
+<tr><td><strong>GPU particles</strong></td><td>Store state in textures; update with a ping-pong render target (<code>GPUComputationRenderer</code>) or compute shaders (“<a href="67-webgpu-tsl.html">WebGPU &amp; TSL</a>”)</td></tr>
 <tr><td><strong>Raymarching / SDF</strong></td><td>Render implicit shapes in a fragment shader by marching rays through a distance function: metaballs, fractals, soft blends</td></tr>
 <tr><td><strong>Vertex animation textures</strong></td><td>Bake complex animation/simulation into textures; play on the GPU (crowds, cloth)</td></tr>
 </table>

@@ -151,7 +151,7 @@ mixer.update(clock.getDelta());
 <ul>
 <li><strong>Draco / Meshopt</strong> compress geometry (<code>DRACOLoader</code>, <code>MeshoptDecoder</code>); <strong>KTX2</strong> compresses textures. <code>gltf-transform</code> or <code>gltfjsx</code> (for R3F) automate it: <code>npx gltf-transform optimize in.glb out.glb --compress draco</code>.</li>
 <li>Aim for under ~5 MB for a hero model on the web; fewer than 100k triangles; few materials (draw calls).</li>
-<li>Reuse via <code>model.clone()</code> or <code>InstancedMesh</code> for many copies (Lesson 38).</li>
+<li>Reuse via <code>model.clone()</code> or <code>InstancedMesh</code> for many copies (“<a href="38-three-physics-post.html">Physics, particles &amp; post-processing</a>”).</li>
 <li>Free up GPU memory: <code>geometry.dispose()</code>, <code>material.dispose()</code>, <code>texture.dispose()</code> when removing objects.</li>
 <li>Use <code>LoadingManager</code> to build a progress bar over many assets.</li>
 </ul>

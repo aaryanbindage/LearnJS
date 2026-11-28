@@ -134,7 +134,7 @@ console.log(await svc.load(1));
 <tr><td>Composite</td><td>The DOM and Three.js scene graph: a tree where nodes and groups share an interface</td></tr>
 <tr><td>Object pool / flyweight</td><td>Particle systems, <code>InstancedMesh</code> sharing geometry</td></tr>
 <tr><td>Repository</td><td>A data-access layer hiding where data comes from (API, cache, IndexedDB)</td></tr>
-<tr><td>Compound components, render props, hooks</td><td>React composition patterns (Lesson 30)</td></tr>
+<tr><td>Compound components, render props, hooks</td><td>React composition patterns (“<a href="30-react-performance.html">Performance, patterns &amp; testing</a>”)</td></tr>
 </table>
 
 <h2>Principles behind the patterns</h2>
@@ -150,7 +150,7 @@ console.log(await svc.load(1));
 <li>Build an <code>EventEmitter</code> with <code>on</code>, <code>once</code>, <code>off</code>, <code>emit</code> and a memory-safe unsubscribe. Use it to decouple a UI from a model.</li>
 <li>Add selectors and middleware (logging) to the <code>createStore</code> above; connect it to React with <code>useSyncExternalStore</code>.</li>
 <li>Model a checkout flow as a state machine (cart → address → payment → confirm → done/failed) and render the UI from the state only.</li>
-<li>Implement undo/redo for the canvas drawing app from Lesson 46 using the command pattern.</li>
+<li>Implement undo/redo for the canvas drawing app from “<a href="46-svg-canvas.html">SVG &amp; Canvas 2D graphics</a>” using the command pattern.</li>
 <li>Implement a reactive <code>observable(obj)</code> with <code>Proxy</code> that logs property sets.</li>
 <li>Write a middleware chain (<code>compose(...mws)(handler)</code>) like Express/Koa for processing requests.</li>
 </ol></section>

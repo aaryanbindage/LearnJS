@@ -114,7 +114,7 @@ const rig = new THREE.Group(); rig.add(camera); scene.add(rig);   // teleport by
 </textarea>
 <h3>VR design rules</h3>
 <ul>
-<li><strong>Frame rate is comfort</strong>: sustain 72–120 fps; dropped frames cause motion sickness. Budget far tighter than desktop (Lesson 68): low poly counts, baked lighting, minimal transparency and post-processing, MSAA over screen-space AA.</li>
+<li><strong>Frame rate is comfort</strong>: sustain 72–120 fps; dropped frames cause motion sickness. Budget far tighter than desktop (“<a href="68-3d-pipeline.html">The 3D asset pipeline: Blender to web</a>”): low poly counts, baked lighting, minimal transparency and post-processing, MSAA over screen-space AA.</li>
 <li><strong>Never move the camera without the user's input</strong> (no unexpected acceleration, camera shake, forced rotation). Use teleport or snap-turn, add vignettes for smooth locomotion.</li>
 <li><strong>Scale is real-world meters</strong>: a door is ~2 m. Test in the headset constantly; the emulator isn't enough.</li>
 <li><strong>UI</strong>: place panels 1–2 m away, large text, world-space (not head-locked). Use ray or direct poke interactions; support hands and controllers.</li>
@@ -129,7 +129,7 @@ const rig = new THREE.Group(); rig.add(camera); scene.add(rig);   // teleport by
 <tr><td>Fallbacks</td><td>WebGL unsupported → static image/video + message; XR unsupported → hide the button; WebGPU → WebGL</td></tr>
 <tr><td>Mobile specifics</td><td>Cap DPR at 1.5–2, avoid heavy shaders and large render targets, handle address-bar resize, prevent scroll/zoom conflicts (<code>touch-action: none</code> on canvas), pause when hidden, watch thermal throttling</td></tr>
 <tr><td>Accessibility</td><td>Keyboard-operable controls, text alternatives and a DOM description of the scene, reduced-motion mode, captions for audio, high-contrast UI, don't gate critical content behind 3D</td></tr>
-<tr><td>Progressive enhancement</td><td>Render meaningful HTML content first (SEO, no-JS), then load the 3D layer lazily after the main content (Lesson 45)</td></tr>
+<tr><td>Progressive enhancement</td><td>Render meaningful HTML content first (SEO, no-JS), then load the 3D layer lazily after the main content (“<a href="45-web-vitals.html">SEO, performance &amp; Core Web Vitals</a>”)</td></tr>
 </table>
 
 <section class="exercises"><h2>Exercises</h2><ol>

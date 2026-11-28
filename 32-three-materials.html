@@ -42,7 +42,7 @@ geo.computeVertexNormals();
 <tr><td><code>MeshStandardMaterial</code></td><td>yes (PBR)</td><td>default for realistic: <code>roughness</code>, <code>metalness</code></td></tr>
 <tr><td><code>MeshPhysicalMaterial</code></td><td>yes (PBR+)</td><td>glass (<code>transmission</code>), clearcoat, sheen, iridescence</td></tr>
 <tr><td><code>MeshToonMaterial</code></td><td>yes</td><td>cel shading</td></tr>
-<tr><td><code>ShaderMaterial</code></td><td>custom</td><td>your own GLSL (Lesson 36)</td></tr>
+<tr><td><code>ShaderMaterial</code></td><td>custom</td><td>your own GLSL (“<a href="36-three-shaders.html">Shaders (GLSL)</a>”)</td></tr>
 </table>
 <textarea class="code" data-lang="js">
 const mat = new THREE.MeshStandardMaterial({
@@ -56,7 +56,7 @@ const mat = new THREE.MeshStandardMaterial({
   flatShading: false,
 });
 mat.color.set("#ff0066");  // change at runtime; mat.needsUpdate = true only for structural changes
-// map, normalMap, roughnessMap, metalnessMap, aoMap, envMap … → Lesson 34
+// map, normalMap, roughnessMap, metalnessMap, aoMap, envMap … → see “Textures, glTF models & environment”
 </textarea>
 
 <h2>Lights</h2>
@@ -69,7 +69,7 @@ mat.color.set("#ff0066");  // change at runtime; mat.needsUpdate = true only for
 <tr><td><code>SpotLight</code></td><td>flashlight cone</td><td>yes</td></tr>
 <tr><td><code>RectAreaLight</code></td><td>softbox / window</td><td>no</td></tr>
 </table>
-<p>Each additional light adds per-pixel cost. Prefer one key directional light, a hemisphere/ambient fill and an environment map (Lesson 34). Light intensities in modern Three.js are physically based: point and spot lights usually need intensities in the dozens, directional around 1–4.</p>
+<p>Each additional light adds per-pixel cost. Prefer one key directional light, a hemisphere/ambient fill and an environment map (“<a href="34-three-models.html">Textures, glTF models &amp; environment</a>”). Light intensities in modern Three.js are physically based: point and spot lights usually need intensities in the dozens, directional around 1–4.</p>
 
 <h2>Everything together (live)</h2>
 <p>Drag to look around is added in the next lesson; here the objects move. Try changing roughness, metalness, light colors and positions.</p>

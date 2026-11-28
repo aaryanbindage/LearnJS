@@ -24,7 +24,7 @@
 <table>
 <tr><th>Decision</th><th>Options → pick when…</th></tr>
 <tr><td><strong>Rendering</strong></td><td>SSG (static content), SSR/streaming (personalized + SEO), ISR (catalogs), CSR (app behind login), islands (mostly-static + interactive bits)</td></tr>
-<tr><td><strong>State ownership</strong></td><td>URL (shareable), server cache (TanStack Query), local state (ephemeral), global store (cross-cutting), see Lesson 61</td></tr>
+<tr><td><strong>State ownership</strong></td><td>URL (shareable), server cache (TanStack Query), local state (ephemeral), global store (cross-cutting), see “<a href="61-react-architecture.html">Advanced state &amp; architecture</a>”</td></tr>
 <tr><td><strong>Data fetching</strong></td><td>REST/GraphQL/RPC; fetch-on-render vs render-as-you-fetch vs server components; prefetch on intent; avoid waterfalls</td></tr>
 <tr><td><strong>Pagination</strong></td><td>Offset (simple, jumpy), cursor (stable, scalable), infinite scroll + virtualization (feeds); preserve scroll on back navigation</td></tr>
 <tr><td><strong>Freshness</strong></td><td>Polling, SSE, WebSocket, push; stale-while-revalidate; optimistic updates with reconciliation</td></tr>
@@ -50,7 +50,7 @@
 <li><strong>Flow</strong>: input → debounce (150–300 ms) → request → results; cancel in-flight requests (<code>AbortController</code>) so stale responses never overwrite newer ones.</li>
 <li><strong>Caching</strong>: cache by normalized query (prefix reuse), in memory + HTTP cache; prefetch popular queries; local filtering when the dataset is small (trie / fuzzy search in a Worker).</li>
 <li><strong>Ranking</strong> on the server (popularity, recency, personalization); highlight matches; keep latency &lt; 100 ms perceived.</li>
-<li><strong>A11y (ARIA combobox pattern)</strong>: <code>role="combobox"</code>, <code>aria-expanded</code>, <code>aria-controls</code>, <code>aria-activedescendant</code>, arrow keys / Enter / Escape, announce result count in a live region. Better: use a headless library (Lesson 62).</li>
+<li><strong>A11y (ARIA combobox pattern)</strong>: <code>role="combobox"</code>, <code>aria-expanded</code>, <code>aria-controls</code>, <code>aria-activedescendant</code>, arrow keys / Enter / Escape, announce result count in a live region. Better: use a headless library (“<a href="62-design-systems.html">Design systems &amp; component libraries</a>”).</li>
 <li><strong>Edge cases</strong>: IME composition, paste, very fast typing, empty results, errors, mobile keyboards.</li>
 </ul>
 

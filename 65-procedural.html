@@ -134,7 +134,7 @@ for (let i = 0; i < COUNT; i++) {
 }
 mesh.instanceMatrix.needsUpdate = true;
 scene.add(mesh);
-// Wind animation of instances is best done in a vertex shader (Lesson 66), not by rewriting 5,000 matrices on the CPU each frame.
+// Wind animation of instances is best done in a vertex shader (see “Advanced shaders: SDFs, raymarching, GPGPU”), not by rewriting 5,000 matrices on the CPU each frame.
 </textarea>
 
 <h2>Techniques catalogue</h2>
@@ -148,7 +148,7 @@ scene.add(mesh);
 <tr><td><strong>Wave function collapse</strong></td><td>Tile-based level and city layouts obeying constraints</td></tr>
 <tr><td><strong>Chunking + LOD</strong></td><td>Infinite worlds: generate chunks around the player, drop distant ones, lower detail far away</td></tr>
 <tr><td><strong>Heightmap textures</strong></td><td>Do displacement on the GPU in a vertex shader; compute normals in the fragment shader</td></tr>
-<tr><td><strong>Web Workers</strong></td><td>Generate chunks off the main thread; transfer typed arrays back (Lesson 52)</td></tr>
+<tr><td><strong>Web Workers</strong></td><td>Generate chunks off the main thread; transfer typed arrays back (“<a href="52-web-apis.html">Workers, service workers, IndexedDB &amp; PWAs</a>”)</td></tr>
 </table>
 <div class="callout"><span class="label">Performance</span>Generation can take hundreds of ms. Build in a Worker, show a loading state, reuse buffers, and update <code>BufferAttribute</code>s in place instead of recreating geometry. Always dispose geometry you discard.</div>
 

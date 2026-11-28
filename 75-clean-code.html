@@ -56,7 +56,7 @@ console.log(paidRevenue({ active: true }, orders), paidRevenue({ active: true },
 <li><strong>DRY, but not at any cost</strong>: duplication is cheaper than the wrong abstraction. Wait for the third occurrence ("rule of three") and make sure the pieces change for the same reason.</li>
 <li><strong>KISS / YAGNI</strong>: build what's needed now. Speculative generality (config for features nobody asked for) is debt.</li>
 <li><strong>SOLID in spirit</strong>: single responsibility, depend on abstractions at boundaries, prefer composition. Don't turn it into ceremony.</li>
-<li><strong>Make illegal states unrepresentable</strong> (Lesson 47). <strong>Fail fast</strong> with clear errors at boundaries.</li>
+<li><strong>Make illegal states unrepresentable</strong> (“<a href="47-ts-fundamentals.html">TypeScript in depth: modeling real data</a>”). <strong>Fail fast</strong> with clear errors at boundaries.</li>
 <li><strong>Separation of concerns</strong>: UI, state, data access, business rules. <strong>Command–query separation</strong>: functions either do something or return something.</li>
 <li><strong>Law of Demeter</strong>: talk to your direct collaborators (<code>order.total()</code>), not through chains (<code>order.customer.address.country.code</code>).</li>
 <li><strong>Immutability and explicit dependencies</strong> make code predictable and testable.</li>

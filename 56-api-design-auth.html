@@ -47,7 +47,7 @@ GET /api/products?category=shoes&min_price=50&sort=-created_at&limit=20&cursor=e
 <tr><td><strong>GraphQL</strong></td><td>Client chooses fields; one endpoint; strong schema; good for many different clients</td><td>Caching, N+1 on the server (DataLoader), query cost limiting, more complexity</td></tr>
 <tr><td><strong>tRPC</strong></td><td>End-to-end TypeScript types with zero codegen, great for a monorepo with one TS client</td><td>TypeScript-only; not a public API</td></tr>
 <tr><td><strong>Server Actions / RPC</strong> (Next.js)</td><td>Call server functions from components</td><td>Tied to the framework; treat them as public endpoints and authorize in each</td></tr>
-<tr><td><strong>WebSocket / SSE</strong></td><td>Push updates</td><td>Stateful connections to scale (Lesson 59)</td></tr>
+<tr><td><strong>WebSocket / SSE</strong></td><td>Push updates</td><td>Stateful connections to scale (“<a href="59-realtime.html">Real-time: WebSockets &amp; multiplayer state</a>”)</td></tr>
 </table>
 <textarea class="code" data-lang="js" data-file="graphql-example.graphql">
 query Product($id: ID!) {
@@ -146,7 +146,7 @@ export async function getOrder(req) {
 <ul>
 <li><strong>Rate limiting</strong> (per IP and per account): token bucket in Redis; stricter on login, signup, password reset. Return <code>429</code> with <code>Retry-After</code>.</li>
 <li><strong>Limits</strong>: body size, pagination size, query depth/complexity (GraphQL), upload types and sizes, request timeouts.</li>
-<li><strong>CORS</strong> allow-list; <strong>CSRF</strong> protection when using cookies (Lesson 53); security headers (<code>helmet</code>).</li>
+<li><strong>CORS</strong> allow-list; <strong>CSRF</strong> protection when using cookies (“<a href="53-security.html">Web security: XSS, CSRF, CSP, auth</a>”); security headers (<code>helmet</code>).</li>
 <li><strong>Webhooks</strong>: verify signatures (HMAC) and timestamps; make handlers idempotent.</li>
 <li><strong>Audit logs</strong> for sensitive actions; alert on anomalies.</li>
 </ul>
