@@ -209,6 +209,8 @@
     2366: "The function says it returns a value, but some paths reach the end without returning.",
     2349: "You're calling something as a function, but its type isn't a function.",
     2769: "None of the ways this function can be called match the arguments you gave.",
+    2454: "There's a path through your code where this variable never gets a value. Make sure every if/else branch sets it.",
+    2678: "This case can never match: the value isn't one of the types allowed here. Check the spelling.",
     1005: "Syntax mistake: a symbol (often a bracket, comma or semicolon) is missing here.",
   };
   const hintFor = msg => { for (const [re, f] of RUNTIME_HINTS) { const m = msg.match(re); if (m) return f(m); } return ""; };
@@ -277,7 +279,7 @@
   }
 
   // ---- the sandbox page that example code runs inside ----
-  const BRIDGE = (key) => `<script>(()=>{const K=${JSON.stringify(key)};const send=(t,d)=>parent.postMessage({__lc:K,t,d},"*");
+  const BRIDGE = (key) => `<script>(()=>{const K=${JSON.stringify(key)};let sent=0;const send=(t,d)=>{if(t!=="error"&&++sent>500){if(sent===501)parent.postMessage({__lc:K,t:"warn",d:"Stopped showing output after 500 lines, to keep the page fast."},"*");return}parent.postMessage({__lc:K,t,d},"*")};
 const fmt=(v,d=0,seen=new WeakSet())=>{if(v===null)return"null";const t=typeof v;
 if(t==="string")return d?JSON.stringify(v):v;if(t==="number")return Object.is(v,-0)?"-0":String(v);
 if(t==="boolean"||t==="undefined")return String(v);if(t==="bigint")return v+"n";if(t==="symbol")return v.toString();

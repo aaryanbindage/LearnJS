@@ -3,111 +3,324 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 11 — Operators & Control Flow</title>
+<title>Making decisions: if, else &amp; switch</title>
 <link rel="stylesheet" href="assets/course.css">
 </head>
 <body data-slug="11-js-control-flow">
 <main><article>
-<h1>Lesson 11 — Operators &amp; control flow</h1>
-<p class="lede">Make decisions and repeat work.</p>
+<h1>Making decisions: if, else &amp; switch</h1>
+<p class="lede">So far every program has run every line, top to bottom. Real programs need to choose: show the "Log in" button <em>or</em> the user's name; say "You win!" <em>or</em> "Try again". This lesson teaches your code to make decisions.</p>
 
-<h2>Operators</h2>
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Run code only when a condition is true, with <code>if</code>.</li>
+<li>Choose between two or more paths with <code>else</code> and <code>else if</code>.</li>
+<li>Write short either/or values with the ternary operator <code>? :</code>.</li>
+<li>Pick from many fixed options with <code>switch</code>.</li>
+<li>See how TypeScript makes sure a variable gets a value on every path.</li>
+</ul><p class="time">About 45 minutes.</p></section>
+
+<h2>The <code>if</code> statement</h2>
+<p>An <code>if</code> statement runs a block of code only when a condition is true. Here's the shape:</p>
+<textarea class="code" data-lang="js">
+if (condition) {
+  // code here runs only when the condition is true
+}
+</textarea>
+<ul>
+<li>The <strong>condition</strong> goes in parentheses. It's any question that gives a boolean, like the comparisons from the last lesson.</li>
+<li>The code to run goes between <dfn>curly braces</dfn> <code>{ }</code>. The code inside the braces is called a <dfn>block</dfn>.</li>
+<li>The code inside is <strong>indented</strong> (pushed right by two spaces). JavaScript doesn't require this, but it makes it easy to see what's inside the block. Always do it.</li>
+</ul>
 <textarea class="code" data-lang="js" data-run>
-console.log(7 + 2, 7 - 2, 7 * 2, 7 / 2, 7 % 2, 2 ** 10);   // arithmetic
-console.log(7 > 2, 7 >= 7, 7 !== 7);                        // comparison
-console.log(true && false, true || false, !true);           // logical
-console.log(5 & 3, 5 | 3, 5 ^ 3, 1 << 4);                   // bitwise (rare)
+const temperature = 30;
+
+if (temperature > 25) {
+  console.log("It's hot! Wear sunscreen.");
+}
+
+console.log("This line always runs.");
+</textarea>
+<div class="try"><span class="label">Try it</span>Change <code>temperature</code> to <code>15</code> and run again. The sunscreen message disappears, but the last line still prints, because it's outside the braces.</div>
+
+<h2><code>else</code>: the other path</h2>
+<p>Often you want to do one thing <em>or</em> another. <code>else</code> gives you a block that runs when the condition is false:</p>
+<textarea class="code" data-lang="js" data-run>
+const age = 15;
+
+if (age >= 18) {
+  console.log("You can vote.");
+} else {
+  console.log("Not yet. You can vote in", 18 - age, "years.");
+}
+</textarea>
+<p>Exactly one of the two blocks runs, never both, never neither.</p>
+<div class="callout analogy"><span class="label">Analogy</span>A fork in a road. You look at the sign (the condition) and take one path. You can't take both.</div>
+
+<h2><code>else if</code>: more than two paths</h2>
+<p>For three or more options, chain conditions with <code>else if</code>. JavaScript checks them in order, from the top, and runs the <strong>first</strong> one that's true. Then it skips the rest.</p>
+<textarea class="code" data-lang="js" data-run>
+const score = 82;
+
+if (score >= 90) {
+  console.log("Grade: A");
+} else if (score >= 80) {
+  console.log("Grade: B");
+} else if (score >= 70) {
+  console.log("Grade: C");
+} else {
+  console.log("Grade: F");
+}
+</textarea>
+<p>Let's trace it with <code>score = 82</code>:</p>
+<ol>
+<li>Is 82 ≥ 90? No. Move on.</li>
+<li>Is 82 ≥ 80? Yes! Print "Grade: B" and <strong>stop</strong>. The remaining checks are skipped.</li>
+</ol>
+<p>You might wonder why the B check doesn't also need "and less than 90". It doesn't, because we only reach it if the A check already failed. That's why <strong>order matters</strong>.</p>
+<div class="quiz"><p>If we swapped the order so <code>score &gt;= 70</code> was checked first, what grade would a score of 95 get?</p>
+<button>A</button><button>B</button><button data-correct>C</button>
+<p class="why">95 ≥ 70 is true, so the first block runs and prints C. The A check is never reached. With <code>else if</code> chains, put the most specific (here, the highest) condition first.</p></div>
+<div class="try"><span class="label">Try it</span>Run the grade example with scores of 95, 70, 69 and 100. Then add a check so a score above 100 prints "That's not a real score".</div>
+
+<h2>Conditions with <code>&amp;&amp;</code>, <code>||</code> and truthiness</h2>
+<p>Any boolean expression works as a condition, including combined ones:</p>
+<textarea class="code" data-lang="js" data-run>
+const isWeekend = true;
+const isRaining = false;
+
+if (isWeekend && !isRaining) {
+  console.log("Let's go to the park!");
+} else if (isWeekend) {
+  console.log("Weekend, but rainy. Movie day.");
+} else {
+  console.log("Work day.");
+}
+</textarea>
+<p>Because of truthiness, you can also check "is there something here?" directly:</p>
+<textarea class="code" data-lang="js" data-run>
+const username = "";   // try putting your name here
+
+if (username) {
+  console.log(`Welcome back, ${username}!`);
+} else {
+  console.log("Please enter your name.");
+}
+</textarea>
+<p>An empty string is falsy, so <code>if (username)</code> means "if a name was typed".</p>
+
+<h2>Blocks inside blocks</h2>
+<p>You can put an <code>if</code> inside another <code>if</code>. This is called <dfn>nesting</dfn>:</p>
+<textarea class="code" data-lang="js" data-run>
+const isLoggedIn = true;
+const isAdmin = false;
+
+if (isLoggedIn) {
+  console.log("Showing your dashboard.");
+  if (isAdmin) {
+    console.log("Showing admin tools too.");
+  }
+} else {
+  console.log("Please log in.");
+}
+</textarea>
+<p>Nesting is fine for one or two levels. Deeper than that gets hard to follow, and combining conditions with <code>&amp;&amp;</code> or reordering the checks is usually clearer.</p>
+
+<h2>Variables made inside a block stay inside</h2>
+<p>A variable created with <code>let</code> or <code>const</code> inside braces only exists inside those braces. This is called <dfn>block scope</dfn>:</p>
+<textarea class="code" data-lang="js" data-run>
+const hour = 9;
+
+if (hour < 12) {
+  const greeting = "Good morning";
+  console.log(greeting);   // works: we're inside the block
+}
+
+console.log(greeting);     // error: greeting doesn't exist out here
+</textarea>
+<p>If you need the value afterwards, create the variable <em>before</em> the <code>if</code> and fill it in inside:</p>
+<textarea class="code" data-lang="js" data-run>
+const hour = 15;
+let greeting;
+
+if (hour < 12) {
+  greeting = "Good morning";
+} else if (hour < 18) {
+  greeting = "Good afternoon";
+} else {
+  greeting = "Good evening";
+}
+
+console.log(greeting);
+</textarea>
+
+<h2>The ternary operator: a one-line if/else</h2>
+<p>When you just need to pick one of two <em>values</em>, there's a compact form called the <dfn>ternary operator</dfn>:</p>
+<textarea class="code" data-lang="js">
+condition ? valueIfTrue : valueIfFalse
+</textarea>
+<p>Read the <code>?</code> as "if so," and the <code>:</code> as "otherwise,".</p>
+<textarea class="code" data-lang="js" data-run>
 const age = 20;
-console.log(age >= 18 ? "adult" : "minor");                 // ternary
+const label = age >= 18 ? "adult" : "minor";
+console.log(label);
 
-// && and || return one of their operands (short-circuit):
-console.log("hi" && "there", "" || "fallback");
-const user = null;
-console.log(user && user.name);        // null (guard)
+const items = 1;
+console.log(`You have ${items} ${items === 1 ? "item" : "items"} in your cart.`);
 </textarea>
+<p>That's the same as writing an <code>if/else</code> that sets <code>label</code>, in one line. Use it for short, simple choices. If you're tempted to put a ternary inside another ternary, use <code>if/else</code> instead; it'll be much easier to read.</p>
 
-<h2>if / else</h2>
+<h2><code>switch</code>: choosing from a list of exact values</h2>
+<p>When you compare one value against many exact options, a <code>switch</code> can be tidier than a long <code>else if</code> chain:</p>
 <textarea class="code" data-lang="js" data-run>
-function grade(score) {
-  if (score >= 90) return "A";
-  else if (score >= 80) return "B";
-  else if (score >= 70) return "C";
-  return "F";
-}
-console.log(grade(95), grade(82), grade(40));
+const day = "Tuesday";
 
-// Early return (guard clauses) keeps code flat:
-function area(w, h) {
-  if (typeof w !== "number" || typeof h !== "number") return NaN;
-  if (w < 0 || h < 0) return 0;
-  return w * h;
-}
-console.log(area(3, 4), area("a", 2), area(-1, 5));
-</textarea>
-
-<h2>switch</h2>
-<textarea class="code" data-lang="js" data-run>
-function dayType(d) {
-  switch (d) {
-    case "sat":
-    case "sun": return "weekend";     // fall-through grouping
-    case "fri": return "almost!";
-    default:    return "weekday";
-  }
-}
-console.log(dayType("sun"), dayType("fri"), dayType("tue"));
-</textarea>
-<p>Don't forget <code>break</code> (or <code>return</code>) in each case or execution falls through.</p>
-
-<h2>Loops</h2>
-<textarea class="code" data-lang="js" data-run>
-for (let i = 0; i < 3; i++) console.log("for", i);
-
-let n = 3;
-while (n > 0) { console.log("while", n); n--; }
-
-let k = 0;
-do { console.log("do-while runs at least once", k); k++; } while (k < 1);
-
-for (const ch of "hey") console.log("for…of", ch);         // iterate VALUES
-const obj = { a: 1, b: 2 };
-for (const key in obj) console.log("for…in", key, obj[key]);  // iterate KEYS
-for (const [k2, v] of Object.entries(obj)) console.log(k2, v);
-
-outer: for (let i = 0; i < 3; i++) {
-  for (let j = 0; j < 3; j++) {
-    if (j === 1) continue;           // skip this iteration
-    if (i === 2) break outer;        // exit both loops
-    console.log(i, j);
-  }
+switch (day) {
+  case "Saturday":
+  case "Sunday":
+    console.log("Weekend!");
+    break;
+  case "Friday":
+    console.log("Almost the weekend.");
+    break;
+  default:
+    console.log("A regular weekday.");
 }
 </textarea>
-<div class="callout warn"><span class="label">Careful</span>Use <code>for…of</code> for arrays (values). <code>for…in</code> iterates keys including inherited ones, so use it only for plain objects, if at all.</div>
+<ul>
+<li><code>switch (day)</code> says which value to look at.</li>
+<li>Each <code>case "...":</code> is one possible value, checked with <code>===</code>.</li>
+<li><code>break</code> means "done, leave the switch". <strong>Without it, the code keeps running into the next case</strong>, which is a classic bug.</li>
+<li>Two cases stacked together (Saturday and Sunday) share the same code.</li>
+<li><code>default:</code> runs if nothing matched, like a final <code>else</code>.</li>
+</ul>
+<div class="try"><span class="label">Try it</span>Delete the <code>break;</code> under "Almost the weekend." and set <code>day</code> to <code>"Friday"</code>. Run it. Both messages print, because without <code>break</code> the code "falls through" to the next case.</div>
 
-<h2>Worked example: FizzBuzz</h2>
-<textarea class="code" data-lang="js" data-run>
-const out = [];
-for (let i = 1; i <= 20; i++) {
-  if (i % 15 === 0) out.push("FizzBuzz");
-  else if (i % 3 === 0) out.push("Fizz");
-  else if (i % 5 === 0) out.push("Buzz");
-  else out.push(i);
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>A semicolon after the condition</strong>: <code>if (x &gt; 5); { ... }</code>. The <code>;</code> ends the <code>if</code> immediately, so the block always runs.</li>
+<li><strong><code>=</code> instead of <code>===</code></strong> in a condition: <code>if (score = 100)</code> sets the score instead of checking it.</li>
+<li><strong>Wrong order in an <code>else if</code> chain</strong>: put the most specific condition first.</li>
+<li><strong>Forgetting <code>break</code></strong> in a <code>switch</code>.</li>
+<li><strong>Missing braces</strong>: <code>if (x) doA(); doB();</code> only makes <code>doA</code> conditional. Always use braces.</li>
+</ul></div>
+
+<h2 class="ts-head">In TypeScript</h2>
+<p><code>if</code>, <code>else</code>, ternaries and <code>switch</code> are written exactly the same in TypeScript. What TypeScript adds is checking that your decisions make sense.</p>
+
+<h3>Every path must give a value</h3>
+<p>Remember the pattern of creating a variable before an <code>if</code> and filling it in on each path? It's easy to forget a path. TypeScript notices:</p>
+<textarea class="code" data-lang="ts" data-run>
+const hour: number = 20;
+let greeting: string;
+
+if (hour < 12) {
+  greeting = "Good morning";
+} else if (hour < 18) {
+  greeting = "Good afternoon";
 }
-console.log(out.join(" "));
-</textarea>
 
-<section class="exercises"><h2>Exercises</h2><ol>
-<li>Write <code>isLeapYear(year)</code> (divisible by 4, except centuries unless divisible by 400).</li>
-<li>Print a 5-row right triangle of <code>*</code> using nested loops or <code>"*".repeat(i)</code>.</li>
-<li>Sum all numbers from 1 to 100 with a loop. Then verify with the formula n(n+1)/2.</li>
-<li>Find all prime numbers up to 50.</li>
-<li>Write a number-guessing function that takes a guess and a secret and returns "higher", "lower" or "correct".</li>
-<li>Collatz: starting from n, if even divide by 2, else 3n+1. Count steps to reach 1 for n=27.</li>
+console.log(greeting);   // ✖ what if hour is 20?
+</textarea>
+<p>The error is <code>Variable 'greeting' is used before being assigned</code>. TypeScript traced every path through the code and found one (hour 18 or later) where <code>greeting</code> never gets a value. In JavaScript, you'd see <code>undefined</code> printed in the evening and wonder why. Add an <code>else</code> that sets <code>greeting = "Good evening"</code> and the error disappears.</p>
+
+<h3>Ternaries and literal types</h3>
+<p>Hover over <code>label</code>:</p>
+<textarea class="code" data-lang="ts" data-run>
+const score: number = 72;
+const label = score >= 50 ? "pass" : "fail";
+console.log(label);
+</textarea>
+<p>The type is <code>"pass" | "fail"</code>. TypeScript knows <code>label</code> can only ever be one of those two exact strings. The <code>|</code> means "or". This kind of type, a list of allowed values, is called a <dfn>union type</dfn>. You'll learn to write your own in a few lessons.</p>
+
+<h3>Impossible cases</h3>
+<p>Because TypeScript knows which values are possible, it can spot a <code>case</code> that could never match. Here we create a named type <code>Light</code> that allows only three colours (the <code>type</code> keyword gives a type a name; more on that soon), and one case has a typo:</p>
+<textarea class="code" data-lang="ts" data-run>
+type Light = "red" | "yellow" | "green";   // the only allowed values
+let light = "yellow" as Light;              // "as Light": pretend this came from a sensor, so it could be any of them
+
+switch (light) {
+  case "red":
+    console.log("Stop");
+    break;
+  case "yelow":           // ✖ typo! TypeScript knows this value is impossible
+    console.log("Slow down");
+    break;
+  case "green":
+    console.log("Go");
+    break;
+}
+
+light = "blue";           // ✖ not one of the allowed values
+</textarea>
+<p>Both errors say the value isn't one of the allowed ones (<code>Type '"yelow"' is not comparable to type 'Light'</code>). In plain JavaScript, the typo'd case would silently never run.</p>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li><code>if (condition) { ... }</code> runs a block only when the condition is truthy.</li>
+<li><code>else</code> handles the false case; <code>else if</code> adds more options, checked top to bottom, first match wins.</li>
+<li>Variables made inside <code>{ }</code> only exist inside them (block scope).</li>
+<li><code>condition ? a : b</code> picks one of two values.</li>
+<li><code>switch</code> compares one value to many exact cases. Don't forget <code>break</code>.</li>
+<li>TypeScript checks every path sets your variables, and flags cases that can never match.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space
+
+</textarea>
+<ol>
+<li>Write a program that checks a number and prints "positive", "negative" or "zero".
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const n: number = -4;
+if (n > 0) {
+  console.log("positive");
+} else if (n < 0) {
+  console.log("negative");
+} else {
+  console.log("zero");
+}
+</textarea></details></li>
+<li>Use <code>%</code> to check whether a number is even or odd, and print the answer using a ternary.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const n = 7;
+console.log(n % 2 === 0 ? "even" : "odd");
+</textarea></details></li>
+<li>Ticket prices: under 4 is free, 4 to 17 costs 8, 65 and over costs 6, everyone else pays 12. Store the price in a variable and print it.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const age: number = 70;
+let price: number;
+if (age < 4) {
+  price = 0;
+} else if (age <= 17) {
+  price = 8;
+} else if (age >= 65) {
+  price = 6;
+} else {
+  price = 12;
+}
+console.log(`Your ticket costs $${price}`);
+</textarea></details></li>
+<li>Write a <code>switch</code> on a variable <code>month</code> (a number 1–12) that prints the season (Northern Hemisphere: 12, 1, 2 are winter, and so on).
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const month: number = 4;
+switch (month) {
+  case 12: case 1: case 2:
+    console.log("Winter"); break;
+  case 3: case 4: case 5:
+    console.log("Spring"); break;
+  case 6: case 7: case 8:
+    console.log("Summer"); break;
+  case 9: case 10: case 11:
+    console.log("Autumn"); break;
+  default:
+    console.log("Not a month!");
+}
+</textarea></details></li>
 </ol></section>
 
-<section class="checkpoint"><h2>Checkpoint</h2>
-<details><summary>What does `a && b` return when a is truthy?</summary>b. Logical operators return an operand, not necessarily a boolean.</details>
-<details><summary>for…of vs for…in?</summary>of iterates values of an iterable; in iterates enumerable property keys.</details>
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>In an <code>if / else if / else</code> chain, how many blocks run?</summary>Exactly one: the first whose condition is true, or the <code>else</code> if none are.</details>
+<details><summary>What does <code>break</code> do in a <code>switch</code>?</summary>It exits the switch. Without it, execution continues into the next case.</details>
+<details><summary>What does "used before being assigned" mean in TypeScript?</summary>There's at least one path through your code where the variable never gets a value, but you use it afterwards.</details>
 </section>
 </article></main>
 <script src="assets/lessons.js"></script>

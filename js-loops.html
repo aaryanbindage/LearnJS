@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loops: repeating code</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="js-loops">
+<main><article>
+<h1>Loops: repeating code</h1>
+<p class="lede">Computers are brilliant at doing the same thing over and over without getting bored. A loop runs a block of code many times, so you can count to a million, go through every item in a list, or keep a game running, with only a few lines of code.</p>
+
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Repeat code while a condition is true with <code>while</code>.</li>
+<li>Count with the <code>for</code> loop, and understand each of its three parts.</li>
+<li>Go through every character of a string with <code>for...of</code>.</li>
+<li>Build up a result inside a loop (totals, counts, new strings).</li>
+<li>Stop early with <code>break</code>, skip with <code>continue</code>, and avoid infinite loops.</li>
+</ul><p class="time">About 50 minutes. This is a big idea, so take breaks.</p></section>
+
+<h2>Why loops?</h2>
+<p>Say you want to print the numbers 1 to 5. Without a loop:</p>
+<textarea class="code" data-lang="js" data-run>
+console.log(1);
+console.log(2);
+console.log(3);
+console.log(4);
+console.log(5);
+</textarea>
+<p>Fine for 5. But what about 1 to 1000? Or "print every product in the shop", when you don't know in advance how many there are? You need a way to say "do this repeatedly". That's a <dfn>loop</dfn>.</p>
+
+<h2>The <code>while</code> loop</h2>
+<p>A <code>while</code> loop looks just like an <code>if</code>, with one difference: when the block finishes, it goes back and checks the condition <em>again</em>. It keeps going round as long as the condition is true.</p>
+<textarea class="code" data-lang="js" data-run>
+let count = 1;
+
+while (count <= 5) {
+  console.log(count);
+  count = count + 1;
+}
+
+console.log("Done! count is now", count);
+</textarea>
+<p>Let's trace it. Each trip through the block is called an <dfn>iteration</dfn>:</p>
+<table>
+<tr><th>Check</th><th><code>count &lt;= 5</code>?</th><th>What happens</th></tr>
+<tr><td>1st</td><td>1 ≤ 5: true</td><td>print 1, count becomes 2</td></tr>
+<tr><td>2nd</td><td>2 ≤ 5: true</td><td>print 2, count becomes 3</td></tr>
+<tr><td>3rd</td><td>3 ≤ 5: true</td><td>print 3, count becomes 4</td></tr>
+<tr><td>4th</td><td>4 ≤ 5: true</td><td>print 4, count becomes 5</td></tr>
+<tr><td>5th</td><td>5 ≤ 5: true</td><td>print 5, count becomes 6</td></tr>
+<tr><td>6th</td><td>6 ≤ 5: <strong>false</strong></td><td>stop, and continue after the loop</td></tr>
+</table>
+<div class="try"><span class="label">Try it</span><ol>
+<li>Change <code>5</code> to <code>1000</code> and run. A thousand lines, same three lines of code.</li>
+<li>Change it to count down from 10 to 1. (Start at 10, keep going while <code>count &gt;= 1</code>, and subtract 1 each time.)</li>
+</ol></div>
+
+<h3>Infinite loops</h3>
+<p>What if the condition never becomes false? Look at this code (don't worry, it's safe to run here):</p>
+<textarea class="code" data-lang="js" data-run>
+let n = 1;
+while (n <= 5) {
+  console.log(n);
+  // Oops: we forgot to change n, so n <= 5 is true forever.
+}
+</textarea>
+<p>This is an <dfn>infinite loop</dfn>. On a normal web page it would freeze the tab. The editors on this site have a safety switch that stops any loop after 3 seconds. Outside this site, if it happens, close the tab.</p>
+<div class="callout"><span class="label">Every loop needs three things</span>
+<ol><li>A <strong>starting point</strong> (<code>let count = 1</code>)</li><li>A <strong>condition</strong> to keep going (<code>count &lt;= 5</code>)</li><li>A <strong>step</strong> that moves towards the end (<code>count = count + 1</code>)</li></ol>
+If the step is missing or goes the wrong way, the loop never ends.</div>
+
+<h2>The <code>for</code> loop</h2>
+<p>Those three things are needed so often that there's a loop that puts them all on one line. This <code>for</code> loop does exactly the same as the <code>while</code> loop above:</p>
+<textarea class="code" data-lang="js" data-run>
+for (let i = 1; i <= 5; i++) {
+  console.log(i);
+}
+</textarea>
+<p>The parentheses hold three parts, separated by semicolons:</p>
+<table>
+<tr><th>Part</th><th>Code</th><th>When it runs</th></tr>
+<tr><td>Start</td><td><code>let i = 1</code></td><td>Once, before the loop begins</td></tr>
+<tr><td>Condition</td><td><code>i &lt;= 5</code></td><td>Before every iteration. If false, the loop ends.</td></tr>
+<tr><td>Step</td><td><code>i++</code></td><td>After every iteration (<code>i++</code> means add 1)</td></tr>
+</table>
+<p>The counter is traditionally called <code>i</code> (for "index"). It's one of the few places where a one-letter name is normal.</p>
+<p>The step can be anything, not just <code>i++</code>:</p>
+<textarea class="code" data-lang="js" data-run>
+// Count by twos
+for (let i = 0; i <= 10; i += 2) {
+  console.log("even:", i);
+}
+
+// Count down
+for (let i = 3; i >= 1; i--) {
+  console.log(i, "...");
+}
+console.log("Liftoff!");
+</textarea>
+
+<div class="quiz"><p>How many times does this print? <code>for (let i = 0; i &lt; 3; i++) { console.log("hi"); }</code></p>
+<button>2</button><button data-correct>3</button><button>4</button>
+<p class="why"><code>i</code> takes the values 0, 1 and 2. When it reaches 3, <code>3 &lt; 3</code> is false, so the loop stops. Starting at 0 and using <code>&lt;</code> is the most common pattern: it runs exactly that many times.</p></div>
+
+<h2>Using the counter</h2>
+<p>The counter isn't just for counting. You can use it in calculations:</p>
+<textarea class="code" data-lang="js" data-run>
+// The 7 times table
+for (let i = 1; i <= 10; i++) {
+  console.log(`7 x ${i} = ${7 * i}`);
+}
+</textarea>
+
+<h2>Building up a result</h2>
+<p>A very common pattern: make a variable <em>before</em> the loop, then add to it on each iteration. This is called an <dfn>accumulator</dfn>.</p>
+<textarea class="code" data-lang="js" data-run>
+// Add up the numbers from 1 to 100
+let total = 0;
+
+for (let i = 1; i <= 100; i++) {
+  total = total + i;
+}
+
+console.log("Total:", total);   // 5050
+</textarea>
+<p>The same idea works with strings:</p>
+<textarea class="code" data-lang="js" data-run>
+let stars = "";
+for (let i = 0; i < 5; i++) {
+  stars += "★";
+  console.log(stars);
+}
+</textarea>
+<p>And with counting things that match a condition, by putting an <code>if</code> inside the loop:</p>
+<textarea class="code" data-lang="js" data-run>
+// How many numbers between 1 and 50 divide evenly by 7?
+let count = 0;
+for (let i = 1; i <= 50; i++) {
+  if (i % 7 === 0) {
+    count++;
+  }
+}
+console.log(count);   // 7, 14, 21, 28, 35, 42, 49 → 7
+</textarea>
+
+<h2>Looping over a string with <code>for...of</code></h2>
+<p>To go through each character of a string, you could use a counting loop with indexes:</p>
+<textarea class="code" data-lang="js" data-run>
+const word = "hello";
+for (let i = 0; i < word.length; i++) {
+  console.log(i, word[i]);
+}
+</textarea>
+<p>Notice <code>i &lt; word.length</code>: indexes go from 0 to <code>length - 1</code>, so we stop before reaching <code>length</code>. But when you just want each character and don't care about the position, there's a simpler loop, <code>for...of</code>:</p>
+<textarea class="code" data-lang="js" data-run>
+const word = "hello";
+for (const letter of word) {
+  console.log(letter);
+}
+</textarea>
+<p>Read it as "for each <code>letter</code> of <code>word</code>". No counter, no condition, no step, and no chance of an off-by-one mistake. You'll use <code>for...of</code> constantly with arrays (lists) in a couple of lessons.</p>
+<textarea class="code" data-lang="js" data-run>
+// Count the vowels in a sentence
+const sentence = "The quick brown fox jumps over the lazy dog";
+let vowels = 0;
+for (const ch of sentence.toLowerCase()) {
+  if ("aeiou".includes(ch)) {
+    vowels++;
+  }
+}
+console.log("Vowels:", vowels);
+</textarea>
+
+<h2><code>break</code> and <code>continue</code></h2>
+<p><code>break</code> exits a loop immediately. It's useful when you're searching for something and have found it:</p>
+<textarea class="code" data-lang="js" data-run>
+// Find the first number above 100 that divides evenly by 17
+for (let i = 101; i < 1000; i++) {
+  if (i % 17 === 0) {
+    console.log("Found it:", i);
+    break;   // stop looking
+  }
+}
+</textarea>
+<p><code>continue</code> skips the rest of the current iteration and jumps straight to the next one:</p>
+<textarea class="code" data-lang="js" data-run>
+// Print 1 to 10, but skip multiples of 3
+for (let i = 1; i <= 10; i++) {
+  if (i % 3 === 0) {
+    continue;   // skip the console.log below for this i
+  }
+  console.log(i);
+}
+</textarea>
+
+<h2>Loops inside loops</h2>
+<p>A loop can contain another loop. For each iteration of the outer loop, the inner loop runs completely:</p>
+<textarea class="code" data-lang="js" data-run>
+for (let row = 1; row <= 3; row++) {
+  let line = "";
+  for (let col = 1; col <= 4; col++) {
+    line += `${row}x${col}=${row * col}  `;
+  }
+  console.log(line);
+}
+</textarea>
+<p>The outer loop runs 3 times; each time, the inner loop runs 4 times, so the inner code runs 12 times in total.</p>
+
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Off by one</strong>: <code>i &lt;= word.length</code> goes one past the end. With indexes starting at 0, use <code>i &lt; length</code>.</li>
+<li><strong>Infinite loops</strong>: forgetting the step, or stepping the wrong way (<code>i--</code> when counting up).</li>
+<li><strong>Resetting the accumulator inside the loop</strong>: if <code>let total = 0</code> is inside the braces, it starts from zero on every iteration.</li>
+<li><strong>Commas instead of semicolons</strong> in the <code>for</code> header: it's <code>for (let i = 0; i &lt; 5; i++)</code>.</li>
+</ul></div>
+
+<h2 class="ts-head">In TypeScript</h2>
+<p>Loops are written the same way in TypeScript, and the types of loop variables are inferred for you. Hover over <code>i</code> and <code>ch</code>:</p>
+<textarea class="code" data-lang="ts" data-run>
+for (let i = 0; i < 3; i++) {
+  console.log(i);           // i: number
+}
+
+for (const ch of "abc") {
+  console.log(ch.toUpperCase());   // ch: string, so string methods autocomplete
+}
+</textarea>
+
+<h3>Accumulators need the right starting type</h3>
+<p>The type of an accumulator comes from its starting value. Starting a total at the wrong kind of value is a bug TypeScript catches immediately:</p>
+<textarea class="code" data-lang="ts" data-run>
+let total = "";             // oops: should be 0
+for (let i = 1; i <= 3; i++) {
+  total = total + i;        // allowed (string + number glues them)...
+}
+const average = total / 3;  // ✖ ...but now you can't do math with it
+console.log(total, average);
+</textarea>
+<p>In JavaScript you'd get <code>"123"</code> for the total and <code>41</code> for the "average", with no warning. Change the first line to <code>let total = 0;</code> and the error disappears, and the answer becomes correct (2).</p>
+
+<h3>Counters that should stay inside the loop</h3>
+<p>Because <code>let i</code> in a <code>for</code> header only exists inside the loop (block scope again), TypeScript stops you using it afterwards by mistake:</p>
+<textarea class="code" data-lang="ts" data-run>
+for (let i = 0; i < 5; i++) {
+  // ...
+}
+console.log(i);   // ✖ Cannot find name 'i'
+</textarea>
+<p>If you need the value after the loop (for example, "at which position did <code>break</code> happen?"), create the variable before the loop.</p>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li><code>while (condition) { ... }</code> repeats as long as the condition is true.</li>
+<li><code>for (start; condition; step) { ... }</code> is the standard counting loop. <code>for (let i = 0; i &lt; n; i++)</code> runs n times.</li>
+<li><code>for (const x of something)</code> goes through each item: each character of a string, and soon each item of an array.</li>
+<li>Build results with an <strong>accumulator</strong> made before the loop.</li>
+<li><code>break</code> leaves the loop; <code>continue</code> skips to the next iteration.</li>
+<li>Every loop needs a way to end. TypeScript infers loop variable types and catches accumulators of the wrong type.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space
+
+</textarea>
+<ol>
+<li>Print all the odd numbers from 1 to 19.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+for (let i = 1; i <= 19; i += 2) {
+  console.log(i);
+}
+</textarea></details></li>
+<li>Calculate 1 × 2 × 3 × … × 10 (this is called "10 factorial"). Careful with the starting value!
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+let product = 1;   // not 0: anything times 0 is 0
+for (let i = 1; i <= 10; i++) {
+  product *= i;
+}
+console.log(product);   // 3628800
+</textarea></details></li>
+<li>Reverse a string: from <code>"stressed"</code>, build <code>"desserts"</code>. (Hint: loop through it, and add each character to the <em>front</em> of an accumulator.)
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const word = "stressed";
+let reversed = "";
+for (const ch of word) {
+  reversed = ch + reversed;
+}
+console.log(reversed);
+</textarea></details></li>
+<li>FizzBuzz, a classic: print 1 to 30, but for multiples of 3 print "Fizz", for multiples of 5 print "Buzz", and for multiples of both print "FizzBuzz". (Hint: think about which check must come first.)
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+for (let i = 1; i <= 30; i++) {
+  if (i % 15 === 0) {
+    console.log("FizzBuzz");    // must be checked first
+  } else if (i % 3 === 0) {
+    console.log("Fizz");
+  } else if (i % 5 === 0) {
+    console.log("Buzz");
+  } else {
+    console.log(i);
+  }
+}
+</textarea></details></li>
+<li>Print a triangle of <code>#</code> characters, 6 rows high: row 1 has one <code>#</code>, row 6 has six.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+for (let row = 1; row <= 6; row++) {
+  console.log("#".repeat(row));
+}
+</textarea></details></li>
+</ol></section>
+
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>What are the three parts of a <code>for</code> loop header?</summary>Start (runs once), condition (checked before each iteration), step (runs after each iteration).</details>
+<details><summary>When would you use <code>for...of</code> instead of a counting <code>for</code> loop?</summary>When you want each item (like each character) and don't need its position number.</details>
+<details><summary>Why does <code>let total = 0</code> go before the loop, not inside it?</summary>Inside, it would be reset to 0 on every iteration, so it could never build up.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>
