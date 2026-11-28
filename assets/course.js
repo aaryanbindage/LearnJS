@@ -300,6 +300,7 @@ seen.delete(v);return r;};
 const line=a=>a.map(x=>fmt(x)).join(" ");
 console.log=console.info=console.debug=(...a)=>send("log",line(a));console.warn=(...a)=>send("warn",line(a));console.error=(...a)=>send("error",{msg:line(a)});
 console.table=(x)=>send("log",fmt(x));console.clear=()=>send("clear");
+const tm={};console.time=(l="default")=>{tm[l]=performance.now()};console.timeEnd=(l="default")=>{if(l in tm){send("log",l+": "+(performance.now()-tm[l]).toFixed(0)+" ms");delete tm[l]}};
 const st={};window.__loop=id=>{const s=st[id]||(st[id]={n:0,first:0,last:0});if(++s.n&63)return;const now=performance.now();if(now-s.last>50)s.first=now;s.last=now;if(now-s.first>3000){s.first=now;throw new RangeError("Loop ran for over 3 seconds, so it was stopped. Is it an infinite loop?")}};
 addEventListener("error",e=>{send("error",{msg:(e.error&&e.error.name?e.error.name+": ":"")+e.message.replace(/^(Uncaught )?(\\w*Error: )?/,""),line:e.lineno})});
 addEventListener("unhandledrejection",e=>{const r=e.reason;send("error",{msg:"Uncaught (in promise) "+(r&&r.message?(r.name?r.name+": ":"")+r.message:fmt(r))})});
