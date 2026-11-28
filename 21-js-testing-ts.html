@@ -17,12 +17,12 @@
 <li>Understand the important <code>tsconfig.json</code> settings.</li>
 <li>Save your work with Git.</li>
 <li>Write automated tests with Vitest.</li>
-</ul><p class="time">About 75 minutes. You'll need Node.js, VS Code and Git installed (see the Start here lesson).</p></section>
+</ul><p class="time">About 75 minutes. You'll need Node.js, a code editor (VS Code or Zed) and Git installed (see the Start here lesson).</p></section>
 
 <h2>Step 1: the terminal</h2>
 <p>The <dfn>terminal</dfn> (also called the command line or shell) is a text window where you type commands. Developers use it to create projects, install packages and run tools. Open one:</p>
 <ul>
-<li><strong>In VS Code</strong> (easiest): menu <em>Terminal → New Terminal</em>, or <kbd>Ctrl</kbd> + <kbd>`</kbd>.</li>
+<li><strong>In your code editor</strong> (easiest): press <kbd>Ctrl</kbd> + <kbd>`</kbd> in VS Code or Zed. In VS Code there's also the menu <em>Terminal → New Terminal</em>.</li>
 <li><strong>Windows</strong>: "Terminal" or "PowerShell" from the Start menu. <strong>Mac</strong>: "Terminal" from Spotlight.</li>
 </ul>
 <p>A few commands you'll use all the time. Type each, then press <kbd>Enter</kbd>:</p>
@@ -75,7 +75,11 @@ npm run dev
 <li><code>cd my-ts-app</code> moves into it; <code>npm install</code> downloads the packages.</li>
 <li><code>npm run dev</code> starts the dev server. It prints an address like <code>http://localhost:5173</code>. Open it in your browser.</li>
 </ol>
-<p>Now open the folder in VS Code (<code>code .</code> in the terminal, or <em>File → Open Folder</em>). The important files:</p>
+<p>Now open the folder in your editor:</p>
+<div class="editor-pick"></div>
+<div data-ed="vscode"><p>Type <code>code .</code> in the terminal (the dot means "this folder"), or use <em>File → Open Folder</em>.</p></div>
+<div data-ed="zed"><p>Type <code>zed .</code> in the terminal, or use <em>File → Open…</em>. (On a Mac, the <code>zed</code> command needs a one-time setup: open the command palette and run <em>cli: install cli binary</em>. On Windows, if <code>zed</code> isn't found, just use the menu.)</p></div>
+<p>The important files:</p>
 <table>
 <tr><th>File</th><th>What it is</th></tr>
 <tr><td><code>index.html</code></td><td>The page. It loads <code>/src/main.ts</code> with <code>&lt;script type="module"&gt;</code>. Yes, a <code>.ts</code> file: Vite converts it on the fly.</td></tr>
@@ -87,7 +91,7 @@ npm run dev
 </table>
 <div class="try"><span class="label">Try it</span><ol>
 <li>Delete everything in <code>src/main.ts</code> and write <code>document.body.textContent = "Hello from TypeScript!";</code>. Save. The browser updates instantly.</li>
-<li>Now write <code>const n: number = "oops";</code>. VS Code underlines it in red, just like the editors on this site.</li>
+<li>Now write <code>const n: number = "oops";</code>. Your editor underlines it in red, just like the editors on this site. VS Code and Zed both have TypeScript built in.</li>
 <li>Copy the typed to-do app from the Events lesson into <code>main.ts</code> (and its HTML into <code>index.html</code>) and get it running.</li>
 </ol></div>
 
@@ -238,11 +242,13 @@ describe("addItem", () => {
 </ul></div>
 
 <h3>Linting and formatting</h3>
-<p>Two more tools you'll find in almost every project. Install them as VS Code extensions too, so they work as you type:</p>
+<p>Two more tools you'll find in almost every project. You want them working inside your editor, as you type:</p>
 <ul>
 <li><strong>ESLint</strong> finds likely bugs and bad patterns (an unused variable, a missing <code>await</code>). With <code>typescript-eslint</code> it understands types.</li>
 <li><strong>Prettier</strong> formats your code automatically on save, so you never argue about spaces again.</li>
 </ul>
+<div data-ed="vscode"><p>Install the <em>ESLint</em> and <em>Prettier</em> extensions, and turn on "Format On Save" in the settings.</p></div>
+<div data-ed="zed"><p>Both are built in. It formats JavaScript, TypeScript, CSS and HTML with Prettier when you save, and shows ESLint's warnings in projects that have an ESLint config. See the <a href="ide-tools.html">tools guide</a> for the setting that also lets ESLint fix problems on save.</p></div>
 
 <section class="recap"><h2>Recap</h2><ul>
 <li>Terminal basics: <code>cd</code>, <code>ls</code>, <code>mkdir</code>; <kbd>Tab</kbd> completes, <kbd>Ctrl</kbd>+<kbd>C</kbd> stops.</li>

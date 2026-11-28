@@ -198,3 +198,14 @@ ol.steps > li { margin: .5em 0; }
   body.nav-open .sidebar { transform: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+
+/* Editor picker: VS Code / Zed specific instructions */
+.editor-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 1.2em 0; padding: 10px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); }
+.editor-pick .q { font-weight: 650; margin-right: 4px; }
+.editor-pick .btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+[data-ed] { border-left: 3px solid var(--border); padding: 2px 0 2px 16px; margin: 1em 0; }
+[data-ed] > :last-child { margin-bottom: 0; }
+.ed-tag { display: inline-block; font-size: 12px; font-weight: 650; padding: 2px 9px; border-radius: 99px; background: var(--surface-2); color: var(--muted); margin-bottom: 6px; }
+:root[data-ed-pick] .ed-tag { display: none; }
+:root[data-ed-pick] [data-ed] { border-left: 0; padding-left: 0; }
+:root[data-ed-pick="zed"] [data-ed="vscode"], :root[data-ed-pick="vscode"] [data-ed="zed"] { display: none; }

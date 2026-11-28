@@ -27,7 +27,7 @@
 </ul>
 
 <h2>The live code editors</h2>
-<p>Most lessons have editors you can type in. They're the same editor that powers VS Code, the most popular code editor in the world. Try this one: change the words inside <code>&lt;h1&gt;</code> and watch the result change below it.</p>
+<p>Most lessons have editors you can type in. They're built on the same editor engine as VS Code, one of the most popular code editors in the world. Try this one: change the words inside <code>&lt;h1&gt;</code> and watch the result change below it.</p>
 <textarea class="code" data-lang="html" data-run data-height="160px">
 <!DOCTYPE html>
 <html lang="en">
@@ -67,29 +67,43 @@
 <p>You can do Parts 1 to 3 entirely in this website's editors. But you'll want real tools soon, and installing them now means they're ready. Everything here is free.</p>
 <ol class="steps">
 <li><strong>A modern browser</strong>: Chrome, Edge or Firefox. You probably have one.</li>
-<li><strong>VS Code</strong>, a code editor, from <code>code.visualstudio.com</code>. Install it, open it, then click the Extensions icon (four squares) on the left and install:
+<li><strong>A code editor</strong>: the program you'll write code in. This course gives instructions for two free, excellent ones. Either is a great choice; pick one and stick with it.
+<div class="editor-pick"></div>
+<div data-ed="vscode"><p><strong>VS Code</strong>, from <code>code.visualstudio.com</code>. It's the most widely used editor, with a huge library of add-ons. Install it, open it, then click the Extensions icon (four squares) on the left and install:</p>
   <ul><li><em>Live Server</em> (shows your HTML in the browser, and refreshes it every time you save)</li>
   <li><em>Prettier</em> (tidies up your code's formatting)</li>
-  <li><em>ESLint</em> (warns you about likely mistakes)</li></ul></li>
+  <li><em>ESLint</em> (warns you about likely mistakes)</li></ul></div>
+<div data-ed="zed"><p><strong>Zed</strong>, from <code>zed.dev</code> (for Mac, Windows and Linux). It's very fast, and comes with what you need already built in: TypeScript support, automatic formatting with Prettier, and a terminal. There's nothing extra to install to get started. (When you first open an HTML file, Zed may offer to install its HTML extension: say yes.)</p></div></li>
 <li><strong>Node.js</strong>, from <code>nodejs.org</code>. Choose the "LTS" version (that means "long-term support", the stable one). It runs JavaScript outside the browser, and installs tools you'll use in Part 4.</li>
 <li><strong>Git</strong>, from <code>git-scm.com</code>. It saves the history of your projects, so you can always go back.</li>
 </ol>
-<p>To check that Node.js and Git installed properly, open VS Code, choose <em>Terminal → New Terminal</em> from the menu, type each of these lines and press Enter. Each should print a version number. (Don't worry about the terminal yet; you'll learn it properly later.)</p>
+<p>To check that Node.js and Git installed properly, open a terminal inside your editor:</p>
+<div data-ed="vscode"><p>Choose <em>Terminal → New Terminal</em> from the menu.</p></div>
+<div data-ed="zed"><p>Press <kbd>Ctrl</kbd> + <kbd>`</kbd> (the key above <kbd>Tab</kbd>; it's <kbd>Ctrl</kbd> on a Mac too). Or open the command palette with <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> (<kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> on a Mac), type <em>terminal</em>, and pick the "toggle" option.</p></div>
+<p>Then type each of these lines and press Enter. Each should print a version number. (Don't worry about the terminal yet; you'll learn it properly later.)</p>
 <textarea class="code" data-lang="bash">
 node -v
 npm -v
 git --version
 </textarea>
-<p>If you see "command not found", close VS Code completely and open it again (it needs to notice the new programs), or restart your computer.</p>
+<p>If you see "command not found", close your editor completely and open it again (it needs to notice the new programs), or restart your computer.</p>
 <p>See the <a href="ide-tools.html">recommended tools guide</a> for more options, but don't spend long on it now. The tools above are all you need.</p>
 
 <h2>Make your first page on your computer</h2>
 <ol class="steps">
 <li>Make a folder somewhere easy to find, called <code>webcourse</code>.</li>
-<li>In VS Code, choose <em>File → Open Folder</em> and pick it.</li>
-<li>Click the "New File" icon next to the folder name, and call the file <code>index.html</code>.</li>
+<li>Open the folder in your editor.
+  <div data-ed="vscode"><p><em>File → Open Folder</em>, and pick it.</p></div>
+  <div data-ed="zed"><p><em>File → Open…</em> (<kbd>Ctrl</kbd> + <kbd>O</kbd>, or <kbd>Cmd</kbd> + <kbd>O</kbd> on a Mac), and pick the folder.</p></div></li>
+<li>Create a file called <code>index.html</code> in it. In VS Code, click the "New File" icon next to the folder name; in Zed, right-click the folder name in the project panel on the left and choose <em>New File</em>.</li>
 <li>Copy the code from the editor at the top of this lesson into it, and save (<kbd>Ctrl</kbd> + <kbd>S</kbd>, or <kbd>Cmd</kbd> + <kbd>S</kbd> on a Mac).</li>
-<li>Right-click in the file and choose <em>Open with Live Server</em>. Your page opens in the browser.</li>
+<li>Show it in the browser, with automatic refreshing.
+  <div data-ed="vscode"><p>Right-click in the file and choose <em>Open with Live Server</em>. Your page opens in the browser.</p></div>
+  <div data-ed="zed"><p>Zed doesn't have a "Live Server" button, so you'll use a one-line command instead. Open the terminal (<kbd>Ctrl</kbd> + <kbd>`</kbd>) and type:</p>
+<textarea class="code" data-lang="bash">
+npx vite
+</textarea>
+  <p>The first time, it asks to install a package called <code>vite</code>: type <kbd>y</kbd> and press Enter. It then prints an address, <code>http://localhost:5173</code>. Hold <kbd>Ctrl</kbd> (or <kbd>Cmd</kbd>) and click it to open your page. Leave the terminal running; press <kbd>Ctrl</kbd> + <kbd>C</kbd> in it when you want to stop. (Vite is a tool you'll learn properly in Part 4.)</p></div></li>
 <li>Change the heading, save, and watch the browser update by itself.</li>
 </ol>
 <p>That's the loop you'll use for the rest of the course: edit, save, look.</p>
@@ -111,7 +125,7 @@ git --version
 <li>Go in order, type every example, try exercises before peeking, and take breaks.</li>
 <li>A browser finds a server with DNS, sends an HTTP request, gets HTML back, then loads CSS, JavaScript and images and draws the page.</li>
 <li>HTML = structure, CSS = appearance, JavaScript = behaviour, TypeScript = JavaScript with safety checks.</li>
-<li>Tools: a browser, VS Code (+ Live Server, Prettier, ESLint), Node.js, Git.</li>
+<li>Tools: a browser, a code editor (VS Code with Live Server, Prettier and ESLint; or Zed, with <code>npx vite</code> for previews), Node.js, Git.</li>
 </ul></section>
 
 <section class="checkpoint"><h2>Check your understanding</h2>

@@ -23,6 +23,28 @@
     try { localStorage.setItem("wmc-theme", next); } catch {}
   }
 
+  // code editor preference: lessons mark editor-specific steps with data-ed="vscode|zed"
+  const EDITORS = { vscode: "VS Code", zed: "Zed" };
+  try { const e = localStorage.getItem("wmc-editor"); if (EDITORS[e]) document.documentElement.dataset.edPick = e; } catch {}
+  function pickEditor(e) {
+    if (e) document.documentElement.dataset.edPick = e; else delete document.documentElement.dataset.edPick;
+    try { e ? localStorage.setItem("wmc-editor", e) : localStorage.removeItem("wmc-editor"); } catch {}
+    document.querySelectorAll(".editor-pick button").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.pick || "") === (e || ""))));
+  }
+  function upgradeEditorPicks() {
+    document.querySelectorAll("[data-ed]").forEach(el => {
+      const tag = document.createElement("span"); tag.className = "ed-tag"; tag.textContent = EDITORS[el.dataset.ed];
+      el.prepend(tag);
+    });
+    document.querySelectorAll(".editor-pick").forEach(box => {
+      box.innerHTML = `<span class="q">Which code editor do you use?</span>` +
+        Object.entries(EDITORS).map(([k, v]) => `<button class="btn" data-pick="${k}">${v}</button>`).join("") +
+        `<button class="btn" data-pick="">Show both</button>`;
+      box.querySelectorAll("button").forEach(b => b.onclick = () => pickEditor(b.dataset.pick));
+    });
+    pickEditor(document.documentElement.dataset.edPick);
+  }
+
   // top bar
   const bar = document.createElement("header");
   bar.className = "topbar";
@@ -532,6 +554,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(<StrictMode><App /><
   }
 
   if (isHome) renderHome(); else { renderLesson(); }
+  upgradeEditorPicks();
   upgradeCode();
   upgradeQuizzes();
 })();

@@ -12,7 +12,12 @@
 <p class="lede">Your editor is the tool you'll spend thousands of hours in. Pick one good setup, learn it deeply, and resist constant switching. Products and prices change, so confirm current details on each tool's website.</p>
 
 <h2>My recommendation</h2>
-<div class="callout"><span class="label">Short answer</span><strong>Use VS Code.</strong> It is free, has the largest extension ecosystem, and the best support for everything in this course (HTML, CSS, JS/TS, React, Node, GLSL). If you want AI built into the editor, <strong>Cursor</strong> is a VS Code fork with the same extensions and keybindings, so switching later costs you almost nothing.</div>
+<div class="callout"><span class="label">Short answer</span><strong>Use VS Code or Zed.</strong> Both are free and work for everything in this course, and every lesson gives instructions for both.
+<ul>
+<li><strong>VS Code</strong> has the largest extension ecosystem, and it's what most tutorials and teams assume. If you want AI built into the editor, <strong>Cursor</strong> is a VS Code fork with the same extensions and keybindings.</li>
+<li><strong>Zed</strong> is open source and noticeably faster. It comes with TypeScript, Prettier formatting, ESLint, Tailwind support, a terminal, Git and a debugger built in, so there's very little to set up.</li>
+</ul>
+Not sure? Either is fine. What matters is picking one and learning it well.</div>
 
 <h2>Editors compared</h2>
 <table>
@@ -20,7 +25,7 @@
 <tr><td><strong>VS Code</strong></td><td>Free</td><td>Everyone; the safe default for web dev</td><td>Needs extensions for a full setup; can feel heavy with many</td></tr>
 <tr><td><strong>Cursor</strong></td><td>Free tier + paid plans</td><td>VS Code experience with deeply integrated AI editing and chat</td><td>Fork of VS Code; some Microsoft extensions/marketplace limits; subscription for heavy AI use</td></tr>
 <tr><td><strong>WebStorm</strong> (JetBrains)</td><td>Free for non-commercial use; paid for commercial</td><td>Out-of-the-box refactoring, debugging, TypeScript and React tooling</td><td>Heavier, fewer community extensions, different keybindings</td></tr>
-<tr><td><strong>Zed</strong></td><td>Free</td><td>Very fast, native, great multiplayer collaboration</td><td>Younger extension ecosystem</td></tr>
+<tr><td><strong>Zed</strong></td><td>Free, open source (paid AI plans optional)</td><td>Very fast and native; JS/TS tooling, terminal, Git and debugger built in; real-time collaboration</td><td>Smaller extension ecosystem; no Live Server (use <code>npx vite</code>)</td></tr>
 <tr><td><strong>Neovim</strong> / Vim</td><td>Free</td><td>Keyboard-driven speed, terminal-based, works over SSH</td><td>Steep learning curve; you assemble the setup yourself</td></tr>
 <tr><td><strong>Sublime Text</strong></td><td>Paid license (free evaluation)</td><td>Extremely fast for quick edits and huge files</td><td>Less integrated tooling for TS/React debugging</td></tr>
 <tr><td><strong>Claude Code</strong></td><td>Requires a Claude plan or API usage</td><td>Agentic coding in your terminal and IDE: reads your repo, edits files, runs tests and commands</td><td>Complements an editor; it doesn't replace one. Review every change</td></tr>
@@ -33,8 +38,12 @@
 <li><strong>Bad uses</strong>: pasting in an exercise and submitting the output, accepting code you can't explain, trusting API names and versions without checking the docs.</li>
 </ul>
 
-<h2>VS Code setup</h2>
-<h3>Essential extensions</h3>
+<h2>Set up your editor</h2>
+<div class="editor-pick"></div>
+
+<div data-ed="vscode">
+<h3>VS Code: essential extensions</h3>
+<p>Open the Extensions view (the four-squares icon, or <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>X</kbd>) and search for each by name.</p>
 <table>
 <tr><th>Extension</th><th>Why</th></tr>
 <tr><td><strong>ESLint</strong></td><td>Finds bugs and enforces rules as you type</td></tr>
@@ -52,7 +61,7 @@
 <tr><td><strong>Docker</strong>, <strong>Thunder Client</strong> or <strong>REST Client</strong></td><td>Containers and quick API requests</td></tr>
 <tr><td><strong>Code Spell Checker</strong></td><td>Catch typos in identifiers and docs</td></tr>
 </table>
-<h3>Recommended <code>settings.json</code></h3>
+<h3>VS Code: recommended <code>settings.json</code></h3>
 <textarea class="code" data-lang="js" data-file="settings.json (Cmd+Shift+P → Preferences: Open User Settings (JSON))">
 {
   "editor.formatOnSave": true,
@@ -80,7 +89,55 @@
 }
 </textarea>
 
+</div>
+
+<div data-ed="zed">
+<h3>Zed: what's built in</h3>
+<p>Zed needs far less setup, because the essentials for this course are part of the editor:</p>
+<table>
+<tr><th>Built in</th><th>VS Code equivalent</th></tr>
+<tr><td>TypeScript and JavaScript language support (errors, autocomplete, go to definition, rename)</td><td>Built in there too</td></tr>
+<tr><td>Formatting with Prettier on save (JS, TS, CSS, HTML, JSON, Markdown)</td><td>Prettier extension</td></tr>
+<tr><td>ESLint warnings, in projects with an ESLint config</td><td>ESLint extension</td></tr>
+<tr><td>Inline error messages (turn on in settings, below)</td><td>Error Lens</td></tr>
+<tr><td>Tailwind CSS autocomplete (“<a href="42-tailwind.html">Tailwind CSS &amp; utility-first design</a>”)</td><td>Tailwind CSS IntelliSense</td></tr>
+<tr><td>Terminal, Git staging and diffs, debugger</td><td>Built in, plus GitLens</td></tr>
+<tr><td>Live preview of pages: run <code>npx vite</code> in the terminal (or <code>npm run dev</code> in a Vite project)</td><td>Live Server</td></tr>
+</table>
+<h3>Zed: extensions worth adding</h3>
+<p>Open the Extensions page (command palette, <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd>, then type <em>extensions</em>) and install these when you reach the lessons that need them. Zed also suggests the right extension when you open a new kind of file.</p>
+<table>
+<tr><th>Extension</th><th>Why</th></tr>
+<tr><td><strong>HTML</strong></td><td>HTML highlighting and autocomplete (from Lesson 1)</td></tr>
+<tr><td><strong>Emmet</strong></td><td>Type <code>ul&gt;li*3</code> to expand into HTML</td></tr>
+<tr><td><strong>GLSL</strong></td><td>Shader highlighting (“<a href="36-three-shaders.html">Shaders (GLSL)</a>”)</td></tr>
+<tr><td><strong>Prisma</strong>, <strong>SQL</strong>, <strong>Dockerfile</strong></td><td>For the backend lessons (Part 9)</td></tr>
+</table>
+<h3>Zed: recommended settings</h3>
+<p>Open the command palette and run <em>zed: open settings file</em>, then merge these in:</p>
+<textarea class="code" data-lang="js" data-file="settings.json (Zed)">
+{
+  "tab_size": 2,
+  "format_on_save": "on",
+  "autosave": "on_focus_change",
+  "ensure_final_newline_on_save": true,
+  "remove_trailing_whitespace_on_save": true,
+  "diagnostics": { "inline": { "enabled": true } },   // show errors at the end of the line
+  "languages": {
+    // let ESLint fix what it can each time you save
+    "JavaScript": { "code_actions_on_format": { "source.fixAll.eslint": true } },
+    "TypeScript": { "code_actions_on_format": { "source.fixAll.eslint": true } },
+    "TSX": { "code_actions_on_format": { "source.fixAll.eslint": true } }
+  },
+  // While you're learning: no AI autocomplete (see the note above)
+  "features": { "edit_prediction_provider": "none" }
+}
+</textarea>
+<p>Settings change between versions; if one is underlined, hover it, and check <code>zed.dev/docs</code>.</p>
+</div>
+
 <h3>Shortcuts that give the biggest speed-up (macOS / Windows-Linux)</h3>
+<p>Zed's default keyboard shortcuts follow VS Code's, so this table works in both editors.</p>
 <table>
 <tr><th>Action</th><th>Keys</th></tr>
 <tr><td>Command palette (do anything)</td><td><kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd></td></tr>
@@ -99,6 +156,8 @@
 <p>Spend one week deliberately using the command palette and "go to definition" instead of the mouse. It compounds.</p>
 
 <h3>Debugging in the editor</h3>
+<p>Both editors can pause your code at a breakpoint and let you step through it line by line. Debugging beats <code>console.log</code> for anything non-trivial.</p>
+<div data-ed="vscode">
 <textarea class="code" data-lang="js" data-file=".vscode/launch.json">
 {
   "version": "0.2.0",
@@ -119,7 +178,31 @@
   ]
 }
 </textarea>
-<p>Set breakpoints by clicking the gutter, press <kbd>F5</kbd>, and step through with <kbd>F10</kbd>/<kbd>F11</kbd>. Debugging beats <code>console.log</code> for anything non-trivial.</p>
+<p>Set breakpoints by clicking the gutter, press <kbd>F5</kbd>, and step through with <kbd>F10</kbd>/<kbd>F11</kbd>.</p>
+</div>
+<div data-ed="zed">
+<textarea class="code" data-lang="js" data-file=".zed/debug.json">
+[
+  {
+    "label": "Debug Chrome (Vite)",
+    "adapter": "JavaScript",
+    "type": "chrome",
+    "request": "launch",
+    "url": "http://localhost:5173",
+    "webRoot": "$ZED_WORKTREE_ROOT/src"
+  },
+  {
+    "label": "Debug Node file",
+    "adapter": "JavaScript",
+    "type": "node",
+    "request": "launch",
+    "program": "$ZED_FILE",
+    "skipFiles": ["<node_internals>/**"]
+  }
+]
+</textarea>
+<p>Set breakpoints by clicking the gutter, then open the command palette, run <em>debugger: start</em>, and pick a configuration. Zed can also read a project's <code>.vscode/launch.json</code> when there's no <code>.zed/debug.json</code>, which helps in mixed teams.</p>
+</div>
 
 <h2>The rest of your toolbox</h2>
 <h3>Browsers and DevTools</h3>
@@ -169,21 +252,28 @@ charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
 </textarea>
+<div data-ed="vscode">
 <textarea class="code" data-lang="js" data-file=".vscode/extensions.json (commit this so teammates get prompts)">
 { "recommendations": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode", "usernamehw.errorlens", "bradlc.vscode-tailwindcss"] }
 </textarea>
+</div>
+<div data-ed="zed">
+<textarea class="code" data-lang="js" data-file=".zed/settings.json (project settings: commit this so teammates share them)">
+{ "tab_size": 2, "format_on_save": "on" }
+</textarea>
+</div>
 
 <h2>How to choose and stick with it</h2>
 <ol>
-<li>Pick <strong>VS Code</strong> (or Cursor) for the whole course.</li>
-<li>Install the essentials above and the settings. Do not install 40 extensions on day one; add one when you feel a specific pain.</li>
+<li>Pick <strong>VS Code</strong> (or Cursor) or <strong>Zed</strong> for the whole course.</li>
+<li>Set up the essentials above and the settings. Do not install 40 extensions on day one; add one when you feel a specific pain.</li>
 <li>Learn 10 shortcuts this week and 10 more next week.</li>
 <li>Use the debugger and the formatter on save every day.</li>
-<li>After Part 9, if you want to explore, try WebStorm or Zed for a week on a real project, then decide. Switching for a reason is fine; switching for novelty is a time sink.</li>
+<li>After Part 9, if you want to explore, try another editor (the other of VS Code and Zed, or WebStorm) for a week on a real project, then decide. Switching for a reason is fine; switching for novelty is a time sink.</li>
 </ol>
 
 <section class="exercises"><h2>Setup tasks</h2><ol>
-<li>Install your editor, the essential extensions and the settings above. Open a project and confirm format-on-save works.</li>
+<li>Install your editor, its essentials and the settings above. Open a project and confirm format-on-save works.</li>
 <li>Create <code>.prettierrc</code> and an ESLint config in a Vite project and make the editor show lint errors inline.</li>
 <li>Set a breakpoint in a small Node script and step through it with the debugger.</li>
 <li>Install <code>gh</code>, authenticate, and create a repository from the terminal.</li>
