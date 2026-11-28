@@ -3,127 +3,343 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 12 — Functions, Scope & Closures</title>
+<title>Functions: reusable code</title>
 <link rel="stylesheet" href="assets/course.css">
 </head>
 <body data-slug="12-js-functions">
 <main><article>
-<h1>Lesson 12 — Functions, scope &amp; closures</h1>
-<p class="lede">Functions are values: you can store them, pass them, and return them. This idea powers everything from event handlers to React.</p>
+<h1>Functions: reusable code</h1>
+<p class="lede">A function is a named, reusable piece of code. You write it once and use it as many times as you like. Functions are how every real program is organized, and they're where TypeScript starts to really shine.</p>
 
-<h2>Defining functions</h2>
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Create (<em>define</em>) a function and run (<em>call</em>) it.</li>
+<li>Pass information in with <strong>parameters</strong>.</li>
+<li>Get a result back with <code>return</code>, and understand how that differs from <code>console.log</code>.</li>
+<li>Give parameters default values.</li>
+<li>Type a function's inputs and output in TypeScript.</li>
+</ul><p class="time">About 50 minutes. This is one of the most important lessons in the course.</p></section>
+
+<h2>Why functions?</h2>
+<p>You've already been using functions: <code>console.log()</code>, <code>Math.round()</code>, <code>Number()</code>. Someone else wrote the code inside them, gave it a name, and now you can use it without knowing how it works. Now you'll write your own.</p>
+<div class="callout analogy"><span class="label">Analogy</span>A function is like a kitchen appliance. A toaster has a slot to put bread in (the input), does its job inside (you don't need to know how), and gives you toast (the output). You can use it again and again, with different bread each time.</div>
+
+<h2>Defining and calling a function</h2>
 <textarea class="code" data-lang="js" data-run>
-function add(a, b) { return a + b; }            // declaration (hoisted)
-const mul = function (a, b) { return a * b; };  // expression
-const sub = (a, b) => a - b;                    // arrow, implicit return
-const square = x => x * x;                      // single param: no parens needed
-const makeUser = (name) => ({ name, active: true }); // returning an object: wrap in ()
-
-console.log(add(2, 3), mul(2, 3), sub(5, 1), square(4), makeUser("Ada"));
-
-// Parameters
-function greet(name = "friend", ...rest) {       // default + rest
-  return `Hi ${name}` + (rest.length ? ` (+${rest.length} more)` : "");
+function sayHello() {
+  console.log("Hello!");
+  console.log("Nice to meet you.");
 }
-console.log(greet(), greet("Ada"), greet("Ada", 1, 2, 3));
-console.log(Math.max(...[3, 9, 2]));             // spread into arguments
-</textarea>
-<p>A function with no <code>return</code> returns <code>undefined</code>. Missing arguments are <code>undefined</code>. Prefer one clear purpose per function and descriptive verbs for names (<code>getUser</code>, <code>isValid</code>).</p>
 
-<h2>Scope</h2>
+sayHello();
+sayHello();
+</textarea>
+<p>There are two separate steps here:</p>
+<ol>
+<li><strong>Defining</strong> the function (lines 1–4). <code>function</code> says "I'm making a function", <code>sayHello</code> is its name, the empty <code>()</code> will hold inputs later, and the code in <code>{ }</code> is its <dfn>body</dfn>. Defining a function doesn't run it. It just stores the instructions under that name.</li>
+<li><strong>Calling</strong> the function (lines 6–7). Writing its name with <code>()</code> runs the body. Each call runs the whole body again.</li>
+</ol>
+<div class="try"><span class="label">Try it</span>Delete the two <code>sayHello();</code> lines and run. Nothing prints! The function exists, but nobody called it. Then add three calls back.</div>
+<p>Function names follow the same rules as variable names (camelCase). Because functions <em>do</em> things, they're usually named with a verb: <code>sayHello</code>, <code>calculateTotal</code>, <code>showMenu</code>.</p>
+
+<h2>Parameters: giving a function input</h2>
+<p>A function that always does exactly the same thing is limited. <dfn>Parameters</dfn> let you hand it different information each time you call it:</p>
 <textarea class="code" data-lang="js" data-run>
-const global = "everywhere";
-function outer() {
-  const a = "outer-only";
-  if (true) {
-    let block = "block-only";      // let/const are BLOCK scoped
-    var leaky = "var ignores blocks";
-    console.log(global, a, block);
+function greet(name) {
+  console.log(`Hello, ${name}!`);
+}
+
+greet("Ada");
+greet("Grace");
+greet("Linus");
+</textarea>
+<p><code>name</code> in the parentheses is a parameter: a variable that only exists inside the function. Each time you call <code>greet</code>, the value you put in the parentheses (called an <dfn>argument</dfn>) is placed into <code>name</code>. On the first call <code>name</code> is <code>"Ada"</code>, on the second it's <code>"Grace"</code>.</p>
+<p>Functions can have several parameters, separated by commas. Arguments are matched up by position: first to first, second to second.</p>
+<textarea class="code" data-lang="js" data-run>
+function describePet(name, animal, age) {
+  console.log(`${name} is a ${age}-year-old ${animal}.`);
+}
+
+describePet("Rex", "dog", 4);
+describePet("Whiskers", "cat", 2);
+describePet(2, "Whiskers", "cat");   // wrong order: JavaScript doesn't notice!
+</textarea>
+<p>The last call has its arguments in the wrong order, and JavaScript happily prints nonsense. Keep that in mind; TypeScript fixes it at the end of this lesson.</p>
+
+<h2><code>return</code>: getting a result back</h2>
+<p>So far our functions print things. But most functions are more useful when they <em>calculate a value and hand it back</em> so the rest of your code can use it. That's what <code>return</code> does:</p>
+<textarea class="code" data-lang="js" data-run>
+function double(n) {
+  return n * 2;
+}
+
+const result = double(21);
+console.log(result);              // 42
+console.log(double(5) + double(10));   // 10 + 20 = 30
+</textarea>
+<p>When JavaScript reaches <code>return</code>, the function stops, and the call <code>double(21)</code> is <em>replaced by the returned value</em>, 42. That's why you can store it in a variable, add two calls together, or pass it to another function.</p>
+<div class="callout analogy"><span class="label">Analogy</span><code>console.log</code> inside a function is like a calculator that shows the answer on its screen. You can see it, but you can't do anything else with it. <code>return</code> is like the calculator handing you a slip of paper with the answer, which you can keep and use in the next calculation.</div>
+
+<h3><code>return</code> vs <code>console.log</code></h3>
+<p>This is the single most common confusion for beginners, so let's look at it directly:</p>
+<textarea class="code" data-lang="js" data-run>
+function addAndPrint(a, b) {
+  console.log(a + b);     // shows the answer, but doesn't give it back
+}
+
+function addAndReturn(a, b) {
+  return a + b;           // gives the answer back to whoever called
+}
+
+const x = addAndPrint(2, 3);    // prints 5...
+const y = addAndReturn(2, 3);   // prints nothing...
+
+console.log("x is", x);   // undefined! addAndPrint gave nothing back
+console.log("y is", y);   // 5
+</textarea>
+<p>A function without a <code>return</code> gives back <code>undefined</code>. The rule of thumb: <strong>functions that calculate something should <code>return</code> it</strong>. Let the code that calls them decide whether to print it.</p>
+
+<div class="quiz"><p>What does this print?</p>
+<textarea class="code" data-lang="js">
+function square(n) {
+  return n * n;
+}
+console.log(square(3) + 1);
+</textarea>
+<button>9</button><button data-correct>10</button><button>16</button><button>undefined</button>
+<p class="why"><code>square(3)</code> returns 9, so the line becomes <code>console.log(9 + 1)</code>, which prints 10.</p></div>
+
+<h3><code>return</code> stops the function</h3>
+<p>Nothing after a <code>return</code> runs. You can use that to exit early:</p>
+<textarea class="code" data-lang="js" data-run>
+function describeAge(age) {
+  if (age < 0) {
+    return "That's not a real age.";
   }
-  console.log(leaky);
-  // console.log(block);           // ReferenceError
-  function inner() { return a + " is visible to inner"; }   // lexical scope
-  return inner();
+  if (age < 13) {
+    return "child";
+  }
+  if (age < 20) {
+    return "teenager";
+  }
+  return "adult";
 }
-console.log(outer());
 
-// Hoisting & the temporal dead zone
-console.log(hoisted());            // works: declarations are hoisted
-function hoisted() { return "ok"; }
-try { console.log(tdz); } catch (e) { console.log(e.name); }   // ReferenceError
-let tdz = 1;
+console.log(describeAge(-5));
+console.log(describeAge(8));
+console.log(describeAge(15));
+console.log(describeAge(40));
 </textarea>
-<p><strong>Lexical scope</strong>: a function can see variables from where it was <em>written</em>, searching outward through enclosing scopes (the scope chain).</p>
+<p>Each <code>return</code> ends the function, so you don't need <code>else</code>. Handling the odd cases first and returning early (sometimes called <dfn>guard clauses</dfn>) keeps functions flat and easy to read.</p>
 
-<h2>Closures</h2>
-<p>A closure is a function that remembers the variables of the scope it was created in, even after that scope has finished.</p>
+<h2>Default parameter values</h2>
+<p>If you call a function with fewer arguments than it has parameters, the missing ones are <code>undefined</code>. You can give a parameter a default value to use instead:</p>
 <textarea class="code" data-lang="js" data-run>
-function makeCounter() {
-  let count = 0;                       // private state
-  return {
-    inc: () => ++count,
-    dec: () => --count,
-    get value() { return count; },
-  };
+function greet(name = "friend", greeting = "Hello") {
+  return `${greeting}, ${name}!`;
 }
-const a = makeCounter(), b = makeCounter();
-a.inc(); a.inc(); b.inc();
-console.log(a.value, b.value);         // 2 1: separate closures
 
-// Practical: function factories
-const multiplyBy = n => x => x * n;
-const double = multiplyBy(2), triple = multiplyBy(3);
-console.log(double(5), triple(5));
-
-// Classic loop gotcha
-const fnsVar = [], fnsLet = [];
-for (var i = 0; i < 3; i++) fnsVar.push(() => i);
-for (let j = 0; j < 3; j++) fnsLet.push(() => j);
-console.log(fnsVar.map(f => f()), fnsLet.map(f => f()));   // [3,3,3] vs [0,1,2]
+console.log(greet("Ada", "Welcome"));   // both given
+console.log(greet("Ada"));              // greeting uses its default
+console.log(greet());                   // both use defaults
 </textarea>
 
-<h2>Higher-order functions</h2>
+<h2>Functions using functions</h2>
+<p>The real power comes from building small functions and combining them. Each one does one clear job:</p>
 <textarea class="code" data-lang="js" data-run>
-const nums = [1, 2, 3, 4, 5, 6];
-console.log(nums.map(n => n * 2));
-console.log(nums.filter(n => n % 2 === 0));
-console.log(nums.reduce((sum, n) => sum + n, 0));
+function priceWithTax(price) {
+  return price * 1.2;
+}
 
-// Write your own
-function repeat(times, fn) { for (let i = 0; i < times; i++) fn(i); }
-repeat(3, i => console.log("run", i));
+function formatMoney(amount) {
+  return `$${amount.toFixed(2)}`;
+}
 
-// Compose / debounce style utilities
-const compose = (...fns) => x => fns.reduceRight((v, f) => f(v), x);
-console.log(compose(x => x + 1, x => x * 2)(5));      // (5*2)+1 = 11
+function receiptLine(item, price) {
+  return `${item}: ${formatMoney(priceWithTax(price))}`;
+}
 
-function once(fn) { let done = false, r; return (...a) => done ? r : (done = true, r = fn(...a)); }
-const init = once(() => { console.log("initialized!"); return 42; });
-console.log(init(), init());
+console.log(receiptLine("Coffee", 3));
+console.log(receiptLine("Cake", 4.5));
 </textarea>
+<p>Read <code>formatMoney(priceWithTax(price))</code> from the inside out: first <code>priceWithTax(3)</code> returns 3.6, then <code>formatMoney(3.6)</code> returns <code>"$3.60"</code>. If the tax rate changes, you fix it in one place.</p>
 
-<h2>Pure functions &amp; side effects</h2>
-<p>A <strong>pure</strong> function returns the same output for the same input and changes nothing outside itself. Pure functions are easy to test and are central to React. Mutating arguments, writing to globals, or reading the clock are <em>side effects</em>.</p>
+<h2>Variables inside functions stay inside</h2>
+<p>Parameters and variables created inside a function only exist while the function runs, and can't be seen from outside (the same block scope rule as <code>if</code> and loops):</p>
 <textarea class="code" data-lang="js" data-run>
-const impure = (arr) => { arr.push(99); return arr; };   // mutates input
-const pure   = (arr) => [...arr, 99];                    // returns a new array
-const original = [1, 2];
-pure(original); console.log(original);
-impure(original); console.log(original);
+function makeSecret() {
+  const secret = 42;
+  return secret;
+}
+
+console.log(makeSecret());   // 42: you get the value via return
+console.log(secret);         // error: secret only exists inside the function
+</textarea>
+<p>This is a good thing. You can use names like <code>total</code> or <code>result</code> inside every function without them clashing with each other.</p>
+
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Forgetting to call it</strong>: <code>sayHello</code> without <code>()</code> doesn't run anything.</li>
+<li><strong>Printing instead of returning</strong>: if you need to use the result, the function must <code>return</code> it.</li>
+<li><strong>Forgetting <code>return</code></strong>: <code>function double(n) { n * 2; }</code> calculates the answer and throws it away. It returns <code>undefined</code>.</li>
+<li><strong>Code after <code>return</code></strong> never runs.</li>
+<li><strong>Arguments in the wrong order</strong>: they're matched by position, not name.</li>
+</ul></div>
+
+<h2 class="ts-head">In TypeScript</h2>
+<p>Functions are where TypeScript is most valuable. A function is a promise: "give me these kinds of inputs and I'll give you this kind of output". TypeScript lets you write that promise down, and then checks every call.</p>
+
+<h3>Parameters need types</h3>
+<p>TypeScript can't guess a parameter's type from the function alone, since the value only arrives when someone calls it. So in strict mode (what professionals use, and what this site uses), parameters without types are an error:</p>
+<textarea class="code" data-lang="ts" data-run>
+function double(n) {      // ✖ Parameter 'n' implicitly has an 'any' type
+  return n * 2;
+}
+</textarea>
+<p>Add the type after the parameter name, with a colon, just like with variables:</p>
+<textarea class="code" data-lang="ts" data-run>
+function double(n: number) {
+  return n * 2;
+}
+
+console.log(double(21));
+console.log(double("21"));   // ✖ a string isn't a number
+</textarea>
+<p>Now every call is checked. <code>Argument of type 'string' is not assignable to parameter of type 'number'</code>: TypeScript caught the bad call at the place where you made it.</p>
+
+<h3>Return types</h3>
+<p>Hover over <code>double</code> in the editor above. You'll see <code>function double(n: number): number</code>. The <code>: number</code> at the end is the <dfn>return type</dfn>, and TypeScript inferred it from <code>n * 2</code>. You can also write it yourself, after the parentheses:</p>
+<textarea class="code" data-lang="ts" data-run>
+function describeAge(age: number): string {
+  if (age < 13) {
+    return "child";
+  }
+  if (age < 20) {
+    return 15;             // ✖ promised a string, returned a number
+  }
+  // ✖ and what if age is 20 or more? Nothing is returned.
+}
+</textarea>
+<p>Writing the return type makes TypeScript check that <em>every</em> path returns the right thing. Here it finds two problems: a wrong value, and a path (age 20+) that returns nothing. Fix both and the errors disappear.</p>
+<div class="callout ts"><span class="label">Should you write return types?</span>It's optional, since TypeScript infers them. Many teams write them on important functions anyway, because it documents the promise and catches mistakes inside the function, not just at the call site. In this course we'll write them when they help.</div>
+
+<h3>Functions that return nothing: <code>void</code></h3>
+<p>A function that does something (like printing) but doesn't return a value has the return type <code>void</code>:</p>
+<textarea class="code" data-lang="ts" data-run>
+function logScore(name: string, score: number): void {
+  console.log(`${name}: ${score} points`);
+}
+
+logScore("Ada", 10);
+const result = logScore("Grace", 20);   // hover: result is void. Nothing useful to store.
 </textarea>
 
-<section class="exercises"><h2>Exercises</h2><ol>
-<li>Write <code>makeCounter(start, step)</code> with <code>inc</code>, <code>reset</code>, and <code>value</code>.</li>
-<li>Implement your own <code>map</code>, <code>filter</code> and <code>reduce</code> as plain functions taking an array and a callback.</li>
-<li>Implement <code>memoize(fn)</code>: cache results by argument. Test with a slow Fibonacci.</li>
-<li>Implement <code>debounce(fn, ms)</code> (use <code>setTimeout</code>/<code>clearTimeout</code>).</li>
-<li>Implement <code>curry(fn)</code> so <code>curry((a,b,c)=>a+b+c)(1)(2)(3) === 6</code>.</li>
-<li>Explain the output of the <code>var</code> loop closure example in your own words.</li>
+<h3>Wrong number or order of arguments</h3>
+<p>Remember <code>describePet(2, "Whiskers", "cat")</code>? With types, TypeScript catches it:</p>
+<textarea class="code" data-lang="ts" data-run>
+function describePet(name: string, animal: string, age: number): string {
+  return `${name} is a ${age}-year-old ${animal}.`;
+}
+
+console.log(describePet("Rex", "dog", 4));     // ✔
+console.log(describePet(2, "Whiskers", "cat")); // ✖ wrong order
+console.log(describePet("Rex", "dog"));         // ✖ missing an argument
+</textarea>
+<p>The second error says <code>Expected 3 arguments, but got 2</code>. In JavaScript, the missing <code>age</code> would just be <code>undefined</code>, and you'd print "Rex is a undefined-year-old dog."</p>
+
+<h3>Optional and default parameters</h3>
+<p>To allow a parameter to be left out, either give it a default value, or mark it optional with <code>?</code>:</p>
+<textarea class="code" data-lang="ts" data-run>
+// Default value: the type is inferred from the default (string)
+function greet(name: string, greeting = "Hello"): string {
+  return `${greeting}, ${name}!`;
+}
+
+// Optional with ?: if left out, it's undefined
+function fullName(first: string, last?: string): string {
+  if (last) {
+    return `${first} ${last}`;
+  }
+  return first;
+}
+
+console.log(greet("Ada"));
+console.log(fullName("Ada", "Lovelace"));
+console.log(fullName("Cher"));
+</textarea>
+<p>Hover over <code>last</code> inside <code>fullName</code>. Its type is <code>string | undefined</code>: "a string, or nothing". TypeScript knows it might be missing. You'll learn much more about handling "might be missing" in the lesson on union types.</p>
+
+<h3>Hover to read any function</h3>
+<p>The same hover works on built-in functions. Hover over <code>Math.max</code>, <code>toFixed</code> and <code>padStart</code> below to see what each one expects and returns. This is how professionals learn new functions without leaving their editor.</p>
+<textarea class="code" data-lang="ts" data-run>
+console.log(Math.max(1, 5, 3));
+console.log((3.14159).toFixed(2));
+console.log("7".padStart(3, "0"));
+</textarea>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li><strong>Define</strong> with <code>function name(params) { ... }</code>; <strong>call</strong> with <code>name(args)</code>.</li>
+<li><strong>Parameters</strong> are the input variables; <strong>arguments</strong> are the values you pass, matched by position.</li>
+<li><code>return</code> hands a value back and stops the function. No <code>return</code> means <code>undefined</code>.</li>
+<li>Prefer returning values over printing inside functions.</li>
+<li>Defaults: <code>function f(x = 10)</code>. Variables inside a function stay inside.</li>
+<li>In TypeScript, type every parameter (<code>n: number</code>), optionally the return (<code>): string</code>). Use <code>void</code> for "returns nothing" and <code>?</code> for optional parameters.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<p>Write these in TypeScript, with types on every parameter.</p>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space
+
+</textarea>
+<ol>
+<li>Write <code>isEven(n)</code> that returns <code>true</code> or <code>false</code>.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function isEven(n: number): boolean {
+  return n % 2 === 0;
+}
+console.log(isEven(4), isEven(7));
+</textarea></details></li>
+<li>Write <code>rectangleArea(width, height)</code>, then use it to calculate the total area of two rectangles (3×4 and 5×6).
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function rectangleArea(width: number, height: number): number {
+  return width * height;
+}
+console.log(rectangleArea(3, 4) + rectangleArea(5, 6));   // 42
+</textarea></details></li>
+<li>Write <code>max(a, b)</code> that returns the bigger of two numbers, without using <code>Math.max</code>.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function max(a: number, b: number): number {
+  return a > b ? a : b;
+}
+console.log(max(3, 9));
+</textarea></details></li>
+<li>Write <code>countVowels(text)</code> that returns how many vowels a string contains. (Combine a <code>for...of</code> loop and an accumulator from the last lesson.)
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function countVowels(text: string): number {
+  let count = 0;
+  for (const ch of text.toLowerCase()) {
+    if ("aeiou".includes(ch)) {
+      count++;
+    }
+  }
+  return count;
+}
+console.log(countVowels("TypeScript is great"));   // 6
+</textarea></details></li>
+<li>Write <code>greeting(name, hour)</code> that returns "Good morning, Ada" / "Good afternoon, Ada" / "Good evening, Ada" depending on the hour, with <code>hour</code> defaulting to 9.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function greeting(name: string, hour = 9): string {
+  if (hour < 12) return `Good morning, ${name}`;
+  if (hour < 18) return `Good afternoon, ${name}`;
+  return `Good evening, ${name}`;
+}
+console.log(greeting("Ada"), "|", greeting("Ada", 20));
+</textarea></details></li>
 </ol></section>
 
-<section class="checkpoint"><h2>Checkpoint</h2>
-<details><summary>What is a closure, in one sentence?</summary>A function bundled with references to the variables of the scope where it was defined, so it keeps access to them later.</details>
-<details><summary>Declaration vs arrow functions?</summary>Declarations are hoisted and have their own <code>this</code>/<code>arguments</code>; arrows are expressions, have no own <code>this</code> or <code>arguments</code>, and can't be constructors (more in Lesson 18).</details>
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>What's the difference between a parameter and an argument?</summary>A parameter is the name in the function definition (<code>n</code> in <code>function double(n)</code>). An argument is the actual value passed in a call (<code>21</code> in <code>double(21)</code>).</details>
+<details><summary>What does a function return if it has no <code>return</code> statement?</summary><code>undefined</code>. In TypeScript its return type is <code>void</code>.</details>
+<details><summary>Why does TypeScript require parameter types, but not variable types?</summary>A variable usually gets a value right away, so its type can be inferred. A parameter's value only arrives when someone calls the function, so TypeScript needs you to say what's allowed.</details>
 </section>
 </article></main>
 <script src="assets/lessons.js"></script>
