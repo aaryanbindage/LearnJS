@@ -305,10 +305,10 @@ addEventListener("error",e=>{send("error",{msg:(e.error&&e.error.name?e.error.na
 addEventListener("unhandledrejection",e=>{const r=e.reason;send("error",{msg:"Uncaught (in promise) "+(r&&r.message?(r.name?r.name+": ":"")+r.message:fmt(r))})});
 })()<\/script>`;
 
-  function sandboxDoc(code, lang, key) {
+  function sandboxDoc(code, lang, key, html) {
     const bridge = BRIDGE(key);
     if (lang === "js" || lang === "ts") {
-      const head = `<!doctype html><meta charset="utf-8"><style>body{font:15px/1.5 system-ui,sans-serif;margin:12px;color:#1d1d1f}button{font:inherit;padding:.3em .8em}</style>${bridge}\n<script type="module">\n`;
+      const head = `<!doctype html><meta charset="utf-8"><style>body{font:15px/1.5 system-ui,sans-serif;margin:12px;color:#1d1d1f}button,input,select{font:inherit;padding:.3em .6em}.hidden{display:none}.highlight{background:#fff3a3}.done{text-decoration:line-through;color:#888}</style>${bridge}${html || ""}\n<script type="module">\n`;
       return { doc: head + code + "\n<\/script>", offset: head.split("\n").length - 1 };
     }
     if (lang === "jsx") {
@@ -340,7 +340,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(<StrictMode><App /><
   function makeLive(ta, wrap, bar, code, lang) {
     const id = String(++uid);
     const isScript = lang === "js" || lang === "ts";
-    const showPage = !isScript || ta.hasAttribute("data-page") || /\bdocument\b/.test(code);
+    const pageHtml = ta.dataset.html || "";
+    const showPage = !isScript || !!pageHtml || ta.hasAttribute("data-page") || /\bdocument\b/.test(code);
     wrap.classList.add("is-live");
 
     const runBtn = document.createElement("button"); runBtn.className = "run"; runBtn.innerHTML = "▶ Run";
@@ -360,6 +361,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(<StrictMode><App /><
     const frame = document.createElement("iframe");
     frame.title = "Result of running the code"; frame.sandbox = "allow-scripts allow-forms allow-modals allow-popups";
     if (ta.dataset.height) frame.style.height = ta.dataset.height;
+    else if (isScript) frame.style.height = "170px";
+    if (pageHtml) frame.srcdoc = sandboxDoc("", "js", "0:0", pageHtml).doc; // show the page before the code has run
     const pagePane = document.createElement("div"); pagePane.className = "pane page";
     pagePane.innerHTML = `<div class="pane-head"><span>${isScript ? "Page" : "Result"}</span></div>`;
     pagePane.append(frame);
@@ -443,7 +446,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(<StrictMode><App /><
         } finally { runBtn.disabled = false; }
       } else status.textContent = "";
       if (isScript) src = guardLoops(src);
-      const { doc, offset } = sandboxDoc(src, lang, id + ":" + state.runId);
+      const { doc, offset } = sandboxDoc(src, lang, id + ":" + state.runId, pageHtml);
       state.offset = offset;
       frame.srcdoc = doc;
       runBtn.innerHTML = isScript ? "↻ Run again" : "↻ Re-run";
