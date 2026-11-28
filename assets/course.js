@@ -211,6 +211,7 @@
     2769: "None of the ways this function can be called match the arguments you gave.",
     2454: "There's a path through your code where this variable never gets a value. Make sure every if/else branch sets it.",
     2678: "This case can never match: the value isn't one of the types allowed here. Check the spelling.",
+    2540: "This property is readonly: it can be set when the object is created, but never changed.",
     1005: "Syntax mistake: a symbol (often a bracket, comma or semicolon) is missing here.",
   };
   const hintFor = msg => { for (const [re, f] of RUNTIME_HINTS) { const m = msg.match(re); if (m) return f(m); } return ""; };

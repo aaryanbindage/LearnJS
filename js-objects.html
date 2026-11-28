@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Objects: grouping related data</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="js-objects">
+<main><article>
+<h1>Objects: grouping related data</h1>
+<p class="lede">A user has a name, an email and an age. A product has a title, a price and a stock count. Objects let you keep all the facts about one thing together, under one name. Along with arrays, they're how almost all data in JavaScript is shaped, and describing their shape is TypeScript's main job.</p>
+
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Create objects, and read and change their properties.</li>
+<li>Put functions inside objects (methods).</li>
+<li>Combine objects and arrays: lists of objects, objects containing lists.</li>
+<li>Loop over an object's keys and values.</li>
+<li>Describe object shapes in TypeScript with <code>type</code> and <code>interface</code>, including optional properties.</li>
+</ul><p class="time">About 55 minutes.</p></section>
+
+<h2>Why objects?</h2>
+<p>Imagine storing information about a user with separate variables:</p>
+<textarea class="code" data-lang="js">
+const userName = "Ada";
+const userEmail = "ada@example.com";
+const userAge = 36;
+</textarea>
+<p>That works for one user. For two, you'd need <code>user2Name</code>, <code>user2Email</code>... and nothing ties them together. An <dfn>object</dfn> groups them into a single value:</p>
+<textarea class="code" data-lang="js" data-run>
+const user = {
+  name: "Ada",
+  email: "ada@example.com",
+  age: 36,
+};
+
+console.log(user);
+</textarea>
+<ul>
+<li>An object is written with curly braces <code>{ }</code>.</li>
+<li>Inside, each line is a <dfn>property</dfn>: a <dfn>key</dfn> (the name, like <code>name</code>), a colon, then the <dfn>value</dfn>.</li>
+<li>Properties are separated by commas. A comma after the last one is allowed, and makes adding lines easier.</li>
+</ul>
+<div class="callout analogy"><span class="label">Analogy</span>An array is a row of <em>numbered</em> lockers. An object is a filing cabinet with <em>labelled</em> drawers: "name", "email", "age". You find things by label, not by position.</div>
+<p>Use an <strong>array</strong> for a list of similar things in order (all the users). Use an <strong>object</strong> for the different facts about one thing (one user).</p>
+
+<h2>Reading properties</h2>
+<p>Use a dot and the key name:</p>
+<textarea class="code" data-lang="js" data-run>
+const user = { name: "Ada", email: "ada@example.com", age: 36 };
+
+console.log(user.name);    // "Ada"
+console.log(user.age);     // 36
+console.log(`${user.name} is ${user.age}`);
+console.log(user.phone);   // undefined: there's no such property
+</textarea>
+<p>You've been doing this all along: <code>console.log</code> is the <code>log</code> property of the <code>console</code> object, and <code>word.length</code> is the <code>length</code> property of a string.</p>
+
+<h3>Square-bracket access</h3>
+<p>You can also use square brackets with the key as a string. This is needed when the key is stored in a variable:</p>
+<textarea class="code" data-lang="js" data-run>
+const user = { name: "Ada", email: "ada@example.com", age: 36 };
+
+console.log(user["name"]);     // same as user.name
+
+const field = "email";
+console.log(user[field]);      // looks up the key stored in field: "email"
+console.log(user.field);       // undefined: looks for a key literally called "field"
+</textarea>
+<p>Rule of thumb: use the dot when you know the key while writing the code. Use brackets when the key comes from a variable.</p>
+
+<h2>Changing, adding and removing properties</h2>
+<textarea class="code" data-lang="js" data-run>
+const user = { name: "Ada", age: 36 };
+
+user.age = 37;                   // change an existing property
+user.email = "ada@example.com";  // add a new one
+delete user.name;                // remove one
+
+console.log(user);
+</textarea>
+<p>Like arrays, a <code>const</code> object can have its contents changed. <code>const</code> only stops <code>user</code> pointing to a different object.</p>
+
+<h2>Methods: functions inside objects</h2>
+<p>A property's value can be a function. A function stored on an object is called a <dfn>method</dfn>:</p>
+<textarea class="code" data-lang="js" data-run>
+const calculator = {
+  add(a, b) {
+    return a + b;
+  },
+  multiply(a, b) {
+    return a * b;
+  },
+};
+
+console.log(calculator.add(2, 3));
+console.log(calculator.multiply(4, 5));
+</textarea>
+<p>That's exactly what <code>Math.round</code> and <code>console.log</code> are: methods on the <code>Math</code> and <code>console</code> objects. (Methods can also use the object's own properties through a keyword called <code>this</code>. That's covered in the Classes lesson.)</p>
+
+<h2>Objects and arrays together</h2>
+<p>Real data is almost always a mix. Here's the most common shape of all: an <strong>array of objects</strong>.</p>
+<textarea class="code" data-lang="js" data-run>
+const products = [
+  { name: "Notebook", price: 3, inStock: true },
+  { name: "Pen", price: 1, inStock: false },
+  { name: "Backpack", price: 25, inStock: true },
+];
+
+console.log(products.length);       // 3 products
+console.log(products[0].name);      // "Notebook": first item, then its name
+console.log(products[2].price);     // 25
+
+for (const product of products) {
+  const status = product.inStock ? "available" : "sold out";
+  console.log(`${product.name}: $${product.price} (${status})`);
+}
+</textarea>
+<p>Read <code>products[0].name</code> left to right: "from <code>products</code>, take item 0, then its <code>name</code>". You can chain as deep as you need.</p>
+<p>Objects can also contain arrays and other objects:</p>
+<textarea class="code" data-lang="js" data-run>
+const student = {
+  name: "Grace",
+  grades: [90, 85, 100],
+  address: {
+    city: "New York",
+    country: "USA",
+  },
+};
+
+console.log(student.grades[1]);         // 85
+console.log(student.address.city);      // "New York"
+student.grades.push(95);                // add a grade
+console.log(student.grades.length);     // 4
+</textarea>
+<div class="try"><span class="label">Try it</span>Add a <code>hobbies</code> array to <code>student</code> with two hobbies, then print the second hobby.</div>
+
+<h2>Looping over an object</h2>
+<p>To go through all the properties of an object, ask for its keys, values or both:</p>
+<textarea class="code" data-lang="js" data-run>
+const stock = { apples: 12, bananas: 0, cherries: 40 };
+
+console.log(Object.keys(stock));      // ["apples", "bananas", "cherries"]
+console.log(Object.values(stock));    // [12, 0, 40]
+console.log(Object.entries(stock));   // [["apples", 12], ["bananas", 0], ...]
+
+for (const [fruit, count] of Object.entries(stock)) {
+  console.log(`${fruit}: ${count}`);
+}
+</textarea>
+<p><code>Object.entries</code> gives you a list of <code>[key, value]</code> pairs. In the loop, <code>const [fruit, count]</code> unpacks each pair into two variables. (That unpacking is called <em>destructuring</em>, and it has its own lesson later.)</p>
+<p>Objects like <code>stock</code>, where the keys are names and the values are all the same kind of thing, work like a dictionary: look up a word, get its definition. They're great for counting:</p>
+<textarea class="code" data-lang="js" data-run>
+const votes = ["cat", "dog", "cat", "fish", "cat", "dog"];
+const tally = {};
+
+for (const vote of votes) {
+  if (tally[vote] === undefined) {
+    tally[vote] = 0;      // first time we've seen this animal
+  }
+  tally[vote]++;
+}
+console.log(tally);   // { cat: 3, dog: 2, fish: 1 }
+</textarea>
+
+<h2>Shortcuts you'll see everywhere</h2>
+<p>When a variable has the same name as the key you want, you can write it once:</p>
+<textarea class="code" data-lang="js" data-run>
+const name = "Ada";
+const age = 36;
+
+const long = { name: name, age: age };
+const short = { name, age };            // same thing
+console.log(long, short);
+</textarea>
+<p>And spread works on objects too, for copying and combining:</p>
+<textarea class="code" data-lang="js" data-run>
+const defaults = { theme: "light", fontSize: 16, sound: true };
+const choices = { theme: "dark" };
+
+const settings = { ...defaults, ...choices };   // later properties win
+console.log(settings);   // { theme: "dark", fontSize: 16, sound: true }
+</textarea>
+<p>Like arrays, assigning an object with <code>=</code> doesn't copy it; both names point to the same object. Use <code>{ ...obj }</code> to copy.</p>
+
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong><code>=</code> instead of <code>:</code></strong> inside an object: it's <code>{ name: "Ada" }</code>, not <code>{ name = "Ada" }</code>.</li>
+<li><strong>Missing commas</strong> between properties.</li>
+<li><strong>Using a variable with the dot</strong>: <code>user.field</code> looks for a key named "field". Use <code>user[field]</code>.</li>
+<li><strong>Typos in keys</strong>: <code>user.nmae</code> is just <code>undefined</code> in JavaScript, with no error. (TypeScript fixes this.)</li>
+</ul></div>
+
+<h2 class="ts-head">In TypeScript</h2>
+<p>This is the heart of TypeScript. Most of the bugs in real JavaScript programs are about objects: a misspelled property, a missing field, a value of the wrong type. TypeScript tracks the exact shape of every object.</p>
+
+<h3>Object types are inferred</h3>
+<p>Hover over <code>user</code>:</p>
+<textarea class="code" data-lang="ts" data-run>
+const user = { name: "Ada", email: "ada@example.com", age: 36 };
+
+console.log(user.name);
+console.log(user.nmae);        // ✖ typo caught: there's no 'nmae' property
+user.age = "thirty-seven";     // ✖ age is a number
+user.phone = "555-0100";       // ✖ there's no phone property
+</textarea>
+<p>TypeScript inferred the shape <code>{ name: string; email: string; age: number }</code> and now checks every use. Note the last error: in TypeScript, you can't add properties that weren't in the shape. That might feel strict, but it's what makes the typo check on line 4 possible.</p>
+
+<h3>Naming a shape with <code>type</code></h3>
+<p>When the same shape is used in several places, give it a name with a <dfn>type alias</dfn>. Type names are written in PascalCase (capital first letter):</p>
+<textarea class="code" data-lang="ts" data-run>
+type User = {
+  name: string;
+  email: string;
+  age: number;
+};
+
+const ada: User = { name: "Ada", email: "ada@example.com", age: 36 };
+const grace: User = { name: "Grace", email: "grace@example.com" };   // ✖ missing age
+
+function describe(user: User): string {
+  return `${user.name} (${user.age})`;
+}
+console.log(describe(ada));
+</textarea>
+<p>Read <code>type User = { ... }</code> as "from now on, <code>User</code> means an object with these properties". The error on <code>grace</code> says <code>Property 'age' is missing</code>. In the type, properties are separated by semicolons (commas also work).</p>
+
+<h3>Optional properties</h3>
+<p>Some properties aren't always there. Mark them with <code>?</code>:</p>
+<textarea class="code" data-lang="ts" data-run>
+type Product = {
+  name: string;
+  price: number;
+  description?: string;   // optional: may be missing
+};
+
+const pen: Product = { name: "Pen", price: 1 };   // ✔ no description is fine
+const mug: Product = { name: "Mug", price: 8, description: "Holds coffee" };
+
+console.log(pen.description?.toUpperCase());   // undefined, no crash
+console.log(mug.description?.toUpperCase());
+console.log(pen.description.toUpperCase());    // ✖ might be undefined!
+</textarea>
+<p>Hover over <code>description</code>: its type is <code>string | undefined</code>. TypeScript won't let you call string methods on it until you've dealt with the "might be missing" case. The <code>?.</code> in <code>pen.description?.toUpperCase()</code> is called <dfn>optional chaining</dfn>: "if this is missing, stop and give <code>undefined</code> instead of crashing". You'll learn the full set of tools for this in the Union types lesson.</p>
+
+<h3>Arrays of objects</h3>
+<p>Combine the two ideas: <code>Product[]</code> means "an array of Products".</p>
+<textarea class="code" data-lang="ts" data-run>
+type Product = { name: string; price: number; inStock: boolean };
+
+const products: Product[] = [
+  { name: "Notebook", price: 3, inStock: true },
+  { name: "Pen", price: 1, inStock: false },
+  { name: "Backpack", prise: 25, inStock: true },   // ✖ typo in a key
+];
+
+function totalValue(items: Product[]): number {
+  let total = 0;
+  for (const item of items) {
+    total += item.price;    // item is a Product: autocomplete works here
+  }
+  return total;
+}
+console.log(totalValue(products));
+</textarea>
+<p>The typo <code>prise</code> is caught where the object is written: <code>Object literal may only specify known properties, and 'prise' does not exist in type 'Product'</code>.</p>
+
+<h3><code>readonly</code> properties</h3>
+<textarea class="code" data-lang="ts" data-run>
+type Account = {
+  readonly id: number;   // set once, never changed
+  balance: number;
+};
+const acct: Account = { id: 1, balance: 100 };
+acct.balance += 50;   // ✔
+acct.id = 2;          // ✖ id is readonly
+</textarea>
+
+<h3>Dictionaries: <code>Record</code></h3>
+<p>For "dictionary" objects like the vote tally, where you don't know the keys in advance, use <code>Record&lt;KeyType, ValueType&gt;</code>:</p>
+<textarea class="code" data-lang="ts" data-run>
+const tally: Record<string, number> = {};   // any string key → a number
+
+for (const vote of ["cat", "dog", "cat"]) {
+  tally[vote] = (tally[vote] ?? 0) + 1;
+}
+console.log(tally);
+tally["fish"] = "lots";   // ✖ values must be numbers
+</textarea>
+<p>(<code>??</code> means "if the left side is missing, use the right side instead". So <code>tally[vote] ?? 0</code> is "the current count, or 0 if there isn't one yet". More on this in the Union types lesson.)</p>
+
+<h3><code>interface</code>: the other way to name a shape</h3>
+<p>You'll often see object shapes written with <code>interface</code> instead of <code>type</code>:</p>
+<textarea class="code" data-lang="ts" data-run>
+interface User {
+  name: string;
+  email: string;
+  age?: number;
+}
+
+const u: User = { name: "Ada", email: "ada@example.com" };
+console.log(u);
+</textarea>
+<div class="callout ts"><span class="label">type or interface?</span>For describing an object, they do the same job, and you'll see both in real code. Small differences matter only in advanced situations. A simple rule: pick one style for your project and stay consistent. This course mostly uses <code>type</code>, because it can also describe things that aren't objects (like the <code>"red" | "yellow" | "green"</code> type you saw earlier).</div>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li>An object groups named properties: <code>{ name: "Ada", age: 36 }</code>.</li>
+<li>Read with <code>obj.key</code>, or <code>obj[variable]</code> when the key is in a variable. Missing keys give <code>undefined</code>.</li>
+<li>A function stored on an object is a <strong>method</strong>.</li>
+<li>Arrays of objects are the most common data shape. Read paths like <code>products[0].name</code> left to right.</li>
+<li><code>Object.keys / values / entries</code> let you loop over an object. <code>{ ...obj }</code> copies.</li>
+<li>TypeScript: <code>type User = { name: string; age?: number }</code>. <code>?</code> = optional, <code>readonly</code> = can't change, <code>User[]</code> = array of them, <code>Record&lt;string, number&gt;</code> = dictionary.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space
+
+</textarea>
+<ol>
+<li>Create a <code>type Book</code> with a title, author, year and an optional <code>rating</code>. Make two books, one with a rating and one without.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+type Book = { title: string; author: string; year: number; rating?: number };
+const b1: Book = { title: "Dune", author: "Frank Herbert", year: 1965, rating: 5 };
+const b2: Book = { title: "Emma", author: "Jane Austen", year: 1815 };
+console.log(b1, b2);
+</textarea></details></li>
+<li>Write <code>oldestBook(books: Book[])</code> that returns the title of the book with the smallest year.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+type Book = { title: string; author: string; year: number };
+function oldestBook(books: Book[]): string {
+  let oldest = books[0];
+  for (const b of books) {
+    if (b.year < oldest.year) oldest = b;
+  }
+  return oldest.title;
+}
+console.log(oldestBook([
+  { title: "Dune", author: "Herbert", year: 1965 },
+  { title: "Emma", author: "Austen", year: 1815 },
+]));
+</textarea></details></li>
+<li>Write <code>countLetters(word: string)</code> that returns a <code>Record&lt;string, number&gt;</code> of how many times each letter appears. <code>countLetters("hello")</code> → <code>{ h: 1, e: 1, l: 2, o: 1 }</code>.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function countLetters(word: string): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const ch of word) {
+    counts[ch] = (counts[ch] ?? 0) + 1;
+  }
+  return counts;
+}
+console.log(countLetters("hello"));
+</textarea></details></li>
+<li>Given a shopping cart <code>[{ name: "Pen", price: 1, qty: 3 }, { name: "Mug", price: 8, qty: 1 }]</code>, write a type for an item and a function that returns the total cost.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+type CartItem = { name: string; price: number; qty: number };
+function cartTotal(cart: CartItem[]): number {
+  let total = 0;
+  for (const item of cart) {
+    total += item.price * item.qty;
+  }
+  return total;
+}
+console.log(cartTotal([{ name: "Pen", price: 1, qty: 3 }, { name: "Mug", price: 8, qty: 1 }]));  // 11
+</textarea></details></li>
+</ol></section>
+
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>When would you use an array, and when an object?</summary>An array for an ordered list of similar things. An object for the named facts about one thing.</details>
+<details><summary>What's the difference between <code>user.key</code> and <code>user[key]</code>?</summary><code>user.key</code> looks up a property literally named "key". <code>user[key]</code> looks up the property whose name is stored in the variable <code>key</code>.</details>
+<details><summary>What does the <code>?</code> in <code>description?: string</code> mean?</summary>The property is optional: it might be missing, so its type is <code>string | undefined</code>.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

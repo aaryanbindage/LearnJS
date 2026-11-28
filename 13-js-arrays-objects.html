@@ -3,137 +3,346 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 13 — Arrays & Objects</title>
+<title>Arrays: lists of values</title>
 <link rel="stylesheet" href="assets/course.css">
 </head>
 <body data-slug="13-js-arrays-objects">
 <main><article>
-<h1>Lesson 13 — Arrays &amp; objects</h1>
-<p class="lede">Almost all real data is arrays of objects. Master these two and the array methods and you can transform any data.</p>
+<h1>Arrays: lists of values</h1>
+<p class="lede">A shopping list, the songs in a playlist, the messages in a chat, the scores in a game: programs are full of lists. In JavaScript, a list is called an <strong>array</strong>.</p>
 
-<h2>Arrays</h2>
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Create arrays, and read items by their index.</li>
+<li>Add, remove and change items.</li>
+<li>Loop through an array with <code>for...of</code>.</li>
+<li>Search arrays with <code>includes</code> and <code>indexOf</code>, and combine them with <code>join</code>, <code>slice</code> and spread.</li>
+<li>Write array types in TypeScript: <code>number[]</code>, <code>string[]</code>.</li>
+</ul><p class="time">About 45 minutes.</p></section>
+
+<h2>Creating an array</h2>
+<p>An <dfn>array</dfn> is an ordered list of values, written in square brackets with commas between the items:</p>
 <textarea class="code" data-lang="js" data-run>
 const fruits = ["apple", "banana", "cherry"];
-console.log(fruits.length, fruits[0], fruits.at(-1));
+const scores = [90, 72, 85, 100];
+const empty = [];
 
-fruits.push("date");        // add end   (mutates)
-fruits.unshift("avocado");  // add start (mutates)
-console.log(fruits.pop(), fruits.shift(), fruits);
+console.log(fruits);
+console.log(scores);
+console.log(empty);
+</textarea>
+<p>Each value in the array is called an <dfn>element</dfn> (or item). An array can hold any type of value, and any number of them, including none.</p>
+<div class="callout analogy"><span class="label">Analogy</span>An array is like a row of numbered lockers. Each locker holds one thing, and the lockers are numbered in order, starting from 0.</div>
 
-console.log(fruits.indexOf("banana"), fruits.includes("kiwi"));
-console.log(fruits.slice(1, 3), fruits);        // slice: copy a part (no mutation)
-const removed = fruits.splice(1, 1, "blueberry", "blackberry");   // splice mutates
-console.log(removed, fruits);
+<h2>Reading items by index</h2>
+<p>Arrays use the same numbering as string characters: the first item is at index <strong>0</strong>.</p>
+<table>
+<tr><th>Index</th><td>0</td><td>1</td><td>2</td></tr>
+<tr><th>Item</th><td>"apple"</td><td>"banana"</td><td>"cherry"</td></tr>
+</table>
+<textarea class="code" data-lang="js" data-run>
+const fruits = ["apple", "banana", "cherry"];
 
-console.log([3, 1, 10, 2].sort());                 // ["1","10","2","3"] strings!
-console.log([3, 1, 10, 2].sort((a, b) => a - b));  // numeric sort
-console.log([1, 2, 3].reverse(), [[1, 2], [3]].flat(), "a,b".split(","));
-console.log(Array.from({ length: 5 }, (_, i) => i * i));
+console.log(fruits[0]);                  // "apple"
+console.log(fruits[2]);                  // "cherry"
+console.log(fruits.length);              // 3: how many items
+console.log(fruits[fruits.length - 1]);  // "cherry": the last item
+console.log(fruits.at(-1));              // "cherry": same thing, shorter
+console.log(fruits[10]);                 // undefined: nothing there
+</textarea>
+<div class="quiz"><p>For <code>const days = ["Mon", "Tue", "Wed", "Thu"]</code>, what is <code>days[days.length - 2]</code>?</p>
+<button>"Tue"</button><button data-correct>"Wed"</button><button>"Thu"</button>
+<p class="why"><code>days.length</code> is 4, so <code>days.length - 2</code> is 2, and index 2 is "Wed" (counting Mon=0, Tue=1, Wed=2).</p></div>
+
+<h2>Changing an array</h2>
+<h3>Changing an item</h3>
+<p>Assign to an index to replace what's there:</p>
+<textarea class="code" data-lang="js" data-run>
+const fruits = ["apple", "banana", "cherry"];
+fruits[1] = "blueberry";
+console.log(fruits);   // ["apple", "blueberry", "cherry"]
+</textarea>
+<p>Wait, <code>fruits</code> is a <code>const</code>. How can we change it? <code>const</code> means the variable always points to <em>the same array</em>; it doesn't stop you changing what's <em>inside</em> that array. (You can't do <code>fruits = ["kiwi"]</code>, which would point it at a different array.) Think of it as the locker row being bolted down, while the lockers can still be opened.</p>
+
+<h3>Adding and removing at the end</h3>
+<textarea class="code" data-lang="js" data-run>
+const queue = ["Ada", "Grace"];
+
+queue.push("Linus");          // add to the END
+console.log(queue);           // ["Ada", "Grace", "Linus"]
+
+const last = queue.pop();     // remove from the END (and give it back)
+console.log(last);            // "Linus"
+console.log(queue);           // ["Ada", "Grace"]
+</textarea>
+<h3>Adding and removing at the start</h3>
+<textarea class="code" data-lang="js" data-run>
+const queue = ["Ada", "Grace"];
+
+queue.unshift("Margaret");    // add to the START
+console.log(queue);           // ["Margaret", "Ada", "Grace"]
+
+const first = queue.shift();  // remove from the START (and give it back)
+console.log(first);           // "Margaret"
+console.log(queue);           // ["Ada", "Grace"]
+</textarea>
+<table>
+<tr><th></th><th>Start</th><th>End</th></tr>
+<tr><th>Add</th><td><code>unshift(x)</code></td><td><code>push(x)</code></td></tr>
+<tr><th>Remove</th><td><code>shift()</code></td><td><code>pop()</code></td></tr>
+</table>
+<p><code>push</code> is by far the one you'll use most.</p>
+
+<h3>Removing from the middle</h3>
+<p><code>splice(start, count)</code> removes <code>count</code> items starting at index <code>start</code>:</p>
+<textarea class="code" data-lang="js" data-run>
+const letters = ["a", "b", "c", "d", "e"];
+letters.splice(1, 2);      // at index 1, remove 2 items ("b" and "c")
+console.log(letters);      // ["a", "d", "e"]
 </textarea>
 
-<h2>The big five: map, filter, reduce, find, and friends</h2>
+<h2>Looping through an array</h2>
+<p>The <code>for...of</code> loop you used on strings works on arrays too, and it's the clearest way to visit every item:</p>
 <textarea class="code" data-lang="js" data-run>
-const people = [
-  { name: "Ada",   age: 36, team: "eng" },
-  { name: "Linus", age: 28, team: "eng" },
-  { name: "Grace", age: 45, team: "ops" },
-  { name: "Alan",  age: 41, team: "ops" },
+const fruits = ["apple", "banana", "cherry"];
+
+for (const fruit of fruits) {
+  console.log(`I like ${fruit}s`);
+}
+</textarea>
+<p>If you also need the position number, use a counting loop (remember: <code>&lt;</code>, not <code>&lt;=</code>):</p>
+<textarea class="code" data-lang="js" data-run>
+const podium = ["Ada", "Grace", "Linus"];
+
+for (let i = 0; i < podium.length; i++) {
+  console.log(`${i + 1}. ${podium[i]}`);   // i + 1 because people count from 1
+}
+</textarea>
+<p>And all the loop patterns from before work. Here's an accumulator adding up scores:</p>
+<textarea class="code" data-lang="js" data-run>
+const scores = [90, 72, 85, 100];
+
+let total = 0;
+for (const score of scores) {
+  total += score;
+}
+
+console.log("Total:", total);
+console.log("Average:", total / scores.length);
+</textarea>
+<p>And one that builds a <em>new</em> array, keeping only some items:</p>
+<textarea class="code" data-lang="js" data-run>
+const scores = [90, 45, 72, 38, 100];
+const passing = [];
+
+for (const score of scores) {
+  if (score >= 50) {
+    passing.push(score);
+  }
+}
+
+console.log(passing);   // [90, 72, 100]
+</textarea>
+<p>These "add up" and "keep some" patterns are so common that arrays have built-in shortcuts for them. That's the lesson after next.</p>
+
+<h2>Searching an array</h2>
+<textarea class="code" data-lang="js" data-run>
+const guests = ["Ada", "Grace", "Linus"];
+
+console.log(guests.includes("Grace"));   // true: is it in there?
+console.log(guests.includes("grace"));   // false: capitals matter
+console.log(guests.indexOf("Linus"));    // 2: where is it?
+console.log(guests.indexOf("Bob"));      // -1: not found
+</textarea>
+
+<h2>Useful array tools</h2>
+<textarea class="code" data-lang="js" data-run>
+const words = ["the", "quick", "brown", "fox"];
+
+console.log(words.join(" "));       // "the quick brown fox": glue into one string
+console.log(words.join(", "));      // "the, quick, brown, fox"
+console.log(words.slice(1, 3));     // ["quick", "brown"]: copy a part (end not included)
+
+const more = ["jumps", "over"];
+const all = [...words, ...more];    // combine arrays
+console.log(all);
+
+const numbers = [3, 1, 2];
+console.log(numbers.reverse());     // [2, 1, 3]  (careful: changes the original!)
+</textarea>
+<p>The <code>...</code> in <code>[...words, ...more]</code> is called <dfn>spread</dfn>. It means "spill out all the items of this array here". It's the easy way to combine or copy arrays.</p>
+<p>Remember <code>split</code> from the Strings lesson? It's the opposite of <code>join</code>: it turns a string into an array.</p>
+<textarea class="code" data-lang="js" data-run>
+const csv = "red,green,blue";
+const colours = csv.split(",");   // string → array
+console.log(colours, colours.length);
+console.log(colours.join(" | ")); // array → string
+</textarea>
+
+<h3>Copying arrays: a trap</h3>
+<p>This catches everyone once. Assigning an array to a new variable does <strong>not</strong> copy it. Both variables point to the same array:</p>
+<textarea class="code" data-lang="js" data-run>
+const original = [1, 2, 3];
+const notACopy = original;     // same array, two names
+notACopy.push(4);
+console.log(original);         // [1, 2, 3, 4]: the original changed too!
+
+const realCopy = [...original];  // spread into a NEW array
+realCopy.push(5);
+console.log(original);         // [1, 2, 3, 4]: unchanged
+console.log(realCopy);         // [1, 2, 3, 4, 5]
+</textarea>
+
+<h2>Arrays can hold anything</h2>
+<p>Items can be any type, including other arrays. An array of arrays is a handy way to store a grid:</p>
+<textarea class="code" data-lang="js" data-run>
+const board = [
+  ["X", "O", "X"],
+  ["O", "X", "O"],
+  ["O", "X", "X"],
 ];
-
-console.log(people.map(p => p.name));                          // transform each
-console.log(people.filter(p => p.age > 40).map(p => p.name));  // keep some
-console.log(people.find(p => p.team === "ops"));               // first match
-console.log(people.findIndex(p => p.name === "Linus"));
-console.log(people.some(p => p.age > 44), people.every(p => p.age > 30));
-
-const totalAge = people.reduce((sum, p) => sum + p.age, 0);
-console.log(totalAge / people.length);
-
-// group by team using reduce
-const byTeam = people.reduce((acc, p) => {
-  (acc[p.team] ??= []).push(p.name);
-  return acc;
-}, {});
-console.log(byTeam);
-
-// non-mutating sort (copy first or use toSorted)
-console.log(people.toSorted((a, b) => b.age - a.age).map(p => p.name));
-people.forEach(p => console.log(`${p.name} is ${p.age}`));
+console.log(board[0]);      // the first row
+console.log(board[1][2]);   // row 1, column 2: "O"
 </textarea>
-<div class="callout"><span class="label">Mutating vs not</span>Mutate: <code>push pop shift unshift splice sort reverse</code>. Return new: <code>map filter slice concat flat toSorted toReversed with</code>. In React you'll almost always want the non-mutating kind.</div>
+<p>In JavaScript, you <em>can</em> also mix types in one array, like <code>[1, "two", true]</code>. It's allowed, but usually a sign of muddled data. TypeScript will help keep your arrays tidy.</p>
 
-<h2>Objects</h2>
-<textarea class="code" data-lang="js" data-run>
-const user = {
-  name: "Ada",
-  "favorite color": "blue",        // quoted key
-  address: { city: "London" },
-  greet() { return `Hi, I'm ${this.name}`; },   // method
-};
-console.log(user.name, user["favorite color"], user.address.city, user.greet());
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Off by one</strong>: the last item is <code>arr[arr.length - 1]</code>, not <code>arr[arr.length]</code>.</li>
+<li><strong>"Copying" with <code>=</code></strong>: use <code>[...arr]</code> for a real copy.</li>
+<li><strong>Expecting <code>push</code> to return the array</strong>: it returns the new length. It changes the array in place.</li>
+<li><strong>Checking an empty array with <code>if (arr)</code></strong>: an empty array is truthy! Use <code>if (arr.length === 0)</code>.</li>
+</ul></div>
 
-user.age = 36;                 // add
-delete user["favorite color"]; // remove
-console.log("age" in user, user.hasOwnProperty("name"), Object.hasOwn(user, "zip"));
+<h2 class="ts-head">In TypeScript</h2>
+<h3>Array types</h3>
+<p>An array's type is written as the item type followed by <code>[]</code>. Read <code>string[]</code> as "an array of strings". Hover over each variable:</p>
+<textarea class="code" data-lang="ts" data-run>
+const fruits = ["apple", "banana"];   // string[]
+const scores = [90, 72, 85];          // number[]
+const flags = [true, false];          // boolean[]
 
-console.log(Object.keys(user), Object.values(user).length);
-console.log(Object.entries({ a: 1, b: 2 }));
-console.log(Object.fromEntries([["x", 1], ["y", 2]]));
+fruits.push("cherry");    // ✔
+fruits.push(42);          // ✖ only strings allowed in a string[]
+scores.push("100");       // ✖ only numbers
+</textarea>
+<p>Once TypeScript knows an array holds strings, it won't let anything else in. Your list stays tidy.</p>
 
-const key = "dynamic";
-const o = { [key]: 1, [`${key}2`]: 2 };      // computed keys
-console.log(o);
-const x = 1, y = 2;
-console.log({ x, y });                        // shorthand properties
+<h3>Empty arrays need a type</h3>
+<p>If you start with an empty array, there's nothing to infer the item type from, so tell TypeScript what will go in it:</p>
+<textarea class="code" data-lang="ts" data-run>
+const passing: number[] = [];
+
+for (const score of [90, 45, 72]) {
+  if (score >= 50) {
+    passing.push(score);
+  }
+}
+console.log(passing);
 </textarea>
 
-<h2>Copying and references</h2>
-<textarea class="code" data-lang="js" data-run>
-const a = { n: 1, nested: { v: 10 } };
-const b = a;                       // same object! (reference)
-b.n = 99; console.log(a.n);
+<h3>Items come out with the right type</h3>
+<p>Because TypeScript knows what's in the array, every item you take out is typed too. Your loop variables get autocomplete for free:</p>
+<textarea class="code" data-lang="ts" data-run>
+const names = ["ada", "grace"];
 
-const shallow = { ...a };          // new top-level object
-shallow.nested.v = 555;            // but nested is STILL shared
-console.log(a.nested.v);
+for (const name of names) {
+  console.log(name.toUpperCase());   // name: string, so string methods work
+}
 
-const deep = structuredClone(a);   // real deep copy
-deep.nested.v = 1; console.log(a.nested.v);
-
-console.log({} === {}, [1] === [1]);   // objects compare by reference, not content
-console.log(JSON.stringify({ a: 1, b: [1, 2] }), JSON.parse('{"x":[1,2]}'));
+const first = names[0];        // string
+const joined = names.join("+");  // string
+const found = names.includes("ada");  // boolean
+console.log(first, joined, found);
 </textarea>
 
-<h2>Immutable updates (the React way)</h2>
-<textarea class="code" data-lang="js" data-run>
-const state = { user: { name: "Ada", tags: ["a"] }, count: 1 };
+<h3>Arrays in function parameters</h3>
+<textarea class="code" data-lang="ts" data-run>
+function average(numbers: number[]): number {
+  let total = 0;
+  for (const n of numbers) {
+    total += n;
+  }
+  return total / numbers.length;
+}
 
-const next = {
-  ...state,
-  count: state.count + 1,
-  user: { ...state.user, tags: [...state.user.tags, "b"] },
-};
-console.log(state, next);
-
-const list = [1, 2, 3, 4];
-console.log(list.filter(n => n !== 3));                  // remove
-console.log(list.map(n => (n === 2 ? 20 : n)));          // update
-console.log([...list.slice(0, 2), 99, ...list.slice(2)]); // insert
+console.log(average([90, 72, 85]));
+console.log(average(["90", "72"]));   // ✖ strings aren't numbers
 </textarea>
 
-<section class="exercises"><h2>Exercises</h2><ol>
-<li>Given the <code>people</code> array, return the average age of each team as an object.</li>
-<li>Write <code>unique(arr)</code> (use <code>Set</code> or <code>filter</code> with <code>indexOf</code>).</li>
-<li>Write <code>countWords(text)</code> returning an object of word → count.</li>
-<li>Write <code>deepEqual(a, b)</code> for nested objects/arrays.</li>
-<li>Write <code>chunk(arr, size)</code>: <code>chunk([1,2,3,4,5], 2)</code> → <code>[[1,2],[3,4],[5]]</code>.</li>
-<li>Implement an immutable <code>updateById(list, id, patch)</code>.</li>
-<li>Sort people by team, then by age descending.</li>
+<h3>Mixed arrays and <code>readonly</code></h3>
+<p>Two extras you'll see in real code. If an array really should hold two types, TypeScript writes that with <code>|</code> ("or"). And if a function shouldn't change an array it's given, mark the parameter <code>readonly</code>:</p>
+<textarea class="code" data-lang="ts" data-run>
+const mixed = [1, "two", 3];   // hover: (string | number)[]
+
+function printAll(items: readonly string[]): void {
+  for (const item of items) {
+    console.log(item);
+  }
+  items.push("sneaky");   // ✖ a readonly array can't be changed
+}
+printAll(["a", "b"]);
+</textarea>
+<p>The <code>(string | number)[]</code> type means "an array where each item is a string or a number". You'll learn all about <code>|</code> types in the Union types lesson.</p>
+<div class="callout ts"><span class="label">Another way to write it</span>You may see <code>Array&lt;string&gt;</code> instead of <code>string[]</code>. They mean exactly the same thing. The angle-bracket form is called a <em>generic</em>, which you'll learn about later.</div>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li>An array is an ordered list: <code>["a", "b", "c"]</code>. Indexes start at 0; <code>.length</code> is the count.</li>
+<li>Change items with <code>arr[i] = x</code>. Add/remove with <code>push</code>/<code>pop</code> (end) and <code>unshift</code>/<code>shift</code> (start).</li>
+<li>Loop with <code>for (const item of arr)</code>.</li>
+<li><code>includes</code>, <code>indexOf</code>, <code>join</code>, <code>slice</code>, and spread <code>[...a, ...b]</code>.</li>
+<li><code>=</code> doesn't copy an array. <code>[...arr]</code> does.</li>
+<li>TypeScript: <code>string[]</code>, <code>number[]</code>. Annotate empty arrays. Use <code>readonly</code> to prevent changes.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space
+
+</textarea>
+<ol>
+<li>Make an array of your three favourite films. Print the first and last, then add a fourth and print how many there are.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const films = ["Spirited Away", "Up", "Arrival"];
+console.log(films[0], films.at(-1));
+films.push("Paddington 2");
+console.log(films.length);
+</textarea></details></li>
+<li>Write <code>findMax(numbers: number[])</code> that returns the biggest number, using a loop (not <code>Math.max</code>).
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function findMax(numbers: number[]): number {
+  let max = numbers[0];
+  for (const n of numbers) {
+    if (n > max) {
+      max = n;
+    }
+  }
+  return max;
+}
+console.log(findMax([3, 17, 8, 12]));   // 17
+</textarea></details></li>
+<li>Write <code>countLongWords(words: string[])</code> that returns how many words have more than 5 letters.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function countLongWords(words: string[]): number {
+  let count = 0;
+  for (const w of words) {
+    if (w.length > 5) count++;
+  }
+  return count;
+}
+console.log(countLongWords(["tree", "banana", "elephant", "cat"]));   // 2
+</textarea></details></li>
+<li>Write <code>reverseWords(sentence: string)</code> that turns "hello big world" into "world big hello". (Hint: split, reverse, join.)
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function reverseWords(sentence: string): string {
+  return sentence.split(" ").reverse().join(" ");
+}
+console.log(reverseWords("hello big world"));
+</textarea></details></li>
 </ol></section>
 
-<section class="checkpoint"><h2>Checkpoint</h2>
-<details><summary>Why does <code>[10, 9, 1].sort()</code> give [1, 10, 9]?</summary>Default sort converts to strings and compares lexicographically. Pass a comparator: <code>(a, b) =&gt; a - b</code>.</details>
-<details><summary>Shallow vs deep copy?</summary>Shallow copies the top level; nested objects remain shared references. <code>structuredClone</code> copies the whole structure.</details>
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>Why can you <code>push</code> to a <code>const</code> array?</summary><code>const</code> stops the variable from pointing to a different array; it doesn't stop the array's contents from changing.</details>
+<details><summary>How do you make a real copy of an array?</summary><code>const copy = [...original];</code></details>
+<details><summary>What does the TypeScript type <code>number[]</code> mean?</summary>An array where every item is a number.</details>
 </section>
 </article></main>
 <script src="assets/lessons.js"></script>
