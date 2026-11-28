@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your first program</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="js-first-program">
+<main><article>
+<h1>Your first program</h1>
+<p class="lede">You've used HTML to describe a page and CSS to style it. Now you'll learn to give the computer <em>instructions</em>. This lesson assumes you have never programmed before. We'll go slowly.</p>
+
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Learn what a program actually is.</li>
+<li>Use the code editors on this site: edit, run, and read the output.</li>
+<li>Print things with <code>console.log()</code>.</li>
+<li>Write comments, and learn to read error messages without panicking.</li>
+</ul><p class="time">About 30 minutes. Type the examples yourself. Don't just read them.</p></section>
+
+<h2>What is a program?</h2>
+<p>A <dfn>program</dfn> is a list of instructions for a computer. The computer does them one at a time, from top to bottom, exactly as written. It doesn't guess what you meant.</p>
+<div class="callout analogy"><span class="label">Analogy</span>A program is like a recipe. "Crack two eggs. Whisk them. Pour into the pan." Each line is one step, done in order. The difference is that a computer follows the recipe <em>literally</em>. If you write "whisk the egs", it stops and says it doesn't know what "egs" are.</div>
+<p>The language we'll write those instructions in is <dfn>JavaScript</dfn> (often shortened to JS). Every web browser can run it. It's what makes web pages interactive: menus that open, forms that check what you typed, games, maps, chat apps.</p>
+<p>Soon you'll also meet <dfn>TypeScript</dfn> (TS). TypeScript is JavaScript with an extra safety layer that catches mistakes before your code runs. You'll learn both side by side, starting two lessons from now. Everything you learn about JavaScript is also true in TypeScript.</p>
+
+<h2>How the code editors on this site work</h2>
+<p>Most lessons have live editors like the one below. Each has three parts:</p>
+<ol class="steps">
+<li><strong>The code</strong>: the dark box with line numbers. Click in it and type, just like a text document.</li>
+<li><strong>The ▶ Run button</strong> at the top right. It runs your code. You can also press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> (<kbd>Cmd</kbd> + <kbd>Enter</kbd> on a Mac) while typing.</li>
+<li><strong>The Console</strong> under the code. Whatever your program prints shows up there.</li>
+</ol>
+<p>If you make a mess, press <strong>Reset</strong> to get the original code back. You can't break anything, so experiment freely.</p>
+<p>Press <strong>▶ Run</strong> on this one now:</p>
+<textarea class="code" data-lang="js" data-run>
+console.log("Hello, world!");
+</textarea>
+<p>You should see <code>Hello, world!</code> appear in the console. That's your first program. Programmers have started with "Hello, world!" for about fifty years, so you're in good company.</p>
+
+<h2>Taking <code>console.log</code> apart</h2>
+<p>That one line has several pieces. Here's what each one does:</p>
+<table>
+<tr><th>Piece</th><th>What it means</th></tr>
+<tr><td><code>console</code></td><td>The console: a text area where programs can print messages. On this site, it's the box under the editor.</td></tr>
+<tr><td><code>.</code></td><td>The dot means "inside" or "belonging to". <code>console.log</code> means "the <code>log</code> thing that belongs to <code>console</code>".</td></tr>
+<tr><td><code>log</code></td><td>The action: write a line to the console ("log" as in a ship's log or a diary).</td></tr>
+<tr><td><code>( )</code></td><td>The parentheses mean "do it now", and hold what you want to print.</td></tr>
+<tr><td><code>"Hello, world!"</code></td><td>The text to print. Text goes inside quotes so JavaScript knows it's text, not code.</td></tr>
+<tr><td><code>;</code></td><td>A semicolon marks the end of an instruction, like a full stop ends a sentence. JavaScript usually works without it, but we'll include it to keep things clear.</td></tr>
+</table>
+<p>An instruction like this is called a <dfn>statement</dfn>. Programs are made of statements.</p>
+
+<div class="try"><span class="label">Try it</span><ol>
+<li>In the editor above, change <code>Hello, world!</code> to your own name. Keep the quotes.</li>
+<li>Press <strong>Run</strong>. Did your name appear?</li>
+<li>Now add a second line underneath: <code>console.log("I'm learning JavaScript");</code> and run again.</li>
+</ol></div>
+
+<h2>Programs run from top to bottom</h2>
+<p>When there are several statements, the computer runs the first line, then the second, then the third. Run this and compare the output order to the code:</p>
+<textarea class="code" data-lang="js" data-run>
+console.log("1. Wake up");
+console.log("2. Brush teeth");
+console.log("3. Eat breakfast");
+</textarea>
+<p>Try swapping two of the lines (cut and paste) and run it again. The output order changes to match. The computer has no idea that brushing your teeth before waking up is odd. It just follows the order you wrote.</p>
+
+<h2>Text vs. numbers</h2>
+<p>You can print numbers too. Numbers don't need quotes, and JavaScript can do math with them:</p>
+<textarea class="code" data-lang="js" data-run>
+console.log(2 + 3);
+console.log(10 - 4);
+console.log(6 * 7);     // * means multiply
+console.log(20 / 4);    // / means divide
+</textarea>
+<p>Now look closely at the difference the quotes make:</p>
+<textarea class="code" data-lang="js" data-run>
+console.log(2 + 3);
+console.log("2 + 3");
+</textarea>
+<p>The first line prints <code>5</code>: JavaScript did the math. The second prints <code>2 + 3</code>: because of the quotes, JavaScript treats it as a piece of text (like a word on a sign) and prints it exactly as written.</p>
+<p>A piece of text in quotes is called a <dfn>string</dfn> (think "a string of characters"). You can use double quotes <code>"like this"</code> or single quotes <code>'like this'</code>. Just start and end with the same kind.</p>
+
+<div class="quiz"><p>What does <code>console.log("10" + "5");</code> print?</p>
+<button>15</button><button data-correct>105</button><button>"10" + "5"</button>
+<p class="why">Both are strings, because both are in quotes. When you use <code>+</code> on two strings, JavaScript glues them together: <code>"10"</code> followed by <code>"5"</code> is <code>"105"</code>. Gluing strings is called <dfn>concatenation</dfn>. You'll see a lot more of this in the Strings lesson. Try it in an editor above to check.</p></div>
+
+<h2>Printing several things at once</h2>
+<p>Put commas between values and <code>console.log</code> prints them all on one line, separated by spaces:</p>
+<textarea class="code" data-lang="js" data-run>
+console.log("The answer is", 6 * 7);
+console.log("Apples:", 3, "Pears:", 5);
+</textarea>
+
+<h2>Comments: notes for humans</h2>
+<p>A <dfn>comment</dfn> is text the computer ignores. You write comments to explain your code to other people, or to yourself next week.</p>
+<textarea class="code" data-lang="js" data-run>
+// Two slashes start a comment. Everything after them on this line is ignored.
+console.log("This runs");
+
+// console.log("This doesn't run, because the line starts with //");
+
+console.log("Comments can go at the end of a line too"); // like this
+
+/*
+  Slash-star starts a comment that can cover
+  several lines. Star-slash ends it.
+*/
+</textarea>
+<div class="callout tip"><span class="label">Handy trick</span>To switch a line off without deleting it, put <code>//</code> in front of it. This is called "commenting out" a line. In the editor, select a line and press <kbd>Ctrl</kbd> + <kbd>/</kbd> (<kbd>Cmd</kbd> + <kbd>/</kbd> on a Mac) to toggle it.</div>
+
+<h2>Errors are normal (and helpful)</h2>
+<p>Every programmer, including those with decades of experience, makes mistakes all day. When the computer can't follow an instruction, it stops and shows an <dfn>error message</dfn>. An error isn't a failure. It's the computer telling you exactly what confused it.</p>
+<p>This code has a typo on purpose. Run it:</p>
+<textarea class="code" data-lang="js" data-run>
+console.log("This line works");
+consol.log("This line has a typo");
+console.log("This line never runs");
+</textarea>
+<p>The console shows something like <code>ReferenceError: consol is not defined (line 2)</code>, and the broken line is highlighted in red. Let's read that message:</p>
+<ul>
+<li><strong>ReferenceError</strong> is the kind of error. A <em>reference</em> error means "you mentioned a name I don't know".</li>
+<li><strong>consol is not defined</strong> is the details: it doesn't know anything called <code>consol</code>, because it's spelled wrong.</li>
+<li><strong>line 2</strong> tells you where to look.</li>
+</ul>
+<p>Notice that the first line still printed, but the third didn't. When JavaScript hits an error, it stops right there. Fix the typo (add the missing <code>e</code>) and run it again.</p>
+
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Capital letters matter.</strong> <code>Console.log</code> and <code>console.LOG</code> don't work. JavaScript is <dfn>case-sensitive</dfn>: <code>console</code> and <code>Console</code> are completely different names to it.</li>
+<li><strong>Missing quote or bracket.</strong> <code>console.log("hi);</code> is missing its closing quote. The editor underlines the problem with a red squiggle before you even run it.</li>
+<li><strong>Curly "smart" quotes.</strong> If you copy code from a word processor, <code>“hi”</code> might sneak in. Code needs straight quotes: <code>"hi"</code>.</li>
+</ul></div>
+<p>Try breaking the code below in each of those three ways, one at a time, and read each error message:</p>
+<textarea class="code" data-lang="js" data-run>
+console.log("Break me, then fix me");
+</textarea>
+
+<h2>Where else JavaScript runs</h2>
+<p>The editors on this site are the easiest place to practice, but JavaScript runs in lots of places. You'll use these later, so it's good to know they exist:</p>
+<ul>
+<li><strong>Your browser's console.</strong> In Chrome, Edge or Firefox, press <kbd>F12</kbd> (or <kbd>Cmd</kbd> + <kbd>Option</kbd> + <kbd>J</kbd> on a Mac), click the <em>Console</em> tab, type <code>console.log("hi")</code> and press <kbd>Enter</kbd>.</li>
+<li><strong>Inside a web page.</strong> A <code>&lt;script&gt;</code> tag in your HTML loads JavaScript, like a <code>&lt;link&gt;</code> tag loads CSS:</li>
+</ul>
+<textarea class="code" data-lang="html" data-file="index.html">
+<!-- At the end of <body>, or in <head> with "defer" -->
+<script src="main.js" defer></script>
+</textarea>
+<ul>
+<li><strong>On your computer with Node.js</strong>, which you installed in the setup lesson. Save code in a file named <code>hello.js</code>, then in a terminal run:</li>
+</ul>
+<textarea class="code" data-lang="bash">
+node hello.js
+</textarea>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li>A <strong>program</strong> is a list of instructions (statements) that run from top to bottom.</li>
+<li><code>console.log(...)</code> prints a value to the console. Use commas to print several.</li>
+<li>Text in quotes is a <strong>string</strong>. Numbers have no quotes and can do math.</li>
+<li><code>//</code> starts a comment; <code>/* ... */</code> wraps a multi-line comment.</li>
+<li>Error messages tell you <em>what</em> went wrong and <em>which line</em>. Read them; they're on your side.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<p>Do these in the editor below. Click "Show answer" only after you've tried.</p>
+<textarea class="code" data-lang="js" data-run>
+// Your practice space. Write your answers here, then press Run.
+
+</textarea>
+<ol>
+<li>Print three lines: your name, your favourite food, and the city you live in.
+<details><summary>Show answer</summary><textarea class="code" data-lang="js">
+console.log("Sam");
+console.log("Pizza");
+console.log("Lisbon");
+</textarea></details></li>
+<li>Print how many minutes are in a day. (Hint: hours times minutes per hour. Let JavaScript do the math.)
+<details><summary>Show answer</summary><textarea class="code" data-lang="js">
+console.log(24 * 60);   // 1440
+</textarea></details></li>
+<li>Print <code>Minutes in a week: 10080</code>, but calculate the number instead of typing it.
+<details><summary>Show answer</summary><textarea class="code" data-lang="js">
+console.log("Minutes in a week:", 7 * 24 * 60);
+</textarea></details></li>
+<li>Write a line, then "comment it out" so it doesn't run. Add a comment above your code explaining what it does.</li>
+</ol></section>
+
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>In what order do statements run?</summary>Top to bottom, one at a time, unless something (like an error) stops the program.</details>
+<details><summary>What's the difference between <code>5</code> and <code>"5"</code>?</summary><code>5</code> is a number you can do math with. <code>"5"</code> is a string: a piece of text that happens to contain the character 5.</details>
+<details><summary>An error says <code>ReferenceError: conole is not defined</code>. What do you check first?</summary>The spelling of the name it mentions. Here <code>conole</code> should be <code>console</code>.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

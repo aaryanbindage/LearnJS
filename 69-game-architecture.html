@@ -92,7 +92,7 @@ console.log([...world.position].map(([id, p]) => `#${id} x=${p.x.toFixed(1)}`).j
 <table>
 <tr><th>Engine</th><th>Notes</th></tr>
 <tr><td><strong>Rapier</strong> (<code>@dimforge/rapier3d-compat</code>, <code>@react-three/rapier</code>)</td><td>Rust → WASM, fast, deterministic option, good character controller, sensors, joints. Recommended default.</td></tr>
-<tr><td><strong>cannon-es</strong></td><td>Pure JS, simple, fine for small scenes (used in Lesson 38)</td></tr>
+<tr><td><strong>cannon-es</strong></td><td>Pure JS, simple, fine for small scenes (used in “<a href="38-three-physics-post.html">Physics, particles &amp; post-processing</a>”)</td></tr>
 <tr><td><strong>Jolt, Havok (WASM)</strong></td><td>High-end performance and features</td></tr>
 </table>
 <ul>
@@ -128,7 +128,7 @@ import { Physics, RigidBody, CuboidCollider, BallCollider } from "@react-three/r
 <li><strong>State machines</strong> for game flow (menu → loading → playing → paused → game over) and for entity AI (idle, patrol, chase, attack).</li>
 <li><strong>Event bus</strong> for decoupled communication (<code>enemyKilled</code> → score, sound, particles).</li>
 <li><strong>Save/load</strong>: serialize plain data (ECS makes this easy); version your save format; use IndexedDB/localStorage.</li>
-<li><strong>Audio</strong> (Lesson 70), <strong>asset loading screens</strong>, <strong>settings</strong> (quality presets), <strong>object pooling</strong> for bullets/particles to avoid GC pauses, <strong>debug tools</strong> (stats, physics debug view, god mode, time scale).</li>
+<li><strong>Audio</strong> (“<a href="70-webxr-audio.html">WebXR, spatial audio &amp; 3D UX</a>”), <strong>asset loading screens</strong>, <strong>settings</strong> (quality presets), <strong>object pooling</strong> for bullets/particles to avoid GC pauses, <strong>debug tools</strong> (stats, physics debug view, god mode, time scale).</li>
 <li><strong>Determinism</strong>: seeded random + fixed timestep + input recording gives replays and easier netcode/testing.</li>
 </ul>
 <textarea class="code" data-lang="js" data-file="loop.js">

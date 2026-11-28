@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meet TypeScript</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="ts-meet">
+<main><article>
+<h1>Meet TypeScript</h1>
+<p class="lede">TypeScript is JavaScript plus a safety net. You write the same code you've been writing, and add small labels that say what type each value should be. Then TypeScript checks your whole program for mistakes <em>before</em> it runs.</p>
+
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Understand what TypeScript is and why most professional JavaScript is now written in it.</li>
+<li>Add your first type annotations: <code>number</code>, <code>string</code>, <code>boolean</code>.</li>
+<li>Learn how TypeScript <em>infers</em> types so you don't have to write them everywhere.</li>
+<li>Read TypeScript error messages, and learn how the TypeScript editors on this site behave.</li>
+</ul><p class="time">About 40 minutes.</p></section>
+
+<h2>The problem TypeScript solves</h2>
+<p>At the end of the last lesson, this happened:</p>
+<textarea class="code" data-lang="js" data-run>
+let age = 36;
+age = "thirty-six";
+console.log(age + 1);   // "thirty-six1" (oops)
+</textarea>
+<p>JavaScript ran it without complaint and gave a wrong answer. It only checks types at the last moment, while the code is running, and even then it tries to "make it work" instead of telling you something is off.</p>
+<p>Now here's the same code in TypeScript. Look at line 2 before you press anything:</p>
+<textarea class="code" data-lang="ts" data-run>
+let age: number = 36;
+age = "thirty-six";
+console.log(age + 1);
+</textarea>
+<p>There's a red squiggle under <code>age</code> on line 2. TypeScript spotted the problem as soon as the page loaded, without running anything. Hover your mouse over the squiggle to read the message:</p>
+<p><code>Type 'string' is not assignable to type 'number'.</code></p>
+<p>In plain English: "You told me <code>age</code> holds a number, but you're trying to put a string in it." That's the whole idea of TypeScript. You state what you intend, and it checks that the code matches.</p>
+
+<h2>What TypeScript actually is</h2>
+<ul>
+<li>TypeScript is <strong>JavaScript with types added</strong>. Every JavaScript program is already valid TypeScript (TypeScript may just warn you about it). Everything you learn about JavaScript in this course applies to TypeScript too.</li>
+<li>Browsers can't run TypeScript directly. A tool first <strong>checks</strong> your code, then <strong>removes the types</strong>, leaving plain JavaScript that runs anywhere. This step is called <dfn>compiling</dfn> (or "transpiling").</li>
+<li>Types only exist while you're writing code. Once the code runs, they're gone. TypeScript doesn't make your program slower or change what it does.</li>
+</ul>
+<div class="callout analogy"><span class="label">Analogy</span>Think of a spell-checker in a word processor. It underlines mistakes while you type, but the printed letter has no red lines on it. TypeScript is a spell-checker for the <em>logic</em> of your code: "this should be a number", "this might be empty", "that property doesn't exist".</div>
+<p>TypeScript was created at Microsoft in 2012 and is now used by most large JavaScript projects. React, VS Code, and the majority of the job listings you'll see expect it.</p>
+
+<h2>How the TypeScript editors on this site work</h2>
+<p>TypeScript editors have a blue <strong>TypeScript</strong> label at the top. They behave like the JavaScript ones, with three extras:</p>
+<ol class="steps">
+<li><strong>Red squiggles</strong> appear under type errors while you type. Hover over one to read the error.</li>
+<li><strong>Hover over any variable</strong> to see its type. This is the best way to learn what TypeScript is thinking.</li>
+<li>When you press <strong>Run</strong>, any type errors are listed first in the console with a blue <span style="font:700 11px var(--font);background:#3178c6;color:#fff;padding:1px 6px;border-radius:4px">TYPE ERROR</span> label and a plain-English hint. Then the code runs anyway, so you can see the result.</li>
+</ol>
+<p>Press <strong>Run</strong> on the example above now. You'll see the type error listed, and then <code>thirty-six1</code>. TypeScript warned you, but since types are removed before running, the JavaScript underneath still ran (and still produced the wrong answer). In a real project, you fix every type error before you ship your code. The editors here run anyway so you can experiment.</p>
+
+<div class="try"><span class="label">Try it</span><ol>
+<li>In the TypeScript editor above, change line 2 to <code>age = 37;</code>. The squiggle disappears.</li>
+<li>Press Run. The console should say <strong>✓ no type errors</strong> and print 38.</li>
+</ol></div>
+
+<h2>Type annotations</h2>
+<p>The <code>: number</code> part in <code>let age: number = 36;</code> is called a <dfn>type annotation</dfn>. It goes right after the variable name: a colon, then the type.</p>
+<textarea class="code" data-lang="ts" data-run>
+let playerName: string = "Ada";
+let score: number = 0;
+let isGameOver: boolean = false;
+
+score = score + 10;      // fine: still a number
+isGameOver = true;       // fine: still a boolean
+
+console.log(playerName, score, isGameOver);
+</textarea>
+<p>The three basic types are written in lowercase: <code>string</code>, <code>number</code>, <code>boolean</code>. They match what <code>typeof</code> told you in the last lesson.</p>
+<div class="try"><span class="label">Try it</span>In the editor above, break each line in a different way and read each error:<ol>
+<li>Set <code>score = "ten";</code></li>
+<li>Set <code>isGameOver = "yes";</code> (a string isn't a boolean, even if it says yes)</li>
+<li>Set <code>playerName = 42;</code></li>
+</ol>Then press Reset.</div>
+
+<h2>Type inference: TypeScript can work it out</h2>
+<p>Here's the good news: you rarely need to write those annotations. If you give a variable a value when you create it, TypeScript works out the type from the value. This is called <dfn>type inference</dfn>.</p>
+<textarea class="code" data-lang="ts" data-run>
+let city = "Lisbon";     // no annotation, but TypeScript knows it's a string
+let population = 545000; // ...and this is a number
+
+city = 7;                // still an error!
+console.log(city, population);
+</textarea>
+<p>Hover over <code>city</code> on line 1 and you'll see <code>let city: string</code>. TypeScript saw the value <code>"Lisbon"</code> and decided <code>city</code> is a string for good. So the mistake on line 4 is caught, even though you never wrote a type.</p>
+<div class="callout"><span class="label">When to write types yourself</span>
+<ul>
+<li><strong>Let TypeScript infer</strong> when you give a variable a value straight away. <code>let count = 0;</code> is clearer than <code>let count: number = 0;</code>.</li>
+<li><strong>Write the type</strong> when there's no value to infer from yet, like a variable you'll fill in later, and (in a few lessons) for function inputs.</li>
+</ul></div>
+<textarea class="code" data-lang="ts" data-run>
+let winner: string;   // no value yet, so tell TypeScript what will go here
+
+// ... later in the program ...
+winner = "Grace";
+console.log("The winner is", winner);
+</textarea>
+
+<h3>A peek at <code>const</code></h3>
+<p>Hover over <code>language</code> in this example:</p>
+<textarea class="code" data-lang="ts" data-run>
+let greeting = "hello";
+const language = "TypeScript";
+console.log(greeting, language);
+</textarea>
+<p><code>greeting</code> has the type <code>string</code>. But <code>language</code> has the type <code>"TypeScript"</code>, the exact text itself! Since a <code>const</code> can never change, TypeScript knows it will <em>always</em> be that exact value. A type that is one specific value is called a <dfn>literal type</dfn>. You don't need to do anything with this yet, but it'll turn out to be very useful later, so remember you saw it.</p>
+
+<h2>TypeScript catches typos too</h2>
+<p>Remember the <code>consol.log</code> typo from the first lesson? In JavaScript you only found out when you ran the code. TypeScript catches it straight away and even suggests the fix:</p>
+<textarea class="code" data-lang="ts" data-run>
+consol.log("hi");
+
+let word = "hello";
+console.log(word.toUppercase());
+</textarea>
+<p>Hover over each squiggle. The first says <code>Cannot find name 'consol'. Did you mean 'console'?</code>. The second says <code>Property 'toUppercase' does not exist on type 'string'. Did you mean 'toUpperCase'?</code>. It knows every built-in function, so it knows the correct spelling.</p>
+<p>This also gives you <strong>autocomplete</strong>. Click at the end of the code above, start a new line, type <code>"hello".</code> (with the dot) and wait a moment. A list pops up with everything you can do with a string. You'll explore that list in the Strings lesson.</p>
+
+<h2>Reading TypeScript errors</h2>
+<p>TypeScript errors can look intimidating at first, but most follow a few patterns. Here are the ones you'll see most in the beginning:</p>
+<table>
+<tr><th>Error</th><th>What it means</th></tr>
+<tr><td><code>Type 'X' is not assignable to type 'Y'</code></td><td>You're putting an X where a Y belongs. ("Assignable" means "allowed to be stored in".)</td></tr>
+<tr><td><code>Cannot find name 'x'</code></td><td>Nothing called <code>x</code> exists. Usually a typo, or you forgot to create it.</td></tr>
+<tr><td><code>Property 'x' does not exist on type 'Y'</code></td><td>You used <code>.x</code> on something that doesn't have an <code>x</code>.</td></tr>
+<tr><td><code>Cannot assign to 'x' because it is a constant</code></td><td>You tried to change a <code>const</code>.</td></tr>
+</table>
+<p>A good habit: read the error from the end. "Type 'string' is not assignable to type 'number'" ends with what TypeScript <em>expected</em> (a number). Then look at what you actually gave it (a string).</p>
+
+<h2><code>any</code>: switching the checker off</h2>
+<p>There's a special type called <code>any</code> that means "this could be anything, don't check it". With <code>any</code>, TypeScript stops helping:</p>
+<textarea class="code" data-lang="ts" data-run>
+let mystery: any = 36;
+mystery = "thirty-six";       // no error
+console.log(mystery + 1);     // the old bug is back, and TypeScript says nothing
+</textarea>
+<div class="callout warn"><span class="label">Avoid any</span>Using <code>any</code> is like turning off the spell-checker because it found a mistake. You'll see it in other people's code, but try not to write it. Later you'll learn a safe alternative called <code>unknown</code>.</div>
+
+<h2>TypeScript on your own computer</h2>
+<p>You don't need this yet, since the editors here do everything for you. But so you know how it works in real life: TypeScript files end in <code>.ts</code>, and you install TypeScript with npm (which came with Node.js):</p>
+<textarea class="code" data-lang="bash">
+# in a project folder
+npm install --save-dev typescript
+
+# check a file for type errors without producing any output
+npx tsc --noEmit hello.ts
+
+# recent versions of Node (23.6 and newer) can also run a .ts file directly
+node hello.ts
+</textarea>
+<p>In real projects you usually don't run <code>tsc</code> by hand. Your editor (VS Code and Zed both have TypeScript built in) shows the same red squiggles you see here, and a build tool called Vite converts the code. You'll set up a real TypeScript project in Part 4.</p>
+
+<h2>How the rest of this course works</h2>
+<p>From now on, each JavaScript lesson ends with an <strong>In TypeScript</strong> section (marked with a blue <strong>TS</strong> badge) that shows how to add types to what you just learned. Do both halves. By the end of Part 4 you'll be as comfortable writing TypeScript as JavaScript.</p>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li><strong>TypeScript</strong> = JavaScript + types. It checks your code before it runs, then the types are removed.</li>
+<li>Annotate with a colon: <code>let score: number = 0;</code>. Basic types: <code>string</code>, <code>number</code>, <code>boolean</code>.</li>
+<li><strong>Inference</strong>: if you give a value immediately, TypeScript works out the type. Hover to see it.</li>
+<li>A <code>const</code> gets a <strong>literal type</strong>: the exact value itself.</li>
+<li>Error messages say what was expected and what you gave. Read them from the end.</li>
+<li>Avoid <code>any</code>, which switches checking off.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run>
+// TypeScript practice space
+
+</textarea>
+<ol>
+<li>Create three variables with explicit annotations: a <code>string</code> for a book title, a <code>number</code> for its pages, a <code>boolean</code> for whether you've read it. Print them.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+let title: string = "Frankenstein";
+let pages: number = 280;
+let hasRead: boolean = false;
+console.log(title, pages, hasRead);
+</textarea></details></li>
+<li>Now remove the annotations and hover over each variable. Does TypeScript still know the types?
+<details><summary>Show answer</summary>Yes. Because each variable gets a value right away, TypeScript infers <code>string</code>, <code>number</code> and <code>boolean</code>.</details></li>
+<li>This code has three type errors. Find and fix them without changing the first three lines:
+<textarea class="code" data-lang="ts" data-run>
+let lives = 3;
+let username = "player1";
+let isPaused = false;
+
+lives = "three";
+username = 1;
+isPaused = "no";
+</textarea>
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+lives = 3;
+username = "player1";
+isPaused = false;
+</textarea></details></li>
+<li>Declare <code>let favouriteColour</code> with no value and no annotation. Hover over it. What type does it get, and why is that a problem? Then fix it.
+<details><summary>Show answer</summary>It's <code>any</code> (TypeScript has nothing to infer from), so it isn't checked. Write <code>let favouriteColour: string;</code> instead.</details></li>
+</ol></section>
+
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>Do types exist when the code runs?</summary>No. TypeScript checks the code, then removes all the types. The browser only ever runs plain JavaScript.</details>
+<details><summary>When should you write a type annotation on a variable?</summary>When TypeScript can't infer one, usually because there's no starting value. If you give a value right away, let TypeScript infer the type.</details>
+<details><summary>What's wrong with <code>any</code>?</summary>It turns off type checking for that value, so TypeScript can't catch mistakes with it.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

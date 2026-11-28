@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Numbers &amp; math</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="js-numbers">
+<main><article>
+<h1>Numbers &amp; math</h1>
+<p class="lede">Almost every program does some math: totals in a shopping cart, a timer counting down, a character moving across a screen. This lesson covers everything you need to work with numbers, including a few surprises.</p>
+
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Use the arithmetic operators, including remainder (<code>%</code>) and power (<code>**</code>).</li>
+<li>Control the order of calculations with parentheses.</li>
+<li>Round numbers, find the biggest or smallest, and make random numbers with <code>Math</code>.</li>
+<li>Turn text like <code>"42"</code> into a real number, and understand <code>NaN</code>.</li>
+<li>See how TypeScript stops you doing math on things that aren't numbers.</li>
+</ul><p class="time">About 40 minutes.</p></section>
+
+<h2>The arithmetic operators</h2>
+<p>An <dfn>operator</dfn> is a symbol that does something to values. You already know most of these from school; only the symbols are a little different:</p>
+<table>
+<tr><th>Operator</th><th>Meaning</th><th>Example</th><th>Result</th></tr>
+<tr><td><code>+</code></td><td>add</td><td><code>7 + 2</code></td><td>9</td></tr>
+<tr><td><code>-</code></td><td>subtract</td><td><code>7 - 2</code></td><td>5</td></tr>
+<tr><td><code>*</code></td><td>multiply</td><td><code>7 * 2</code></td><td>14</td></tr>
+<tr><td><code>/</code></td><td>divide</td><td><code>7 / 2</code></td><td>3.5</td></tr>
+<tr><td><code>%</code></td><td>remainder</td><td><code>7 % 2</code></td><td>1</td></tr>
+<tr><td><code>**</code></td><td>to the power of</td><td><code>7 ** 2</code></td><td>49</td></tr>
+</table>
+<textarea class="code" data-lang="js" data-run>
+console.log(7 + 2);
+console.log(7 - 2);
+console.log(7 * 2);
+console.log(7 / 2);
+console.log(7 % 2);
+console.log(7 ** 2);
+</textarea>
+<p>JavaScript has just one number type for both whole numbers (<dfn>integers</dfn>, like 7) and decimals (like 3.5). Dividing two whole numbers gives you a decimal if it doesn't divide evenly.</p>
+
+<h3>The remainder operator <code>%</code></h3>
+<p><code>%</code> is the one most beginners haven't seen. It gives you what's <em>left over</em> after dividing. 7 divided by 2 is 3 with 1 left over, so <code>7 % 2</code> is 1.</p>
+<div class="callout analogy"><span class="label">Analogy</span>You have 17 cookies to share among 5 friends. Each friend gets 3 (that's 15 cookies), and you have 2 left over. <code>17 % 5</code> is 2.</div>
+<p>It sounds niche, but it's used everywhere. The most common use: a number is <strong>even</strong> if dividing by 2 leaves nothing over.</p>
+<textarea class="code" data-lang="js" data-run>
+console.log(17 % 5);    // 2 cookies left over
+console.log(10 % 2);    // 0: 10 is even
+console.log(11 % 2);    // 1: 11 is odd
+console.log(12 % 3);    // 0: 12 divides evenly by 3
+</textarea>
+
+<div class="quiz"><p>What is <code>20 % 6</code>?</p>
+<button>3</button><button data-correct>2</button><button>3.33</button><button>0</button>
+<p class="why">6 goes into 20 three times (18), leaving 2. So <code>20 % 6</code> is 2.</p></div>
+
+<h2>Order of operations</h2>
+<p>JavaScript follows the same order as school math: <code>**</code> first, then <code>*</code> <code>/</code> <code>%</code>, then <code>+</code> <code>-</code>. Anything in parentheses happens first.</p>
+<textarea class="code" data-lang="js" data-run>
+console.log(2 + 3 * 4);      // 14, because * happens before +
+console.log((2 + 3) * 4);    // 20, because the parentheses go first
+
+// Average of three test scores:
+const a = 80, b = 90, c = 70;
+console.log(a + b + c / 3);     // wrong: only c is divided
+console.log((a + b + c) / 3);   // right: 80
+</textarea>
+<div class="callout tip"><span class="label">Tip</span>When in doubt, add parentheses. They make your intention obvious to the next person who reads the code, even when they're not strictly needed.</div>
+
+<h2>Decimals aren't always exact</h2>
+<p>Run this and look carefully at the result:</p>
+<textarea class="code" data-lang="js" data-run>
+console.log(0.1 + 0.2);
+</textarea>
+<p>You'd expect <code>0.3</code>, but you get <code>0.30000000000000004</code>. This isn't a JavaScript bug. Computers store numbers in binary (ones and zeros), and some decimals like 0.1 can't be stored exactly in binary, just like 1/3 can't be written exactly in decimal (0.3333…). Almost every programming language does the same thing.</p>
+<p>For most programs, the tiny error doesn't matter. When you show a number to a person, round it first:</p>
+<textarea class="code" data-lang="js" data-run>
+const total = 0.1 + 0.2;
+console.log(total.toFixed(2));   // "0.30": exactly 2 decimal places
+
+const price = 19.999;
+console.log(price.toFixed(2));   // "20.00"
+</textarea>
+<p><code>toFixed(2)</code> means "show this with exactly 2 digits after the decimal point". Notice it gives you back a <em>string</em> (text for display), not a number. That matters, and TypeScript will remind you later in this lesson.</p>
+<div class="callout"><span class="label">Money tip</span>For prices, many programs store whole cents instead of decimals (<code>1999</code> instead of <code>19.99</code>) and only divide by 100 when displaying. Whole numbers are always exact.</div>
+
+<h2>The <code>Math</code> toolbox</h2>
+<p>JavaScript comes with a built-in object called <code>Math</code>, full of useful functions. You use them like <code>console.log</code>: the name, a dot, the function name, then parentheses with the input.</p>
+<h3>Rounding</h3>
+<textarea class="code" data-lang="js" data-run>
+console.log(Math.round(4.5));   // 5: nearest whole number
+console.log(Math.round(4.4));   // 4
+console.log(Math.floor(4.9));   // 4: always rounds DOWN (think: down to the floor)
+console.log(Math.ceil(4.1));    // 5: always rounds UP (think: up to the ceiling)
+console.log(Math.trunc(-4.7));  // -4: just chops off the decimal part
+</textarea>
+<h3>Biggest, smallest and other helpers</h3>
+<textarea class="code" data-lang="js" data-run>
+console.log(Math.max(3, 9, 2));   // 9: the biggest
+console.log(Math.min(3, 9, 2));   // 2: the smallest
+console.log(Math.abs(-7));        // 7: distance from zero ("absolute value")
+console.log(Math.sqrt(81));       // 9: square root
+console.log(Math.PI);             // 3.141592653589793
+</textarea>
+<h3>Random numbers</h3>
+<p><code>Math.random()</code> gives a random decimal between 0 and 1 (it can be 0, but never quite 1). Run this a few times:</p>
+<textarea class="code" data-lang="js" data-run>
+console.log(Math.random());
+</textarea>
+<p>To roll a dice (a whole number from 1 to 6), build it up in steps. Read each comment, and run it several times:</p>
+<textarea class="code" data-lang="js" data-run>
+const r = Math.random();         // e.g. 0.73  (between 0 and 0.999...)
+const scaled = r * 6;            // e.g. 4.38  (between 0 and 5.999...)
+const whole = Math.floor(scaled);// e.g. 4     (0, 1, 2, 3, 4 or 5)
+const dice = whole + 1;          // e.g. 5     (1 to 6)
+console.log(r, scaled, whole, dice);
+
+// The same thing in one line:
+console.log(Math.floor(Math.random() * 6) + 1);
+</textarea>
+<div class="try"><span class="label">Try it</span>Change the code so it picks a random number from 1 to 100. Then from 1 to 20 (a 20-sided dice for board-game players).</div>
+
+<h2>Turning text into numbers</h2>
+<p>Values that come from the outside world, like what someone types into a form, almost always arrive as <strong>strings</strong>, even if they look like numbers. That causes a famous problem:</p>
+<textarea class="code" data-lang="js" data-run>
+const typedAge = "36";       // imagine this came from a form
+console.log(typedAge + 1);   // "361", the strings were glued together!
+</textarea>
+<p>When one side of <code>+</code> is a string, JavaScript glues instead of adding. To do real math, convert the string to a number first with <code>Number()</code>:</p>
+<textarea class="code" data-lang="js" data-run>
+const typedAge = "36";
+const age = Number(typedAge);
+console.log(age + 1);              // 37
+console.log(typeof typedAge, typeof age);
+</textarea>
+<p>What if the text isn't a number at all?</p>
+<textarea class="code" data-lang="js" data-run>
+console.log(Number("hello"));      // NaN
+console.log(Number("12px"));       // NaN
+console.log(parseInt("12px"));     // 12: reads digits from the start, stops at the first non-digit
+console.log(parseFloat("3.5kg"));  // 3.5: like parseInt, but keeps decimals
+</textarea>
+<p><code>NaN</code> stands for "Not a Number". It's JavaScript's way of saying "I tried to make a number, but this didn't make sense". Any math with <code>NaN</code> gives <code>NaN</code>, so one bad value can spread through a whole calculation. Check for it with <code>Number.isNaN()</code>:</p>
+<textarea class="code" data-lang="js" data-run>
+const input = Number("abc");
+console.log(Number.isNaN(input));   // true: it wasn't a valid number
+console.log(input * 2 + 10);        // NaN: it spreads
+console.log(typeof NaN);            // "number" (strange, but true)
+</textarea>
+<p>One more oddity: dividing by zero doesn't crash. It gives <code>Infinity</code>.</p>
+<textarea class="code" data-lang="js" data-run>
+console.log(10 / 0);    // Infinity
+console.log(-10 / 0);   // -Infinity
+</textarea>
+
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Doing math on strings from a form.</strong> <code>"5" + 5</code> is <code>"55"</code>. Convert with <code>Number()</code> first.</li>
+<li><strong>Forgetting parentheses</strong> in averages and percentages: <code>a + b / 2</code> isn't the average of a and b.</li>
+<li><strong>Comparing decimals exactly.</strong> <code>0.1 + 0.2 === 0.3</code> is false. Round first, or work in whole numbers.</li>
+<li><strong>Doing more math on the result of <code>toFixed()</code></strong>, which is a string. Round only at the very end, for display.</li>
+</ul></div>
+
+<h2 class="ts-head">In TypeScript</h2>
+<p>All of this works the same in TypeScript, and every number, whole or decimal, has the type <code>number</code>. The difference is that TypeScript stops the "math on the wrong type" bugs before they happen.</p>
+<textarea class="code" data-lang="ts" data-run>
+const price = 19.99;
+const quantity = 3;
+const total = price * quantity;     // hover: number
+console.log(total.toFixed(2));
+
+const label = total.toFixed(2);     // hover over label: it's a string!
+const doubled = label * 2;          // TypeScript catches the mistake
+</textarea>
+<p>The error on the last line says <code>The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type</code>. That's a long way of saying: "you can only multiply numbers, and <code>label</code> is a string". In plain JavaScript this would quietly give you a wrong answer or <code>NaN</code>.</p>
+
+<h3>What TypeScript does and doesn't catch</h3>
+<textarea class="code" data-lang="ts" data-run>
+const typed = "36";
+
+const a = typed * 2;          // ✖ error: can't multiply a string
+const b = typed + 1;          // allowed! (gluing text is a valid thing to do) → "361"
+const c = Number(typed) + 1;  // ✔ the right way → 37
+
+console.log(b, c);
+</textarea>
+<p>Notice that <code>typed + 1</code> is <em>not</em> an error, because joining a string and a number is a legitimate thing to want. But hover over <code>b</code> and you'll see its type is <code>string</code>, not <code>number</code>. TypeScript always tells you the truth about what you've got. If you then tried to use <code>b</code> as a number, it would complain.</p>
+
+<h3>Types for function results</h3>
+<p>TypeScript knows the type that every built-in function gives back. Hover over each variable:</p>
+<textarea class="code" data-lang="ts" data-run>
+const rounded = Math.round(4.7);    // number
+const shown = (4.7).toFixed(1);     // string
+const parsed = Number("42");        // number (could be NaN, which is still a number)
+const isBad = Number.isNaN(parsed); // boolean
+console.log(rounded, shown, parsed, isBad);
+</textarea>
+<p>Learning to hover and check types like this will save you hours. It's the quickest way to answer "wait, is this a number or a string?"</p>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li>Operators: <code>+ - * /</code>, <code>%</code> (remainder) and <code>**</code> (power). Use parentheses to control order.</li>
+<li>Decimals can be slightly inexact (<code>0.1 + 0.2</code>). Round for display with <code>toFixed()</code>, which returns a string.</li>
+<li><code>Math.round/floor/ceil</code>, <code>Math.max/min</code>, <code>Math.random()</code> are your everyday helpers.</li>
+<li>Convert text to numbers with <code>Number()</code>. Invalid conversions give <code>NaN</code>; check with <code>Number.isNaN()</code>.</li>
+<li>TypeScript blocks math on non-numbers, and hovering shows exactly what type you have.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space (TypeScript). Plain JavaScript works here too.
+
+</textarea>
+<ol>
+<li>A pizza has 8 slices and 3 friends share it equally (whole slices only). Calculate how many slices each person gets and how many are left over.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const slices = 8;
+const people = 3;
+console.log("Each gets", Math.floor(slices / people));  // 2
+console.log("Left over", slices % people);              // 2
+</textarea></details></li>
+<li>Convert a temperature from Celsius to Fahrenheit: multiply by 9, divide by 5, add 32. Try it with 100 (should be 212) and 37.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const celsius = 37;
+const fahrenheit = celsius * 9 / 5 + 32;
+console.log(fahrenheit);   // 98.6
+</textarea></details></li>
+<li>Two prices arrive from a form as strings: <code>"12.50"</code> and <code>"7.25"</code>. Add them properly and print the total with two decimal places.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const a = "12.50";
+const b = "7.25";
+const total = Number(a) + Number(b);
+console.log(total.toFixed(2));   // "19.75"
+</textarea></details></li>
+<li>Print a random whole number between 50 and 60 (including both).
+<details><summary>Show answer</summary>There are 11 possible numbers (50 through 60), so: <code>Math.floor(Math.random() * 11) + 50</code></details></li>
+</ol></section>
+
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>How do you check if a number is even?</summary><code>n % 2 === 0</code>: if dividing by 2 leaves no remainder, it's even.</details>
+<details><summary>Why does <code>"5" + 1</code> give <code>"51"</code>?</summary>When either side of <code>+</code> is a string, JavaScript joins them as text. Convert with <code>Number("5")</code> first.</details>
+<details><summary>What type does <code>toFixed()</code> return?</summary>A string. It's for displaying a number, not for doing more math.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

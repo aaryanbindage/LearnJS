@@ -3,234 +3,320 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 47 — TypeScript in Depth</title>
+<title>TypeScript in depth: modeling real data</title>
 <link rel="stylesheet" href="assets/course.css">
 </head>
 <body data-slug="47-ts-fundamentals">
 <main><article>
-<h1>Lesson 47 — TypeScript in depth</h1>
-<p class="lede">Lesson 21 gave you a taste. Now learn TypeScript as a daily tool: how the type system thinks, how to model real data, and how to configure it for safety. Practice every snippet in the TypeScript Playground (typescriptlang.org/play) or a Vite <code>react-ts</code> project.</p>
+<h1>TypeScript in depth: modeling real data</h1>
+<p class="lede">You've used TypeScript in every lesson since Part 3. This lesson fills in the rest of the everyday language: how TypeScript decides two types are compatible, tuples, intersections, <code>as const</code> and <code>satisfies</code>, enums, assertions, and how types meet the outside world (libraries, JSON, React). Every example is live; hover everything.</p>
 
-<h2>Mental model</h2>
-<ul>
-<li>TypeScript is a <strong>static analyzer</strong>: it checks code before it runs, then <strong>erases</strong> types. It adds no runtime behavior and no runtime validation.</li>
-<li>Types are <strong>structural</strong> ("duck typing"): two types are compatible if their shapes match, regardless of names.</li>
-<li>Prefer <strong>inference</strong> for local variables; <strong>annotate boundaries</strong> (function parameters, exported APIs, data from outside).</li>
-</ul>
-<textarea class="code" data-lang="js" data-file="structural.ts">
-interface Point { x: number; y: number }
-function len(p: Point) { return Math.hypot(p.x, p.y); }
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Understand <strong>structural typing</strong>, and the "excess property" check.</li>
+<li>Use tuples, intersections (<code>&amp;</code>) and index signatures.</li>
+<li>Choose between literal unions and <code>enum</code>; use <code>as const</code> and <code>satisfies</code>.</li>
+<li>Know when <code>as</code> assertions are dangerous, and write assertion functions instead.</li>
+<li>Type the edges of your app: JSON (with zod), third-party libraries, and React props.</li>
+</ul><p class="time">About 70 minutes. Assumes you've done the TypeScript sections of Parts 3 and 4.</p></section>
 
-const v = { x: 3, y: 4, label: "extra" };
-len(v);                       // OK: v has at least x and y (structural typing)
-len({ x: 3, y: 4, label: "" });  // ✖ error: object LITERAL excess property check
-</textarea>
+<h2>Structural typing: shapes, not names</h2>
+<p>In many languages, a value is only a <code>Point</code> if it was created as a <code>Point</code>. TypeScript doesn't care where a value came from. It only checks the <strong>shape</strong>: if it has the required properties with the right types, it fits. This is called <dfn>structural typing</dfn> (or "duck typing": if it walks like a duck and quacks like a duck…).</p>
+<textarea class="code" data-lang="ts" data-run>
+type Point = { x: number; y: number };
 
-<h2>Strict mode: turn it on</h2>
-<textarea class="code" data-lang="js" data-file="tsconfig.json">
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "jsx": "react-jsx",
-    "strict": true,                       // noImplicitAny, strictNullChecks, strictFunctionTypes, ...
-    "noUncheckedIndexedAccess": true,     // arr[i] is T | undefined: catches real bugs
-    "exactOptionalPropertyTypes": true,
-    "noImplicitOverride": true,
-    "noFallthroughCasesInSwitch": true,
-    "verbatimModuleSyntax": true,         // use `import type` for types
-    "skipLibCheck": true,
-    "noEmit": true                        // a bundler emits JS; tsc only type-checks
-  },
-  "include": ["src"]
+function length(p: Point): number {
+  return Math.hypot(p.x, p.y);
 }
+
+const v = { x: 3, y: 4, label: "corner" };   // never declared as a Point
+console.log(length(v));                       // ✔ it has x and y, so it fits (the extra label is fine)
+
+class Vector { constructor(public x: number, public y: number) {} }
+console.log(length(new Vector(6, 8)));        // ✔ a class instance with the right shape fits too
+</textarea>
+<h3>The excess property check</h3>
+<p>There's one exception, and it confuses everyone once. If you write an object literal <em>directly</em> where a type is expected, extra properties are an error:</p>
+<textarea class="code" data-lang="ts" data-run>
+type Point = { x: number; y: number };
+function length(p: Point) { return Math.hypot(p.x, p.y); }
+
+length({ x: 3, y: 4, label: "corner" });   // ✖ 'label' does not exist in type 'Point'
+
+const v = { x: 3, y: 4, label: "corner" };
+length(v);                                 // ✔ via a variable, it's allowed
+</textarea>
+<p>Why the difference? When you write a fresh object straight into a call, an extra property is almost always a typo (<code>{ x: 1, yy: 2 }</code>), so TypeScript flags it. A variable might be used elsewhere for other things, so extra properties are fine. It's a typo-catcher, not a rule about shapes.</p>
+
+<h2>Tuples: fixed-length arrays</h2>
+<p>A <dfn>tuple</dfn> is an array with a fixed length, where each position has its own type. You've used one: <code>Object.entries</code> returns <code>[string, value]</code> pairs, and React's <code>useState</code> returns a tuple.</p>
+<textarea class="code" data-lang="ts" data-run>
+type Pair = [string, number];
+const age: Pair = ["Ada", 36];
+const bad: Pair = [36, "Ada"];        // ✖ wrong order
+
+// Labels make tuples self-documenting (hover over rgb):
+type RGB = [red: number, green: number, blue: number];
+const rgb: RGB = [255, 128, 0];
+const [r, g, b] = rgb;
+
+// A function returning a tuple: like React's useState
+function useCounter(start: number): [number, () => void] {
+  let n = start;
+  return [n, () => { n++; }];
+}
+const [count, increment] = useCounter(0);
+console.log(age, r, g, b, count, typeof increment);
 </textarea>
 
-<h2>The core building blocks</h2>
-<textarea class="code" data-lang="js" data-file="basics.ts">
-// Primitives and arrays
-let n: number = 1; let s: string = "a"; let b: boolean = true;
-const ids: number[] = [1, 2];  const ro: readonly string[] = ["a"];
-const pair: [string, number] = ["age", 36];                // tuple
-const named: [x: number, y: number] = [1, 2];
+<h2>Intersections: combining types with <code>&amp;</code></h2>
+<p>A union <code>A | B</code> is "A <em>or</em> B". An <dfn>intersection</dfn> <code>A &amp; B</code> is "A <em>and</em> B": a value with everything from both.</p>
+<textarea class="code" data-lang="ts" data-run>
+type HasId = { id: number };
+type Timestamps = { createdAt: Date; updatedAt: Date };
+type User = { name: string; email: string };
 
-// Special types
-let a: any;        // opts out of checking. Avoid.
-let u: unknown;    // "something, but check before using": the safe any
-u.toString();      // ✖ must narrow first
-if (typeof u === "string") u.toUpperCase();   // ✔
-function fail(msg: string): never { throw new Error(msg); }   // never returns
-function log(): void { console.log("hi"); }
+type StoredUser = User & HasId & Timestamps;   // hover: all six properties
 
-// Object types
-type User = {
-  readonly id: number;
-  name: string;
-  email?: string;                    // optional: string | undefined
-  tags: string[];
+const u: StoredUser = {
+  id: 1, name: "Ada", email: "ada@example.com",
+  createdAt: new Date(), updatedAt: new Date(),
 };
-interface Admin extends User { permissions: Set<string> }      // interfaces extend; types intersect
+console.log(u.id, u.name);
 
-// Union and literal types: model "one of"
-type Status = "idle" | "loading" | "error" | "success";
-type ID = number | string;
-type Dict = { [key: string]: number };      // index signature; or Record<string, number>
+// Same idea with interfaces: extends
+interface Animal { name: string }
+interface Dog extends Animal { breed: string }
+const d: Dog = { name: "Rex", breed: "beagle" };
+console.log(d);
+</textarea>
+<div class="callout ts"><span class="label">type vs interface, revisited</span>Both can describe objects. <code>interface</code> uses <code>extends</code> to combine; <code>type</code> uses <code>&amp;</code>. Only <code>type</code> can name unions, tuples and other non-object types. Interfaces with the same name in the same scope merge together, which is how libraries let you add to their types. Rule of thumb: use <code>type</code> by default, and <code>interface</code> when you want that merging or prefer the style. Be consistent.</div>
 
-// Functions
-function add(a: number, b = 1): number { return a + b; }
-const greet = (name: string, ...rest: string[]): string => `Hi ${name}`;
-type Handler = (event: MouseEvent) => void;
-function overloaded(x: string): string;
-function overloaded(x: number): number;
-function overloaded(x: any) { return x; }
+<h2>Index signatures and <code>Record</code></h2>
+<p>For objects used as dictionaries, with keys you don't know in advance:</p>
+<textarea class="code" data-lang="ts" data-run>
+type Scores = { [playerName: string]: number };   // any string key → number
+type Scores2 = Record<string, number>;            // exactly the same thing
 
-// Enums: prefer union types or `as const` objects
-const Role = { Admin: "admin", User: "user" } as const;
-type Role = typeof Role[keyof typeof Role];      // "admin" | "user"
+const scores: Scores = { ada: 10, grace: 12 };
+scores.linus = 7;
+console.log(scores["ada"], scores.nobody);        // hover over scores.nobody: number... but it's undefined!
+</textarea>
+<p>That last line shows a gap: with an index signature, TypeScript assumes every key exists. Turn on <code>noUncheckedIndexedAccess</code> in your <code>tsconfig.json</code> (see the TypeScript projects lesson) and lookups become <code>number | undefined</code>, which is the truth. Or use a <code>Map</code>, whose <code>get</code> already returns <code>V | undefined</code>.</p>
+
+<h2>Literal types, <code>as const</code> and <code>satisfies</code></h2>
+<p>TypeScript usually <em>widens</em> values in objects and arrays to general types, because they could be changed later:</p>
+<textarea class="code" data-lang="ts" data-run>
+const config = { mode: "dark", sizes: [8, 16] };
+// hover: { mode: string; sizes: number[] }, not "dark"
+
+function setMode(m: "light" | "dark") { console.log(m); }
+setMode(config.mode);   // ✖ string isn't "light" | "dark"
+</textarea>
+<p><code>as const</code> says "this will never change; keep the exact values" (and makes everything <code>readonly</code>):</p>
+<textarea class="code" data-lang="ts" data-run>
+const config = { mode: "dark", sizes: [8, 16] } as const;
+// hover: { readonly mode: "dark"; readonly sizes: readonly [8, 16] }
+
+function setMode(m: "light" | "dark") { console.log(m); }
+setMode(config.mode);   // ✔
+
+const ROLES = ["admin", "editor", "viewer"] as const;
+type Role = (typeof ROLES)[number];     // "admin" | "editor" | "viewer"
+</textarea>
+<p><code>satisfies</code> (TypeScript 4.9+) checks a value against a type <em>without</em> widening it to that type. You get the check, and keep the precise inferred type:</p>
+<textarea class="code" data-lang="ts" data-run>
+type Theme = Record<"primary" | "danger", string>;
+
+const a: Theme = { primary: "#5b3df5", danger: "#d6455d" };
+const b = { primary: "#5b3df5", danger: "#d6455d" } satisfies Theme;
+const c = { primary: "#5b3df5", dangr: "#d6455d" } satisfies Theme;   // ✖ typo caught
+
+// hover over a.primary: string     (annotation widened it)
+// hover over b.primary: string too, but b keeps exactly its own keys:
+console.log(a.primary, b.primary);
+
+const routes = {
+  home: "/",
+  profile: "/users/:id",
+} satisfies Record<string, `/${string}`>;   // every value must start with "/"
+type RouteName = keyof typeof routes;      // "home" | "profile", not just string
+</textarea>
+<p>Use an annotation (<code>: Type</code>) when you want the variable to <em>be</em> that type. Use <code>satisfies</code> when you want to <em>check</em> it but keep its exact shape, which is common for config objects.</p>
+
+<h2>Enums (and why unions are usually better)</h2>
+<p>You'll meet <code>enum</code> in existing codebases. It creates a named set of constants:</p>
+<textarea class="code" data-lang="ts" data-run>
+enum Direction { Up, Down, Left, Right }      // numbers 0, 1, 2, 3
+enum Status { Active = "active", Banned = "banned" }
+
+const d = Direction.Up;
+console.log(d, Direction[d], Status.Banned);   // 0 "Up" "banned"
+</textarea>
+<p>Unlike almost everything else in TypeScript, enums generate real JavaScript code, and numeric enums have some loose rules. The modern preference is a union of string literals, which does the same job with plain values:</p>
+<textarea class="code" data-lang="ts" data-run>
+type Direction = "up" | "down" | "left" | "right";
+const STATUS = { Active: "active", Banned: "banned" } as const;   // if you want named constants
+type Status = (typeof STATUS)[keyof typeof STATUS];               // "active" | "banned"
+
+function move(d: Direction) { console.log("moving", d); }
+move("up");
+move(STATUS.Active);   // ✖ not a Direction
 </textarea>
 
-<h2>type vs interface</h2>
-<table>
-<tr><th></th><th><code>interface</code></th><th><code>type</code></th></tr>
-<tr><td>Object shapes</td><td>yes</td><td>yes</td></tr>
-<tr><td>Unions, tuples, primitives, mapped/conditional types</td><td>no</td><td>yes</td></tr>
-<tr><td>Extending</td><td><code>extends</code>, declaration merging</td><td>intersection <code>&amp;</code></td></tr>
-<tr><td>Guideline</td><td>public object contracts (components props, classes)</td><td>everything else; pick one convention per codebase</td></tr>
-</table>
+<h2>Assertions: <code>as</code>, and why to be careful</h2>
+<p><code>value as SomeType</code> tells TypeScript "treat this as SomeType". It doesn't check or convert anything; it just changes TypeScript's opinion. If you're wrong, TypeScript can't help you:</p>
+<textarea class="code" data-lang="ts" data-run>
+type User = { name: string; age: number };
 
-<h2>Narrowing: the compiler follows your checks</h2>
-<textarea class="code" data-lang="js" data-file="narrowing.ts">
-function pad(x: string | number | null) {
-  if (x === null) return "";                       // equality
-  if (typeof x === "number") return x.toFixed(2);  // typeof
-  return x.trim();                                 // x is string here
+const data: unknown = JSON.parse('{"name": "Ada"}');
+const user = data as User;          // TypeScript believes you...
+console.log(user.age.toFixed(0));   // ...and this crashes: there is no age
+</textarea>
+<p>Better: write a function that really checks, and tells TypeScript the result. You've seen type guards (<code>x is User</code>). An <dfn>assertion function</dfn> throws if the check fails, and narrows the type after the call:</p>
+<textarea class="code" data-lang="ts" data-run>
+type User = { name: string; age: number };
+
+function assertUser(x: unknown): asserts x is User {
+  if (typeof x !== "object" || x === null) throw new Error("Not an object");
+  const o = x as Record<string, unknown>;
+  if (typeof o.name !== "string") throw new Error("name must be a string");
+  if (typeof o.age !== "number") throw new Error("age must be a number");
 }
 
-if ("radius" in shape) { /* in operator */ }
-if (value instanceof Date) { /* instanceof */ }
-
-// Custom type guard
-function isString(x: unknown): x is string { return typeof x === "string"; }
-// Assertion function
-function assertDefined<T>(x: T | undefined, msg = "missing"): asserts x is T { if (x === undefined) throw new Error(msg); }
-
-// Discriminated unions: THE pattern for state
-type Result<T> =
-  | { status: "loading" }
-  | { status: "error"; error: Error }
-  | { status: "success"; data: T };
-
-function render(r: Result<User[]>) {
-  switch (r.status) {
-    case "loading": return "…";
-    case "error":   return r.error.message;        // r.error exists only here
-    case "success": return r.data.length + " users";
-    default: { const _exhaustive: never = r; return _exhaustive; }   // compile error if a case is added later
-  }
-}
+const data: unknown = JSON.parse('{"name": "Ada", "age": 36}');
+assertUser(data);
+console.log(data.name, data.age);   // data is a User from here on
 </textarea>
+<div class="callout"><span class="label">When <code>as</code> is OK</span>It's fine when you genuinely know more than TypeScript and can't easily prove it, like <code>{} as Record&lt;string, string[]&gt;</code> for an empty starting value. It's risky for data from outside your program. Never write <code>as any</code> to silence an error; find out what the error means.</div>
 
-<h2>Generics: types that take parameters</h2>
-<textarea class="code" data-lang="js" data-file="generics.ts">
-function first<T>(xs: readonly T[]): T | undefined { return xs[0]; }
-const n = first([1, 2, 3]);         // T inferred as number
-
-function pluck<T, K extends keyof T>(obj: T, key: K): T[K] { return obj[key]; }   // constraint
-pluck({ id: 1, name: "a" }, "name");   // string;   pluck(..., "nope") is an error
-
-interface Box<T = string> { value: T }               // default type parameter
-class Stack<T> { private items: T[] = []; push(x: T) { this.items.push(x); } pop(): T | undefined { return this.items.pop(); } }
-
-async function getJSON<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  return res.json() as Promise<T>;       // WARNING: this is an assertion; the server may lie
-}
+<h2>Types at the edges: validating with zod</h2>
+<p>Writing guards by hand for every API response gets tedious. The library <strong>zod</strong> lets you describe the shape once, as a schema, and get both a runtime check and a TypeScript type from it:</p>
+<textarea class="code" data-lang="bash">
+npm install zod
 </textarea>
-
-<h2>Utility types you'll use daily</h2>
-<textarea class="code" data-lang="js" data-file="utility.ts">
-type U = { id: number; name: string; email: string; password: string };
-type Public   = Omit<U, "password">;            // remove keys
-type Preview  = Pick<U, "id" | "name">;         // keep keys
-type Draft    = Partial<U>;                     // all optional
-type Complete = Required<Draft>;                // all required
-type Frozen   = Readonly<U>;
-type ById     = Record<number, U>;
-type Fn       = (a: number, b: string) => boolean;
-type R = ReturnType<Fn>;                        // boolean
-type P = Parameters<Fn>;                        // [a: number, b: string]
-type Resolved = Awaited<Promise<string>>;       // string
-type NoNull = NonNullable<string | null>;       // string
-</textarea>
-
-<h2>Types at the boundaries: runtime validation</h2>
-<div class="callout warn"><span class="label">Key insight</span>Types vanish at runtime. Data from <code>fetch</code>, <code>localStorage</code>, form input and <code>JSON.parse</code> is <code>unknown</code> no matter what you claim. Validate it with a schema library, and <em>derive</em> the static type from the schema so they can't drift.</div>
-<textarea class="code" data-lang="js" data-file="schema.ts">
+<textarea class="code" data-lang="ts" data-file="user.ts">
 import { z } from "zod";
 
 const UserSchema = z.object({
-  id: z.number().int().positive(),
+  id: z.number().int(),
   name: z.string().min(1),
   email: z.string().email(),
-  role: z.enum(["admin", "user"]).default("user"),
+  role: z.enum(["admin", "editor", "viewer"]).default("viewer"),
 });
-type User = z.infer<typeof UserSchema>;       // static type derived from the schema
 
-async function loadUser(id: number): Promise<User> {
+type User = z.infer<typeof UserSchema>;   // the TypeScript type, derived from the schema
+
+export async function getUser(id: number): Promise<User> {
   const res = await fetch(`/api/users/${id}`);
-  return UserSchema.parse(await res.json());   // throws a descriptive error if the shape is wrong
-  // or .safeParse() returns { success, data | error } without throwing
+  const json: unknown = await res.json();
+  return UserSchema.parse(json);          // throws a detailed error if the data is wrong
+}
+
+// Or, to handle bad data without throwing:
+const result = UserSchema.safeParse({ id: 1, name: "", email: "nope" });
+if (!result.success) console.log(result.error.issues);   // a list of what's wrong
+</textarea>
+<p>The pattern to remember: <strong>validate at the edges</strong> (API responses, form input, <code>localStorage</code>, URL parameters), and inside your app, trust the types.</p>
+
+<h2>Types for libraries: <code>.d.ts</code> files and <code>@types</code></h2>
+<p>When you <code>import</code> a library, TypeScript needs its types. They come from <dfn>declaration files</dfn> (<code>.d.ts</code>): files with only types, no code. Most modern libraries include them. For older ones written in plain JavaScript, the community maintains types in packages named <code>@types/...</code>:</p>
+<textarea class="code" data-lang="bash">
+npm install three            # Three.js itself ships without TypeScript types...
+npm install -D @types/three  # so add the community types
+</textarea>
+<p>Once installed, hover and autocomplete work for the whole library, which is a great way to learn it. To describe something that only exists at runtime (like a global added by a script tag), write your own small declaration:</p>
+<textarea class="code" data-lang="ts" data-file="src/globals.d.ts">
+declare const ANALYTICS_ID: string;          // "trust me, this global exists"
+
+interface Window {                           // interfaces merge, so this ADDS to the built-in Window type
+  myApp: { version: string };
 }
 </textarea>
 
-<h2>TypeScript with React</h2>
-<textarea class="code" data-lang="jsx" data-file="Card.tsx">
-import { useState, type ReactNode, type ComponentProps } from "react";
+<h2>A first look at TypeScript with React</h2>
+<p>You'll write React in TypeScript from Part 5 on. Here's how it looks, so you recognise it. The component's props are an object, typed exactly like a destructured parameter from the Modern JS lesson:</p>
+<textarea class="code" data-lang="ts" data-file="Card.tsx">
+import { useState, type ReactNode } from "react";
 
 type CardProps = {
   title: string;
-  children: ReactNode;
-  onSelect?: (id: string) => void;
-} & Omit<ComponentProps<"section">, "title">;        // inherit all <section> props
+  tone?: "neutral" | "warning";       // optional, limited to two values
+  children: ReactNode;                // anything React can render
+  onClose?: () => void;               // an optional callback prop
+};
 
-export function Card({ title, children, onSelect, ...rest }: CardProps) {
-  const [open, setOpen] = useState(false);            // inferred boolean
-  const [user, setUser] = useState<User | null>(null);   // annotate when initial value isn't enough
-  return <section {...rest}><h2>{title}</h2>{children}</section>;
+export function Card({ title, tone = "neutral", children, onClose }: CardProps) {
+  const [open, setOpen] = useState(true);        // inferred: boolean
+  const [items, setItems] = useState<string[]>([]);  // empty start: give the type
+  if (!open) return null;
+  return (
+    <section className={tone}>
+      <h2>{title}</h2>
+      {children}
+      <button onClick={() => { setOpen(false); onClose?.(); }}>Close</button>
+    </section>
+  );
 }
-
-const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => console.log(e.target.value);
-const ref = useRef<HTMLDivElement>(null);
-</textarea>
-<textarea class="code" data-lang="js" data-file="three.ts">
-import * as THREE from "three";
-const mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial> = new THREE.Mesh(geo, mat);
-// R3F: useRef<THREE.Mesh>(null!)   |   useFrame((state, delta) => { ref.current.rotation.y += delta })
 </textarea>
 
-<h2>Practical rules</h2>
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong><code>as</code> on external data</strong>: it's a promise, not a check. Validate.</li>
+<li><strong>Annotating everything</strong>: let inference work inside functions; annotate parameters, return types of exported functions, and empty starting values.</li>
+<li><strong>Trusting index signatures</strong>: turn on <code>noUncheckedIndexedAccess</code>.</li>
+<li><strong>Reaching for <code>enum</code></strong> by habit: a string-literal union is usually simpler.</li>
+</ul></div>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li>TypeScript is <strong>structural</strong>: any value with the right shape fits. Extra properties are only flagged on fresh object literals.</li>
+<li>Tuples (<code>[string, number]</code>), intersections (<code>A &amp; B</code>), index signatures (<code>{ [k: string]: V }</code>).</li>
+<li><code>as const</code> keeps exact values; <code>satisfies</code> checks without widening.</li>
+<li>Prefer literal unions over <code>enum</code>. Prefer guards, assertion functions or zod over <code>as</code>.</li>
+<li>Libraries ship <code>.d.ts</code> types, or you install <code>@types/name</code>.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space
+
+</textarea>
 <ol>
-<li>Avoid <code>any</code>. Use <code>unknown</code> + narrowing or generics.</li>
-<li>Avoid type assertions (<code>as</code>) and non-null assertions (<code>!</code>); each is a promise you can break. Prefer guards and validation.</li>
-<li>Model states with discriminated unions, not bags of optional booleans.</li>
-<li>Let inference work; don't annotate what the compiler already knows.</li>
-<li>Don't fight the compiler with clever types. If a type takes 20 minutes to write, the design is probably too clever.</li>
-<li>Use <code>satisfies</code> to check a value matches a type while keeping its narrow inferred type: <code>const cfg = { port: 3000 } satisfies Config;</code></li>
-</ol>
-
-<section class="exercises"><h2>Exercises</h2><ol>
-<li>Convert your Project 2 (vanilla app) to TypeScript with <code>strict</code> and <code>noUncheckedIndexedAccess</code>. Fix every error properly, without <code>any</code>.</li>
-<li>Model an <code>AsyncState&lt;T&gt;</code> discriminated union and write an exhaustive <code>switch</code> renderer.</li>
-<li>Write a generic typed <code>fetchJson&lt;T&gt;(url, schema)</code> that validates with Zod and returns a <code>Result</code> instead of throwing.</li>
-<li>Write a type-safe <code>EventEmitter&lt;Events&gt;</code> where <code>on("login", payload =&gt; …)</code> infers the payload type from an event map.</li>
-<li>Type a polymorphic React <code>Button</code> that renders as a <code>button</code> or an <code>a</code> based on <code>href</code>.</li>
-<li>Use <code>tsc --noEmit</code> in CI so type errors fail the build.</li>
+<li>Write a type <code>Range = [start: number, end: number]</code> and a function <code>overlaps(a: Range, b: Range): boolean</code>.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+type Range = [start: number, end: number];
+function overlaps([a1, a2]: Range, [b1, b2]: Range): boolean {
+  return a1 < b2 && b1 < a2;
+}
+console.log(overlaps([1, 5], [4, 8]), overlaps([1, 2], [3, 4]));
+</textarea></details></li>
+<li>Create a <code>MENU</code> array with <code>as const</code> of three pizza names, derive a <code>Pizza</code> type from it, and write <code>order(p: Pizza)</code>.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const MENU = ["margherita", "pepperoni", "funghi"] as const;
+type Pizza = (typeof MENU)[number];
+function order(p: Pizza) { console.log("One", p, "coming up"); }
+order("funghi");
+</textarea></details></li>
+<li>Write an assertion function <code>assertIsStringArray(x: unknown): asserts x is string[]</code> and use it on <code>JSON.parse('["a","b"]')</code>.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function assertIsStringArray(x: unknown): asserts x is string[] {
+  if (!Array.isArray(x) || !x.every((i) => typeof i === "string")) {
+    throw new Error("Expected an array of strings");
+  }
+}
+const data: unknown = JSON.parse('["a","b"]');
+assertIsStringArray(data);
+console.log(data.map((s) => s.toUpperCase()));
+</textarea></details></li>
+<li>Use <code>satisfies</code> to check a <code>colors</code> object where every value must be a string starting with <code>#</code>, while keeping its exact keys.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const colors = { brand: "#5b3df5", text: "#1d1d1f" } satisfies Record<string, `#${string}`>;
+type ColorName = keyof typeof colors;   // "brand" | "text"
+</textarea></details></li>
 </ol></section>
 
-<section class="checkpoint"><h2>Checkpoint</h2>
-<details><summary>any vs unknown?</summary>any disables checking. unknown accepts any value but forces you to narrow before use, so it keeps safety.</details>
-<details><summary>Why validate API data if I have a type?</summary>Types are erased and can't verify runtime data. A schema parser confirms the shape and gives you a trustworthy typed value.</details>
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>Why can you pass <code>{x, y, label}</code> in a variable but not as a literal to a function expecting <code>{x, y}</code>?</summary>Fresh object literals get an extra "excess property" check, because extra keys there are usually typos. Values in variables are only checked for the required shape.</details>
+<details><summary>What's the difference between <code>const x: T = ...</code> and <code>const x = ... satisfies T</code>?</summary>The annotation makes <code>x</code> have type T. <code>satisfies</code> checks the value matches T, but <code>x</code> keeps its more precise inferred type.</details>
+<details><summary>Why is <code>data as User</code> risky for API data?</summary>It doesn't check anything at runtime. If the data has a different shape, your code crashes later in a confusing place. Validate instead (type guard, assertion function, zod).</details>
 </section>
 </article></main>
 <script src="assets/lessons.js"></script>

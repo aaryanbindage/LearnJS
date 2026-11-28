@@ -3,137 +3,376 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 17 — Asynchronous JavaScript</title>
+<title>Async code: promises, fetch &amp; await</title>
 <link rel="stylesheet" href="assets/course.css">
 </head>
 <body data-slug="17-js-async">
 <main><article>
-<h1>Lesson 17 — Asynchronous JavaScript</h1>
-<p class="lede">JavaScript runs one thing at a time, yet it fetches data, waits for timers, and responds to clicks without freezing. Understand how, then use promises and async/await fluently.</p>
+<h1>Async code: promises, fetch &amp; await</h1>
+<p class="lede">Some things take time: loading data from a server, waiting for a timer, reading a file. JavaScript doesn't freeze while it waits. Instead, it carries on and comes back when the result is ready. This lesson explains how that works and how to write it clearly with <code>async</code> and <code>await</code>.</p>
 
-<h2>The event loop</h2>
-<p>JS has a single <strong>call stack</strong>. Slow work (timers, network, I/O) is handled by the browser; when finished, a callback is queued. The <strong>event loop</strong> pushes queued callbacks onto the stack only when it's empty. Promise callbacks (<em>microtasks</em>) run before timer callbacks (<em>macrotasks</em>).</p>
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Understand the difference between synchronous and asynchronous code.</li>
+<li>Know what a <strong>Promise</strong> is.</li>
+<li>Write asynchronous code that reads top-to-bottom with <code>async</code>/<code>await</code>.</li>
+<li>Load real data from the internet with <code>fetch</code>, and handle errors.</li>
+<li>Run several requests at once with <code>Promise.all</code>.</li>
+<li>Type promises and fetched data in TypeScript.</li>
+</ul><p class="time">About 60 minutes. Async is famously confusing at first. Go slowly, and run every example.</p></section>
+
+<h2>Waiting without freezing</h2>
+<p>Everything you've written so far has been <dfn>synchronous</dfn>: each line finishes before the next one starts. That's fine for math, but imagine loading data from a server on the other side of the world, which might take a second or two. If JavaScript stopped and waited, the whole page would freeze: no scrolling, no clicking, nothing.</p>
+<p>So slow operations are <dfn>asynchronous</dfn>: you start them, JavaScript carries on with other things, and your code is notified when the result arrives. You've already seen this with <code>setTimeout</code>:</p>
 <textarea class="code" data-lang="js" data-run>
-console.log("1 sync");
-setTimeout(() => console.log("4 macrotask (timeout 0)"), 0);
-Promise.resolve().then(() => console.log("3 microtask"));
-queueMicrotask(() => console.log("3b microtask"));
-console.log("2 sync");
-// Predict the order, then run!
+console.log("1. Order a pizza");
+
+setTimeout(() => {
+  console.log("3. Pizza arrives!");
+}, 1500);
+
+console.log("2. Watch TV while waiting");
 </textarea>
+<p>The output order is 1, 2, 3, not the order of the lines. <code>setTimeout</code> starts the timer and returns immediately; its callback runs later.</p>
+<div class="callout analogy"><span class="label">Analogy</span>Ordering at a busy café. You order, they give you a buzzer, and you go and sit down. You don't stand at the counter blocking everyone. When your food is ready, the buzzer goes off and you collect it. The buzzer is a <strong>promise</strong>: "your result is coming".</div>
 
 <h2>Promises</h2>
-<p>A promise represents a future value: <em>pending</em> → <em>fulfilled</em> (value) or <em>rejected</em> (error).</p>
+<p>A <dfn>Promise</dfn> is an object that represents a result that isn't ready yet. It's always in one of three states:</p>
+<ul>
+<li><strong>pending</strong>: still waiting (the buzzer hasn't gone off)</li>
+<li><strong>fulfilled</strong>: finished successfully, with a value (your food)</li>
+<li><strong>rejected</strong>: failed, with an error (they ran out of pizza)</li>
+</ul>
+<p>To try promises out, here's a small helper that gives back a promise that fulfils after some milliseconds. You don't need to understand how it's built yet; just use it:</p>
 <textarea class="code" data-lang="js" data-run>
-const wait = (ms, value, fail = false) =>
-  new Promise((resolve, reject) => setTimeout(() => (fail ? reject(new Error("boom: " + value)) : resolve(value)), ms));
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-wait(100, "first")
-  .then(v => { console.log("got", v); return wait(100, "second"); })   // returning a promise chains
-  .then(v => { console.log("got", v); return wait(50, "third", true); })
-  .then(v => console.log("never runs", v))
-  .catch(err => console.log("caught:", err.message))
-  .finally(() => console.log("cleanup always runs"));
+const p = wait(1000);
+console.log(p);   // Promise { … }: the buzzer, not the result
+
+p.then(() => console.log("One second passed"));
+</textarea>
+<p><code>.then(callback)</code> says "when this promise fulfils, run this". That works, but chains of <code>.then</code> get hard to read. Modern JavaScript has a much nicer way.</p>
+
+<h2><code>async</code> and <code>await</code></h2>
+<p>Inside a function marked <code>async</code>, you can put <code>await</code> in front of a promise. <code>await</code> pauses <em>that function</em> until the promise is done, and gives you its result. The rest of the page keeps running in the meantime.</p>
+<textarea class="code" data-lang="js" data-run>
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function makeBreakfast() {
+  console.log("Put the kettle on");
+  await wait(1000);
+  console.log("Kettle boiled. Make tea");
+  await wait(1000);
+  console.log("Tea ready!");
+}
+
+makeBreakfast();
+console.log("(Meanwhile, the rest of the program carries on)");
+</textarea>
+<p>Look at <code>makeBreakfast</code>: it reads top to bottom, like normal code, even though it takes two seconds. That's the point of <code>await</code>. And the last line still prints immediately, because only <code>makeBreakfast</code> pauses, not the whole program.</p>
+<p>Two rules:</p>
+<ol>
+<li><code>await</code> can only be used inside an <code>async</code> function (or at the top level of a module, which is what the editors here are).</li>
+<li>An <code>async</code> function always returns a promise. Whatever you <code>return</code> becomes the promise's value.</li>
+</ol>
+<textarea class="code" data-lang="js" data-run>
+async function getNumber() {
+  return 42;
+}
+
+const result = getNumber();
+console.log(result);          // a Promise, not 42!
+console.log(await result);    // 42: await unwraps it (top-level await works in modules)
 </textarea>
 
-<h2>async / await</h2>
-<p><code>async</code> functions always return a promise. <code>await</code> pauses <em>that function</em> (not the whole program) until a promise settles. Errors become normal <code>try/catch</code>.</p>
+<h2>Loading data with <code>fetch</code></h2>
+<p><code>fetch(url)</code> asks a server for something and returns a promise. Here we load a sample to-do item from JSONPlaceholder, a free test API that returns made-up data:</p>
 <textarea class="code" data-lang="js" data-run>
-const wait = (ms, v) => new Promise(r => setTimeout(() => r(v), ms));
+const response = await fetch("https://jsonplaceholder.typicode.com/todos/1");
+console.log("Status:", response.status, response.ok);
 
-async function main() {
-  console.time("sequential");
-  const a = await wait(200, "A");
-  const b = await wait(200, "B");          // waits for A first: slow
-  console.log(a, b);
-  console.timeEnd?.("sequential");
+const todo = await response.json();   // read the body and turn the JSON text into an object
+console.log(todo);
+console.log(todo.title);
+</textarea>
+<p>There are two <code>await</code>s, because there are two waits:</p>
+<ol>
+<li><code>await fetch(...)</code> waits for the server to start replying. You get a <code>Response</code> object with the status code (200 means OK) and headers.</li>
+<li><code>await response.json()</code> waits for the rest of the data to arrive, and converts it from <dfn>JSON</dfn> (a text format for data that looks just like JavaScript objects) into a real object.</li>
+</ol>
+<p>Let's get a list and use what you know about arrays:</p>
+<textarea class="code" data-lang="js" data-run>
+const res = await fetch("https://jsonplaceholder.typicode.com/todos?userId=1");
+const todos = await res.json();
 
-  const t0 = Date.now();
-  const [x, y] = await Promise.all([wait(200, "X"), wait(200, "Y")]);   // parallel
-  console.log(x, y, "took ~" + Math.round((Date.now() - t0) / 100) * 100 + "ms");
+console.log(`Loaded ${todos.length} to-dos`);
+const done = todos.filter((t) => t.completed);
+console.log(`${done.length} are completed`);
+console.log(todos.slice(0, 3).map((t) => t.title));
+</textarea>
 
+<h2>When things go wrong</h2>
+<p>Network requests fail all the time: no internet, the server is down, the address is wrong. There are two kinds of failure:</p>
+<ul>
+<li>The request couldn't be made at all (offline, bad domain). The <code>fetch</code> promise <strong>rejects</strong>, which throws an error at the <code>await</code>.</li>
+<li>The server replied, but with an error status like 404 (not found) or 500 (server error). <code>fetch</code> does <strong>not</strong> treat this as a failure! You have to check <code>response.ok</code> yourself.</li>
+</ul>
+<p>Handle both with <code>try</code>/<code>catch</code>. Code in <code>try</code> runs normally; if anything in it throws an error, JavaScript jumps straight to <code>catch</code>, instead of crashing:</p>
+<textarea class="code" data-lang="js" data-run>
+async function loadTodo(id) {
   try {
-    await Promise.reject(new Error("nope"));
-  } catch (e) {
-    console.log("caught", e.message);
-  }
-}
-main();
-</textarea>
-<table>
-<tr><th>Combinator</th><th>Resolves when…</th></tr>
-<tr><td><code>Promise.all([…])</code></td><td>all succeed (rejects on first failure)</td></tr>
-<tr><td><code>Promise.allSettled([…])</code></td><td>all finish; gives status of each</td></tr>
-<tr><td><code>Promise.race([…])</code></td><td>first to settle</td></tr>
-<tr><td><code>Promise.any([…])</code></td><td>first to succeed</td></tr>
-</table>
-<div class="callout warn"><span class="label">Common bug</span><code>array.forEach(async …)</code> does not wait. Use a <code>for…of</code> loop with <code>await</code> for sequential work, or <code>await Promise.all(array.map(async …))</code> for parallel.</div>
-
-<h2>fetch</h2>
-<p>These demos call a public JSON API (<code>jsonplaceholder.typicode.com</code>), so you need an internet connection.</p>
-<textarea class="code" data-lang="js" data-run>
-async function getTodo(id) {
-  const res = await fetch(`https://jsonplaceholder.typicode.com/todos/${id}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);   // fetch does NOT reject on 404/500!
-  return res.json();
-}
-
-try {
-  console.log(await getTodo(1));
-  console.log(await getTodo(999999));
-} catch (e) {
-  console.log("Failed:", e.message);
-}
-</textarea>
-<textarea class="code" data-lang="js">
-// POST JSON
-const res = await fetch("/api/items", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ title: "New" }),
-});
-
-// Cancel with AbortController (also used for timeouts and React effect cleanup)
-const ctrl = new AbortController();
-fetch(url, { signal: ctrl.signal }).catch(e => e.name === "AbortError" && console.log("cancelled"));
-ctrl.abort();
-</textarea>
-<div class="callout"><span class="label">CORS</span>Browsers block cross-origin requests unless the server sends the right <code>Access-Control-Allow-Origin</code> header. If you see a CORS error, the fix is on the server (or via a proxy), not in your fetch call.</div>
-
-<h2>Resilience patterns</h2>
-<textarea class="code" data-lang="js" data-run>
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-async function retry(fn, tries = 3, delay = 100) {
-  for (let i = 1; ; i++) {
-    try { return await fn(); }
-    catch (e) {
-      if (i >= tries) throw e;
-      console.log(`attempt ${i} failed, retrying…`);
-      await sleep(delay * 2 ** i);       // exponential backoff
+    const res = await fetch(`https://jsonplaceholder.typicode.com/todos/${id}`);
+    if (!res.ok) {
+      throw new Error(`Server replied ${res.status}`);   // turn a bad status into an error
     }
+    const todo = await res.json();
+    console.log("Loaded:", todo.title);
+  } catch (error) {
+    console.log("Couldn't load to-do", id, "→", error.message);
   }
 }
-let calls = 0;
-console.log(await retry(async () => { if (++calls < 3) throw new Error("flaky"); return "success after " + calls; }));
 
-const withTimeout = (p, ms) => Promise.race([p, sleep(ms).then(() => { throw new Error("timeout"); })]);
-try { await withTimeout(sleep(500), 100); } catch (e) { console.log(e.message); }
+await loadTodo(1);       // works
+await loadTodo(99999);   // the server says 404
 </textarea>
-<p>Top-level <code>await</code> works in modules (and in these demos). In classic scripts, wrap it in an <code>async</code> function.</p>
+<div class="try"><span class="label">Try it</span>Change the address to <code>https://no-such-site.invalid/todos/1</code> and run. This time <code>fetch</code> itself fails, and the same <code>catch</code> handles it.</div>
 
-<section class="exercises"><h2>Exercises</h2><ol>
-<li>Predict and verify the output order of a script mixing <code>setTimeout</code>, promises, and sync logs.</li>
-<li>Write <code>sleep(ms)</code>, then write a loop that logs a countdown 3…2…1 with one-second gaps.</li>
-<li>Fetch 5 todos in parallel and print only the completed ones.</li>
-<li>Build a user search box that fetches as you type, debounced, ignoring out-of-date responses (use <code>AbortController</code>).</li>
-<li>Write <code>promisify(fn)</code> for Node-style callbacks.</li>
-<li>Implement <code>Promise.all</code> yourself using <code>new Promise</code>.</li>
+<h2>Showing loading and error states on a page</h2>
+<p>A real page should show the user what's happening: loading, done, or failed. This brings together async, the DOM and events:</p>
+<textarea class="code" data-lang="js" data-run data-html='<label>User id (1–10): <input id="uid" type="number" value="1" min="1" max="12"></label> <button id="load">Load</button><p id="status"></p><ul id="list"></ul>' data-height="260px">
+const input = document.querySelector("#uid");
+const status = document.querySelector("#status");
+const list = document.querySelector("#list");
+
+async function loadPosts() {
+  status.textContent = "Loading…";
+  list.replaceChildren();
+  try {
+    const res = await fetch(`https://jsonplaceholder.typicode.com/posts?userId=${input.value}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const posts = await res.json();
+    if (posts.length === 0) {
+      status.textContent = "That user has no posts.";
+      return;
+    }
+    status.textContent = `${posts.length} posts:`;
+    for (const post of posts.slice(0, 5)) {
+      const li = document.createElement("li");
+      li.textContent = post.title;
+      list.append(li);
+    }
+  } catch (err) {
+    status.textContent = `Something went wrong: ${err.message}`;
+  }
+}
+
+document.querySelector("#load").addEventListener("click", loadPosts);
+loadPosts();
+</textarea>
+
+<h2>Doing several things at once</h2>
+<p>Each <code>await</code> waits for the previous one to finish. If requests don't depend on each other, that's wasted time. <code>Promise.all</code> starts them all together, and waits until every one is done:</p>
+<textarea class="code" data-lang="js" data-run>
+const base = "https://jsonplaceholder.typicode.com";
+
+console.time("one after another");
+const u1 = await (await fetch(`${base}/users/1`)).json();
+const u2 = await (await fetch(`${base}/users/2`)).json();
+console.timeEnd("one after another");
+
+console.time("all at once");
+const [a, b] = await Promise.all([
+  fetch(`${base}/users/1`).then((r) => r.json()),
+  fetch(`${base}/users/2`).then((r) => r.json()),
+]);
+console.timeEnd("all at once");
+
+console.log(a.name, "&", b.name);
+</textarea>
+<p>(<code>console.time</code> and <code>console.timeEnd</code> measure how long the code between them takes.) "All at once" should take about half as long. If any promise in <code>Promise.all</code> fails, the whole thing fails. Use <code>Promise.allSettled</code> when you want every result, success or not.</p>
+
+<h2>How it works underneath: the event loop</h2>
+<p>JavaScript runs one thing at a time. While your code runs, nothing else can. Async callbacks wait in a queue, and the browser runs them one by one, whenever the current code has finished. This system is called the <dfn>event loop</dfn>. Its consequence for you:</p>
+<textarea class="code" data-lang="js" data-run>
+setTimeout(() => console.log("timeout (0 ms)"), 0);
+Promise.resolve().then(() => console.log("promise"));
+console.log("normal code");
+// normal code first, always. Then the promise, then the timer.
+</textarea>
+<p>Even a 0 ms timer waits until the current code finishes. That's why a long loop freezes the page: event handlers, timers and screen updates all wait in the queue until it's done.</p>
+
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Forgetting <code>await</code></strong>: <code>const data = fetch(url)</code> gives you a promise, not the data. You'll see <code>Promise { … }</code> or "undefined" properties.</li>
+<li><strong>Forgetting <code>await res.json()</code></strong>: <code>res.json()</code> is also a promise.</li>
+<li><strong>Not checking <code>res.ok</code></strong>: a 404 page doesn't throw.</li>
+<li><strong>Using <code>await</code> in a non-async function</strong>: a syntax error. Add <code>async</code>.</li>
+<li><strong>Using a value before it's loaded</strong>: code after an <em>un</em>-awaited call runs before the data arrives.</li>
+</ul></div>
+
+<h2 class="ts-head">In TypeScript</h2>
+<h3><code>Promise&lt;T&gt;</code></h3>
+<p>A promise's type says what it will eventually give you: <code>Promise&lt;number&gt;</code> is "a promise of a number". Hover over the functions and variables:</p>
+<textarea class="code" data-lang="ts" data-run>
+function wait(ms: number): Promise<void> {           // fulfils with nothing
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function rollDice(): Promise<number> {         // an async function returns Promise<...>
+  await wait(300);
+  return Math.floor(Math.random() * 6) + 1;
+}
+
+const pending = rollDice();     // Promise<number>
+const value = await pending;    // number: await unwraps it
+console.log(value);
+
+const oops: number = rollDice();   // ✖ forgot await: a Promise isn't a number
+</textarea>
+<p>That last error is one of the most valuable checks in TypeScript. "Forgot to await" bugs are common and confusing in JavaScript; here, the moment you use a promise as if it were the value, you get an error.</p>
+
+<h3>Typing data from the internet</h3>
+<p>TypeScript has no idea what a server will send. <code>response.json()</code> returns <code>Promise&lt;any&gt;</code>, and <code>any</code> means no checking. So describe the data with a type:</p>
+<textarea class="code" data-lang="ts" data-run>
+type Todo = { userId: number; id: number; title: string; completed: boolean };
+
+async function getTodos(userId: number): Promise<Todo[]> {
+  const res = await fetch(`https://jsonplaceholder.typicode.com/todos?userId=${userId}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();   // we're telling TypeScript: trust us, it's a Todo[]
+}
+
+const todos = await getTodos(1);           // Todo[]
+const open = todos.filter((t) => !t.completed);
+console.log(open.map((t) => t.title.toUpperCase()).slice(0, 3));
+console.log(todos[0].titel);               // ✖ typo caught, thanks to the Todo type
+</textarea>
+<div class="callout ts"><span class="label">Important</span>The type is a <em>promise you make</em>, not a check. If the server sends something different, TypeScript can't know, because types don't exist when the code runs. For data you don't control, professional apps check it at runtime, often with a library called <strong>zod</strong>. You'll meet it in the backend part of the course. Here's the idea by hand:</div>
+<textarea class="code" data-lang="ts" data-run>
+type Todo = { id: number; title: string; completed: boolean };
+
+function isTodo(x: unknown): x is Todo {        // "x is Todo": if this returns true, x is a Todo
+  return typeof x === "object" && x !== null &&
+    typeof (x as Todo).id === "number" &&
+    typeof (x as Todo).title === "string" &&
+    typeof (x as Todo).completed === "boolean";
+}
+
+const res = await fetch("https://jsonplaceholder.typicode.com/todos/1");
+const data: unknown = await res.json();        // honest: we don't know yet
+
+if (isTodo(data)) {
+  console.log("Valid todo:", data.title);      // narrowed to Todo
+} else {
+  console.log("The server sent something unexpected");
+}
+</textarea>
+<p>A function whose return type is <code>x is Todo</code> is called a <dfn>type guard</dfn>: your own custom narrowing check, usable in an <code>if</code> just like <code>typeof</code>.</p>
+
+<h3>Errors in <code>catch</code> are <code>unknown</code></h3>
+<p>In JavaScript you can <code>throw</code> anything, not just <code>Error</code> objects (<code>throw "oops"</code> is legal). So TypeScript gives the <code>catch</code> variable the type <code>unknown</code>, and you narrow it:</p>
+<textarea class="code" data-lang="ts" data-run>
+try {
+  const res = await fetch("https://no-such-site.invalid/");
+  console.log(res.status);
+} catch (err) {
+  console.log(err.message);                 // ✖ 'err' is of type 'unknown'
+  if (err instanceof Error) {
+    console.log("Failed:", err.message);    // ✔
+  } else {
+    console.log("Failed:", String(err));
+  }
+}
+</textarea>
+
+<h3>Loading states as a discriminated union</h3>
+<p>Remember the <code>Request</code> type from the union types lesson? This is exactly where it's used:</p>
+<textarea class="code" data-lang="ts" data-run data-html='<p id="out"></p>'>
+type User = { id: number; name: string; email: string };
+type State =
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "done"; user: User };
+
+const out = document.querySelector("#out")!;   // we know #out exists on this page
+
+function render(state: State): void {
+  if (state.status === "loading") out.textContent = "Loading…";
+  else if (state.status === "error") out.textContent = `Error: ${state.message}`;
+  else out.textContent = `${state.user.name} <${state.user.email}>`;
+}
+
+render({ status: "loading" });
+try {
+  const res = await fetch("https://jsonplaceholder.typicode.com/users/3");
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  render({ status: "done", user: await res.json() });
+} catch (err) {
+  render({ status: "error", message: err instanceof Error ? err.message : String(err) });
+}
+</textarea>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li>Slow operations are <strong>asynchronous</strong>: they start now and finish later, without freezing the page.</li>
+<li>A <strong>Promise</strong> is a placeholder for a future value: pending, fulfilled or rejected.</li>
+<li><code>async</code> functions can <code>await</code> promises, which reads like normal top-to-bottom code. They always return a promise.</li>
+<li><code>const data = await (await fetch(url)).json()</code>. Check <code>res.ok</code>; wrap in <code>try/catch</code>.</li>
+<li><code>Promise.all</code> runs independent tasks at the same time.</li>
+<li>TypeScript: <code>Promise&lt;T&gt;</code>, catches forgotten <code>await</code>s. Type fetched data (and validate it if you don't trust it). <code>catch (err)</code> is <code>unknown</code>.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<p>JSONPlaceholder has <code>/users</code>, <code>/posts</code>, <code>/comments</code>, <code>/todos</code> and <code>/albums</code>, and supports filters like <code>?userId=1</code> or <code>?postId=1</code>.</p>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space
+const API = "https://jsonplaceholder.typicode.com";
+
+</textarea>
+<ol>
+<li>Write <code>countdown(n)</code>, an async function that prints n, n-1, … 1 with a second between each, then "Go!".
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+async function countdown(n: number): Promise<void> {
+  for (let i = n; i >= 1; i--) {
+    console.log(i);
+    await wait(1000);
+  }
+  console.log("Go!");
+}
+countdown(3);
+</textarea></details></li>
+<li>Load user 1 and print their name and the city from their address. Write a type for the parts you use.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+type User = { name: string; address: { city: string } };
+const res = await fetch("https://jsonplaceholder.typicode.com/users/1");
+const user: User = await res.json();
+console.log(`${user.name} lives in ${user.address.city}`);
+</textarea></details></li>
+<li>Load all posts by user 2, and print how many there are and the longest title.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+type Post = { id: number; title: string; body: string };
+const posts: Post[] = await (await fetch("https://jsonplaceholder.typicode.com/posts?userId=2")).json();
+const longest = posts.reduce((best, p) => (p.title.length > best.length ? p.title : best), "");
+console.log(posts.length, longest);
+</textarea></details></li>
+<li>Load users 1, 2 and 3 at the same time with <code>Promise.all</code> and print their names.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+type User = { name: string };
+const ids = [1, 2, 3];
+const users: User[] = await Promise.all(
+  ids.map((id) => fetch(`https://jsonplaceholder.typicode.com/users/${id}`).then((r) => r.json()))
+);
+console.log(users.map((u) => u.name));
+</textarea></details></li>
 </ol></section>
 
-<section class="checkpoint"><h2>Checkpoint</h2>
-<details><summary>Why does fetch("/missing") not throw?</summary>fetch only rejects on network failure. HTTP error statuses still resolve; check <code>res.ok</code>.</details>
-<details><summary>Does await block the browser?</summary>No. It suspends only the current async function; the event loop keeps running other tasks.</details>
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>What does <code>await</code> do?</summary>It pauses the current async function until the promise settles, then gives you its value (or throws its error). Other code keeps running meanwhile.</details>
+<details><summary>Does <code>fetch</code> throw on a 404?</summary>No. It only rejects if the request couldn't be made. Check <code>response.ok</code> for HTTP errors.</details>
+<details><summary>What's the type of an <code>async function f(): ...</code> that returns a string?</summary><code>() =&gt; Promise&lt;string&gt;</code>. Async functions always return a promise.</details>
 </section>
 </article></main>
 <script src="assets/lessons.js"></script>

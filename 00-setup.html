@@ -3,75 +3,136 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 0 — Setup & How the Web Works</title>
+<title>Start here: how the web works</title>
 <link rel="stylesheet" href="assets/course.css">
 </head>
 <body data-slug="00-setup">
 <main><article>
-<h1>Lesson 0 — Setup &amp; how the web works</h1>
-<p class="lede">Before writing code, get your tools ready and understand what a browser actually does with it.</p>
+<h1>Start here: how the web works</h1>
+<p class="lede">Welcome! This course takes you from never having written code to building real web apps in JavaScript and TypeScript, and beyond. You don't need any experience. This first lesson explains how the course works, what the web is made of, and how to set up your computer.</p>
 
-<h2>How the web works</h2>
-<p>A browser sends an HTTP <strong>request</strong> to a server (found via DNS from a domain name). The server returns a <strong>response</strong>, usually HTML. The browser parses the HTML into the <strong>DOM</strong>, fetches linked CSS, JS and images, applies styles, runs scripts, and paints pixels.</p>
-<table>
-<tr><th>Technology</th><th>Job</th><th>Analogy</th></tr>
-<tr><td>HTML</td><td>Structure &amp; meaning</td><td>Skeleton</td></tr>
-<tr><td>CSS</td><td>Presentation</td><td>Skin &amp; clothes</td></tr>
-<tr><td>JavaScript</td><td>Behavior</td><td>Muscles</td></tr>
-<tr><td>React</td><td>Build UIs from components</td><td>A framework for the muscles</td></tr>
-<tr><td>Three.js</td><td>3D graphics on WebGL</td><td>A movie set</td></tr>
-</table>
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Learn how to use this course, and its live code editors.</li>
+<li>Understand, in plain English, what happens when you visit a website.</li>
+<li>Meet the languages you'll learn: HTML, CSS, JavaScript and TypeScript.</li>
+<li>Install the free tools professionals use.</li>
+</ul><p class="time">About 45 minutes, most of it installing things.</p></section>
 
-<h2>Install your tools</h2>
-<ol>
-<li><strong>VS Code</strong> (code.visualstudio.com) with the extensions <em>Live Server</em>, <em>Prettier</em>, <em>ESLint</em>.</li>
-<li><strong>Node.js LTS</strong> (nodejs.org). Check with <code>node -v</code> and <code>npm -v</code>.</li>
-<li><strong>Git</strong>. Check with <code>git --version</code>.</li>
-<li><strong>Chrome or Firefox</strong> with DevTools (<kbd>F12</kbd> or <kbd>Cmd</kbd>+<kbd>Opt</kbd>+<kbd>I</kbd>).</li>
-</ol>
-<textarea class="code" data-lang="bash">
-mkdir ~/webcourse && cd ~/webcourse
-mkdir lesson-00 && cd lesson-00
-code .        # opens VS Code here
-git init      # start version control
-</textarea>
+<h2>How this course works</h2>
+<ul>
+<li><strong>Go in order.</strong> Each lesson builds on the ones before it. Use the list on the left (or the ☰ Lessons button on a phone) to move around. Your progress is saved in your browser.</li>
+<li><strong>Type the examples, don't just read them.</strong> Programming is a skill, like playing an instrument. You learn it with your fingers.</li>
+<li><strong>Do the "Try it" boxes and the practice exercises.</strong> Try each exercise before you open its answer. Getting stuck and then un-stuck is exactly how learning to code feels, for everyone.</li>
+<li><strong>Take breaks.</strong> If a lesson feels like a lot, stop halfway and come back tomorrow. The time estimate at the top of each lesson is a guide, not a target.</li>
+</ul>
 
-<h2>Your first page (live)</h2>
-<p>This editor is live. Change the text and the colors and watch the result update.</p>
-<textarea class="code" data-lang="html" data-run>
+<h2>The live code editors</h2>
+<p>Most lessons have editors you can type in. They're built on the same editor engine as VS Code, one of the most popular code editors in the world. Try this one: change the words inside <code>&lt;h1&gt;</code> and watch the result change below it.</p>
+<textarea class="code" data-lang="html" data-run data-height="160px">
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8">
-    <title>Hello</title>
     <style> h1 { color: rebeccapurple; font-family: system-ui; } </style>
   </head>
   <body>
     <h1>Hello, web!</h1>
-    <p>I wrote this page.</p>
+    <p>I'm editing a real web page.</p>
   </body>
 </html>
 </textarea>
-<p>In your own editor, save this as <code>index.html</code> and open it with Live Server. Edits refresh automatically.</p>
+<p>HTML and CSS editors update as you type. JavaScript and TypeScript editors have a <strong>▶ Run</strong> button instead (or press <kbd>Ctrl</kbd> + <kbd>Enter</kbd>), and show what your program prints in a <strong>Console</strong> panel. You'll learn about those in Part 3. If you break something, press <strong>Reset</strong>. Nothing you do in these editors can harm your computer.</p>
 
-<h2>DevTools tour (spend 15 minutes)</h2>
+<h2>What happens when you visit a website?</h2>
+<p>Let's follow what happens when you type <code>example.com</code> into your browser and press Enter.</p>
+<ol class="steps">
+<li><strong>Finding the computer.</strong> Websites live on computers called <dfn>servers</dfn>, which are always connected to the internet. Every computer online has a number address (an <dfn>IP address</dfn>, like <code>93.184.215.14</code>). Your browser asks the internet's phone book, called <dfn>DNS</dfn>, "what's the number for example.com?"</li>
+<li><strong>Asking for the page.</strong> Your browser sends a message to that server: "please send me your home page". This message is an <dfn>HTTP request</dfn>. (The <code>https</code> at the start of web addresses means the conversation is encrypted, so nobody in between can read it.)</li>
+<li><strong>Getting the page.</strong> The server sends back an <dfn>HTTP response</dfn>: usually an HTML file. The response also has a status code: <code>200</code> means OK, and you've probably seen <code>404</code>, which means "not found".</li>
+<li><strong>Drawing the page.</strong> The browser reads the HTML, notices it also needs some CSS, JavaScript and images, asks the server for those too, and then draws (renders) everything on your screen.</li>
+</ol>
+<div class="callout analogy"><span class="label">Analogy</span>It's like ordering from a restaurant by phone. You look up the number (DNS), call and place your order (request), the kitchen sends back your food (response), and you arrange it on your table (rendering).</div>
+
+<h2>The languages of the web</h2>
+<p>A web page is made with three languages, each with its own job. You'll learn them in this order:</p>
+<table>
+<tr><th>Language</th><th>Its job</th><th>Analogy: a house</th></tr>
+<tr><td><strong>HTML</strong></td><td>The content and structure: headings, paragraphs, images, buttons.</td><td>The walls and rooms</td></tr>
+<tr><td><strong>CSS</strong></td><td>How it looks: colours, fonts, layout, animation.</td><td>The paint and furniture</td></tr>
+<tr><td><strong>JavaScript</strong></td><td>How it behaves: reacting to clicks, loading data, games, apps.</td><td>The electricity and plumbing</td></tr>
+<tr><td><strong>TypeScript</strong></td><td>JavaScript with extra safety checks that catch mistakes before your code runs. Most professional JavaScript is written in it.</td><td>A building inspector who checks the wiring before you switch it on</td></tr>
+</table>
+<p>HTML and CSS aren't programming languages: they <em>describe</em> things rather than giving step-by-step instructions, which makes them a gentle place to start. JavaScript and TypeScript are where you'll learn to program, starting in Part 3. Later parts cover React (for building big apps), Three.js (3D graphics), servers and databases.</p>
+
+<h2>Install your tools</h2>
+<p>You can do Parts 1 to 3 entirely in this website's editors. But you'll want real tools soon, and installing them now means they're ready. Everything here is free.</p>
+<ol class="steps">
+<li><strong>A modern browser</strong>: Chrome, Edge or Firefox. You probably have one.</li>
+<li><strong>A code editor</strong>: the program you'll write code in. This course gives instructions for two free, excellent ones. Either is a great choice; pick one and stick with it.
+<div class="editor-pick"></div>
+<div data-ed="vscode"><p><strong>VS Code</strong>, from <code>code.visualstudio.com</code>. It's the most widely used editor, with a huge library of add-ons. Install it, open it, then click the Extensions icon (four squares) on the left and install:</p>
+  <ul><li><em>Live Server</em> (shows your HTML in the browser, and refreshes it every time you save)</li>
+  <li><em>Prettier</em> (tidies up your code's formatting)</li>
+  <li><em>ESLint</em> (warns you about likely mistakes)</li></ul></div>
+<div data-ed="zed"><p><strong>Zed</strong>, from <code>zed.dev</code> (for Mac, Windows and Linux). It's very fast, and comes with what you need already built in: TypeScript support, automatic formatting with Prettier, and a terminal. There's nothing extra to install to get started. (When you first open an HTML file, Zed may offer to install its HTML extension: say yes.)</p></div></li>
+<li><strong>Node.js</strong>, from <code>nodejs.org</code>. Choose the "LTS" version (that means "long-term support", the stable one). It runs JavaScript outside the browser, and installs tools you'll use in Part 4.</li>
+<li><strong>Git</strong>, from <code>git-scm.com</code>. It saves the history of your projects, so you can always go back.</li>
+</ol>
+<p>To check that Node.js and Git installed properly, open a terminal inside your editor:</p>
+<div data-ed="vscode"><p>Choose <em>Terminal → New Terminal</em> from the menu.</p></div>
+<div data-ed="zed"><p>Press <kbd>Ctrl</kbd> + <kbd>`</kbd> (the key above <kbd>Tab</kbd>; it's <kbd>Ctrl</kbd> on a Mac too). Or open the command palette with <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> (<kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> on a Mac), type <em>terminal</em>, and pick the "toggle" option.</p></div>
+<p>Then type each of these lines and press Enter. Each should print a version number. (Don't worry about the terminal yet; you'll learn it properly later.)</p>
+<textarea class="code" data-lang="bash">
+node -v
+npm -v
+git --version
+</textarea>
+<p>If you see "command not found", close your editor completely and open it again (it needs to notice the new programs), or restart your computer.</p>
+<p>See the <a href="ide-tools.html">recommended tools guide</a> for more options, but don't spend long on it now. The tools above are all you need.</p>
+
+<h2>Make your first page on your computer</h2>
+<ol class="steps">
+<li>Make a folder somewhere easy to find, called <code>webcourse</code>.</li>
+<li>Open the folder in your editor.
+  <div data-ed="vscode"><p><em>File → Open Folder</em>, and pick it.</p></div>
+  <div data-ed="zed"><p><em>File → Open…</em> (<kbd>Ctrl</kbd> + <kbd>O</kbd>, or <kbd>Cmd</kbd> + <kbd>O</kbd> on a Mac), and pick the folder.</p></div></li>
+<li>Create a file called <code>index.html</code> in it. In VS Code, click the "New File" icon next to the folder name; in Zed, right-click the folder name in the project panel on the left and choose <em>New File</em>.</li>
+<li>Copy the code from the editor at the top of this lesson into it, and save (<kbd>Ctrl</kbd> + <kbd>S</kbd>, or <kbd>Cmd</kbd> + <kbd>S</kbd> on a Mac).</li>
+<li>Show it in the browser, with automatic refreshing.
+  <div data-ed="vscode"><p>Right-click in the file and choose <em>Open with Live Server</em>. Your page opens in the browser.</p></div>
+  <div data-ed="zed"><p>Zed doesn't have a "Live Server" button, so you'll use a one-line command instead. Open the terminal (<kbd>Ctrl</kbd> + <kbd>`</kbd>) and type:</p>
+<textarea class="code" data-lang="bash">
+npx vite
+</textarea>
+  <p>The first time, it asks to install a package called <code>vite</code>: type <kbd>y</kbd> and press Enter. It then prints an address, <code>http://localhost:5173</code>. Hold <kbd>Ctrl</kbd> (or <kbd>Cmd</kbd>) and click it to open your page. Leave the terminal running; press <kbd>Ctrl</kbd> + <kbd>C</kbd> in it when you want to stop. (Vite is a tool you'll learn properly in Part 4.)</p></div></li>
+<li>Change the heading, save, and watch the browser update by itself.</li>
+</ol>
+<p>That's the loop you'll use for the rest of the course: edit, save, look.</p>
+
+<h2>Your browser's developer tools</h2>
+<p>Every browser has hidden tools for web developers, called <dfn>DevTools</dfn>. Open them on any page with <kbd>F12</kbd> (or <kbd>Cmd</kbd> + <kbd>Option</kbd> + <kbd>I</kbd> on a Mac). Have a look around for a few minutes; you'll use them a lot:</p>
 <ul>
-<li><strong>Elements</strong>: the live DOM and computed styles. Edit anything; changes are temporary.</li>
-<li><strong>Console</strong>: type <code>document.title = "Hacked"</code>.</li>
-<li><strong>Network</strong>: reload and see every request, status code, size and timing.</li>
-<li><strong>Sources</strong>: breakpoints. <strong>Application</strong>: storage and cookies.</li>
+<li><strong>Elements</strong>: the page's HTML and CSS. You can edit anything here to experiment. Changes disappear when you reload, so you can't break the real site.</li>
+<li><strong>Console</strong>: where JavaScript messages and errors appear. You'll use this from Part 3.</li>
+<li><strong>Network</strong>: every file the page loaded. Reload the page with this tab open and watch the requests appear, each with its status code.</li>
 </ul>
+<div class="try"><span class="label">Try it</span><ol>
+<li>Open any website you like, and open DevTools.</li>
+<li>In the Elements tab, click the arrow icon at the top-left of DevTools, then click a heading on the page. Its HTML is highlighted.</li>
+<li>Double-click the heading's text in the Elements panel and change it. You've just "edited" a famous website (only on your screen).</li>
+</ol></div>
 
-<section class="exercises"><h2>Exercises</h2><ol>
-<li>In the Network tab, find the HTTP status code and <code>Content-Type</code> of your page.</li>
-<li>Open any big website; in Elements, delete a heading and change a color.</li>
-<li>In the Console, run <code>document.querySelectorAll("a").length</code> on a news site.</li>
-<li>Run <code>git init</code> in your folder and make a first commit.</li>
-</ol></section>
+<section class="recap"><h2>Recap</h2><ul>
+<li>Go in order, type every example, try exercises before peeking, and take breaks.</li>
+<li>A browser finds a server with DNS, sends an HTTP request, gets HTML back, then loads CSS, JavaScript and images and draws the page.</li>
+<li>HTML = structure, CSS = appearance, JavaScript = behaviour, TypeScript = JavaScript with safety checks.</li>
+<li>Tools: a browser, a code editor (VS Code with Live Server, Prettier and ESLint; or Zed, with <code>npx vite</code> for previews), Node.js, Git.</li>
+</ul></section>
 
-<section class="checkpoint"><h2>Checkpoint</h2>
-<p>Explain what happens between typing a URL and seeing a page.</p>
-<details><summary>Show the key steps</summary>DNS lookup → TCP/TLS connection → HTTP request/response → parse HTML into the DOM → parse CSS into the CSSOM → build render tree → layout → paint → run JavaScript (which can change the DOM again).</details></section>
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>What's the difference between a request and a response?</summary>The request is your browser asking a server for something. The response is the server's reply, usually with the file you asked for and a status code.</details>
+<details><summary>Which language would you use to make a button change colour when clicked?</summary>CSS defines the colours, and JavaScript reacts to the click and switches between them. The button itself is HTML. Real pages use all three together.</details>
+<details><summary>What does a 404 status code mean?</summary>"Not found": the server doesn't have anything at that address.</details>
+</section>
 </article></main>
 <script src="assets/lessons.js"></script>
 <script src="assets/course.js"></script>

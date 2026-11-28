@@ -19,7 +19,7 @@
 <tr><td><strong>Kysely</strong></td><td>Type-safe SQL query builder</td><td>No schema magic; you write the SQL structure</td></tr>
 <tr><td>Raw SQL (<code>pg</code>, <code>postgres.js</code>)</td><td>Full control</td><td>Fastest to reason about performance; manual typing</td></tr>
 </table>
-<p>ORMs remove boilerplate and give types, but they can generate poor queries. Learn SQL first (Lesson 55) and inspect the SQL your ORM emits.</p>
+<p>ORMs remove boilerplate and give types, but they can generate poor queries. Learn SQL first (“<a href="55-databases-sql.html">Databases &amp; SQL</a>”) and inspect the SQL your ORM emits.</p>
 <textarea class="code" data-lang="js" data-file="prisma/schema.prisma">
 generator client { provider = "prisma-client-js" }
 datasource db { provider = "postgresql"; url = env("DATABASE_URL") }

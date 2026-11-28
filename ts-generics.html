@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Generics &amp; utility types</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="ts-generics">
+<main><article>
+<h1>Generics &amp; utility types</h1>
+<p class="lede">You've been <em>using</em> generics for a while: <code>Promise&lt;number&gt;</code>, <code>Map&lt;string, number&gt;</code>, <code>querySelector&lt;HTMLInputElement&gt;</code>. In this TypeScript lesson you'll learn what those angle brackets mean, write your own generic functions and types, and use TypeScript's built-in "utility types" to build new types from existing ones.</p>
+
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Understand the problem generics solve.</li>
+<li>Write generic functions with type parameters like <code>&lt;T&gt;</code>.</li>
+<li>Write generic types, such as a reusable API response type.</li>
+<li>Restrict generics with <code>extends</code> and <code>keyof</code>.</li>
+<li>Use <code>Partial</code>, <code>Pick</code>, <code>Omit</code>, <code>Readonly</code> and <code>Record</code>.</li>
+</ul><p class="time">About 50 minutes. This is a pure TypeScript lesson.</p></section>
+
+<h2>The problem</h2>
+<p>Here's a tiny function that returns the first item of an array. What type should its parameter have?</p>
+<textarea class="code" data-lang="ts" data-run>
+function firstNumber(items: number[]): number | undefined {
+  return items[0];
+}
+function firstString(items: string[]): string | undefined {
+  return items[0];
+}
+// ...and another one for booleans, users, products...?
+console.log(firstNumber([1, 2]), firstString(["a", "b"]));
+</textarea>
+<p>The code inside is identical every time; only the types change. One fix is <code>any</code>:</p>
+<textarea class="code" data-lang="ts" data-run>
+function first(items: any[]): any {
+  return items[0];
+}
+
+const n = first([1, 2, 3]);   // hover: any. TypeScript has forgotten it's a number!
+n.toUpperCase();              // no error, but this crashes when it runs
+</textarea>
+<p>That works for any array, but the result is <code>any</code>, so all checking is lost. We want a function that works for any type <em>and</em> remembers which type it was given.</p>
+
+<h2>Generic functions</h2>
+<textarea class="code" data-lang="ts" data-run>
+function first<T>(items: T[]): T | undefined {
+  return items[0];
+}
+
+const n = first([1, 2, 3]);          // hover: number | undefined
+const s = first(["a", "b"]);         // hover: string | undefined
+const u = first([{ name: "Ada" }]);  // hover: { name: string } | undefined
+
+console.log(n, s, u);
+s?.toUpperCase();    // ✔ TypeScript knows s is a string
+n?.toUpperCase();    // ✖ and knows n is a number
+</textarea>
+<p>The <code>&lt;T&gt;</code> after the function name declares a <dfn>type parameter</dfn>: a placeholder for a type, filled in each time the function is called. Read the signature as: "for any type <code>T</code>, <code>first</code> takes an array of <code>T</code> and returns a <code>T</code> (or undefined)".</p>
+<div class="callout analogy"><span class="label">Analogy</span>A normal parameter is a blank for a <em>value</em>: <code>double(n)</code> works for any number. A type parameter is a blank for a <em>type</em>: <code>first&lt;T&gt;</code> works for any type. When you call <code>first([1, 2, 3])</code>, TypeScript looks at the argument and fills in <code>T = number</code>.</div>
+<p><code>T</code> is just a name (short for "type"); you could call it <code>Item</code>. Single capital letters are the convention: <code>T</code>, then <code>U</code>, or <code>K</code> and <code>V</code> for keys and values.</p>
+<p>Usually TypeScript works out <code>T</code> from the arguments. You can also fill it in yourself, in angle brackets at the call. That's what you did with <code>querySelector&lt;HTMLInputElement&gt;</code> and <code>new Map&lt;string, number&gt;()</code>:</p>
+<textarea class="code" data-lang="ts" data-run>
+function makeList<T>(): T[] {
+  return [];
+}
+const names = makeList<string>();   // nothing to infer from, so we say T = string
+names.push("Ada");
+names.push(42);                     // ✖
+</textarea>
+
+<h3>More generic functions</h3>
+<textarea class="code" data-lang="ts" data-run>
+// Two type parameters
+function pair<A, B>(a: A, b: B): [A, B] {
+  return [a, b];
+}
+const p = pair("age", 36);          // [string, number]
+
+// Generic + callback: this is how map() itself is typed!
+function mapArray<T, U>(items: T[], fn: (item: T) => U): U[] {
+  const result: U[] = [];
+  for (const item of items) result.push(fn(item));
+  return result;
+}
+const lengths = mapArray(["a", "bbb"], (s) => s.length);   // number[]
+console.log(p, lengths);
+</textarea>
+<p>Look at <code>mapArray</code>: <code>T</code> is the input item type, <code>U</code> is the output item type, and the callback connects them. Hover over the real <code>[].map</code> method sometime: it's declared almost exactly like this.</p>
+
+<h2>Generic types</h2>
+<p>Types can have type parameters too. A very common real-world example: every response from your server has the same wrapper, but different data inside.</p>
+<textarea class="code" data-lang="ts" data-run>
+type ApiResponse<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: string };
+
+type User = { id: number; name: string };
+type Post = { id: number; title: string };
+
+const userRes: ApiResponse<User> = { ok: true, data: { id: 1, name: "Ada" } };
+const postsRes: ApiResponse<Post[]> = { ok: false, error: "Not found" };
+
+function show(res: ApiResponse<User>): string {
+  return res.ok ? `Hello ${res.data.name}` : `Error: ${res.error}`;
+}
+console.log(show(userRes));
+</textarea>
+<p>Now you can see what the types you've used all along really are:</p>
+<table>
+<tr><th>Type</th><th>Means</th></tr>
+<tr><td><code>Array&lt;T&gt;</code> (same as <code>T[]</code>)</td><td>an array of T</td></tr>
+<tr><td><code>Promise&lt;T&gt;</code></td><td>a promise that will give a T</td></tr>
+<tr><td><code>Set&lt;T&gt;</code>, <code>Map&lt;K, V&gt;</code></td><td>a set of T; a map from K to V</td></tr>
+<tr><td><code>Record&lt;K, V&gt;</code></td><td>an object whose keys are K and values are V</td></tr>
+</table>
+
+<h3>A generic fetch helper</h3>
+<p>Putting it together with the async lesson, a reusable, typed way to load JSON:</p>
+<textarea class="code" data-lang="ts" data-run>
+async function getJSON<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  return res.json() as Promise<T>;
+}
+
+type Todo = { id: number; title: string; completed: boolean };
+
+const todo = await getJSON<Todo>("https://jsonplaceholder.typicode.com/todos/1");
+const users = await getJSON<{ name: string }[]>("https://jsonplaceholder.typicode.com/users");
+console.log(todo.title, users.length);   // both fully typed
+</textarea>
+
+<h2>Constraints: <code>extends</code></h2>
+<p>Sometimes a generic function needs to know <em>something</em> about <code>T</code>. This doesn't work, because not every type has a <code>length</code>:</p>
+<textarea class="code" data-lang="ts" data-run>
+function longest<T>(a: T, b: T): T {
+  return a.length >= b.length ? a : b;   // ✖ Property 'length' does not exist on type 'T'
+}
+</textarea>
+<p>Add a <dfn>constraint</dfn> with <code>extends</code>: "T can be any type, <em>as long as</em> it has a numeric <code>length</code>":</p>
+<textarea class="code" data-lang="ts" data-run>
+function longest<T extends { length: number }>(a: T, b: T): T {
+  return a.length >= b.length ? a : b;
+}
+
+console.log(longest("apple", "fig"));        // T = string
+console.log(longest([1, 2], [1, 2, 3]));     // T = number[]
+console.log(longest(10, 20));                // ✖ numbers don't have a length
+</textarea>
+
+<h3><code>keyof</code>: the names of an object's properties</h3>
+<p><code>keyof SomeType</code> is a union of its property names. Combined with generics, you can write a function that only accepts real property names, and returns the right type for each:</p>
+<textarea class="code" data-lang="ts" data-run>
+type User = { id: number; name: string; email: string };
+type UserKey = keyof User;   // hover: "id" | "name" | "email"
+
+function getProp<T, K extends keyof T>(obj: T, key: K): T[K] {
+  return obj[key];
+}
+
+const ada: User = { id: 1, name: "Ada", email: "ada@example.com" };
+const id = getProp(ada, "id");       // number
+const name = getProp(ada, "name");   // string
+getProp(ada, "phone");               // ✖ not a key of User
+
+// A typed "sort by any field" helper:
+function sortBy<T>(items: T[], key: keyof T): T[] {
+  return [...items].sort((a, b) => (a[key] < b[key] ? -1 : a[key] > b[key] ? 1 : 0));
+}
+console.log(sortBy([{ n: "b", x: 2 }, { n: "a", x: 1 }], "n"));
+</textarea>
+<p><code>T[K]</code> means "the type of property K in T", so asking for <code>"id"</code> gives back a <code>number</code>. Typing the key as a string literal, you'll also notice the editor suggests only valid property names.</p>
+
+<h2>Utility types: building types from types</h2>
+<p>TypeScript has built-in generic types that transform other types. They save you from writing near-duplicate types by hand. Hover over each one:</p>
+<textarea class="code" data-lang="ts" data-run>
+type User = { id: number; name: string; email: string; age?: number };
+
+type UserUpdate = Partial<User>;             // every property optional
+type FullUser = Required<User>;              // every property required (age too)
+type UserPreview = Pick<User, "id" | "name">;      // only these properties
+type NewUser = Omit<User, "id">;             // everything except id
+type FrozenUser = Readonly<User>;            // nothing can be changed
+type UsersById = Record<number, User>;       // { [id: number]: User }
+
+// Real uses:
+function updateUser(user: User, changes: Partial<User>): User {
+  return { ...user, ...changes };            // any subset of fields can be changed
+}
+
+function createUser(data: Omit<User, "id">): User {
+  return { id: Math.floor(Math.random() * 1000), ...data };   // the server picks the id
+}
+
+const ada = createUser({ name: "Ada", email: "ada@example.com" });
+console.log(updateUser(ada, { age: 37 }));
+updateUser(ada, { age: "old" });   // ✖ still type-checked
+createUser({ id: 5, name: "x", email: "y" });   // ✖ id isn't allowed here
+</textarea>
+<table>
+<tr><th>Utility</th><th>Gives you</th></tr>
+<tr><td><code>Partial&lt;T&gt;</code></td><td>T with every property optional (good for "updates")</td></tr>
+<tr><td><code>Required&lt;T&gt;</code></td><td>T with every property required</td></tr>
+<tr><td><code>Pick&lt;T, Keys&gt;</code></td><td>only the listed properties</td></tr>
+<tr><td><code>Omit&lt;T, Keys&gt;</code></td><td>everything except the listed properties</td></tr>
+<tr><td><code>Readonly&lt;T&gt;</code></td><td>T where no property can be reassigned</td></tr>
+<tr><td><code>Record&lt;K, V&gt;</code></td><td>an object with keys K and values V</td></tr>
+<tr><td><code>ReturnType&lt;typeof fn&gt;</code></td><td>whatever a function returns</td></tr>
+<tr><td><code>Awaited&lt;P&gt;</code></td><td>what a promise resolves to</td></tr>
+</table>
+
+<h3><code>typeof</code> in types</h3>
+<p>In a type position, <code>typeof someValue</code> gives you the type of an existing value. That lets you derive types from real data instead of writing them twice:</p>
+<textarea class="code" data-lang="ts" data-run>
+const defaultSettings = { theme: "light", fontSize: 16, sound: true };
+type Settings = typeof defaultSettings;   // { theme: string; fontSize: number; sound: boolean }
+
+const SIZES = ["small", "medium", "large"] as const;   // "as const": keep the exact values
+type Size = (typeof SIZES)[number];       // "small" | "medium" | "large"
+
+function setSize(s: Size) { console.log("size:", s); }
+setSize("large");
+setSize("huge");                          // ✖
+for (const s of SIZES) setSize(s);        // and you can loop over the allowed values!
+</textarea>
+<p>The <code>SIZES</code> trick is very handy: one array gives you both a list you can loop over (for a dropdown menu, say) and a matching type.</p>
+
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Generics where none are needed</strong>: if <code>T</code> appears only once in the signature, you probably don't need it. Generics are for connecting types (input to output).</li>
+<li><strong>Using <code>any</code> instead of a generic</strong>: you lose all checking on the result.</li>
+<li><strong>Forgetting a constraint</strong> when you use a property of <code>T</code>: add <code>T extends { ... }</code>.</li>
+<li><strong>Copy-pasting near-identical types</strong>: derive them with <code>Pick</code>, <code>Omit</code>, <code>Partial</code>.</li>
+</ul></div>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li>A <strong>type parameter</strong> (<code>&lt;T&gt;</code>) is a placeholder for a type, usually inferred from the arguments.</li>
+<li>Generic functions connect input and output types: <code>first&lt;T&gt;(items: T[]): T | undefined</code>.</li>
+<li>Generic types: <code>type ApiResponse&lt;T&gt; = ...</code>. <code>Array</code>, <code>Promise</code>, <code>Map</code>, <code>Record</code> are all generic.</li>
+<li><code>T extends X</code> constrains T; <code>keyof T</code> is the union of T's keys; <code>T[K]</code> is the type of key K.</li>
+<li>Utility types: <code>Partial</code>, <code>Required</code>, <code>Pick</code>, <code>Omit</code>, <code>Readonly</code>, <code>Record</code>. <code>typeof value</code> turns a value into a type.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space
+
+</textarea>
+<ol>
+<li>Write <code>last&lt;T&gt;(items: T[]): T | undefined</code>.
+<details><summary>Show answer</summary><code>function last&lt;T&gt;(items: T[]): T | undefined { return items[items.length - 1]; }</code></details></li>
+<li>Write <code>groupBy&lt;T&gt;(items: T[], getKey: (item: T) =&gt; string): Record&lt;string, T[]&gt;</code>, and use it to group words by their first letter.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function groupBy<T>(items: T[], getKey: (item: T) => string): Record<string, T[]> {
+  const groups: Record<string, T[]> = {};
+  for (const item of items) {
+    const key = getKey(item);
+    (groups[key] ??= []).push(item);
+  }
+  return groups;
+}
+console.log(groupBy(["apple", "avocado", "banana"], (w) => w[0]));
+</textarea></details></li>
+<li>Given <code>type Product = { id: number; name: string; price: number; stock: number }</code>, write types for: a product without its id (for creating), and an update where every field except id is optional.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+type Product = { id: number; name: string; price: number; stock: number };
+type NewProduct = Omit<Product, "id">;
+type ProductUpdate = Partial<Omit<Product, "id">>;
+const update: ProductUpdate = { price: 9.99 };
+console.log(update);
+</textarea></details></li>
+<li>Write <code>pluck&lt;T, K extends keyof T&gt;(items: T[], key: K): T[K][]</code> that returns one property from every item.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function pluck<T, K extends keyof T>(items: T[], key: K): T[K][] {
+  return items.map((item) => item[key]);
+}
+const names = pluck([{ name: "Ada", age: 36 }, { name: "Grace", age: 45 }], "name");  // string[]
+console.log(names);
+</textarea></details></li>
+</ol></section>
+
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>Why is <code>first&lt;T&gt;(items: T[]): T</code> better than <code>first(items: any[]): any</code>?</summary>The generic version remembers the item type, so the result is fully typed. The <code>any</code> version loses all type information.</details>
+<details><summary>What does <code>T extends { length: number }</code> mean?</summary>T can be any type that has a numeric <code>length</code> property (strings, arrays, …).</details>
+<details><summary>What's <code>Omit&lt;User, "id"&gt;</code>?</summary>The <code>User</code> type with the <code>id</code> property removed.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

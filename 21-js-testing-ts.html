@@ -3,125 +3,273 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 21 — Testing & TypeScript Primer</title>
+<title>Real TypeScript projects &amp; testing</title>
 <link rel="stylesheet" href="assets/course.css">
 </head>
 <body data-slug="21-js-testing-ts">
 <main><article>
-<h1>Lesson 21 — Testing &amp; TypeScript primer</h1>
-<p class="lede">Two skills that separate hobby code from professional code: proving it works, and letting a type checker catch mistakes before you run anything.</p>
+<h1>Real TypeScript projects &amp; testing</h1>
+<p class="lede">So far the editors on this site have done the setup for you. Professional code lives in project folders on your computer, with a build tool, a type checker, version control and automated tests. This lesson walks you through setting all of that up, step by step, for a real TypeScript project.</p>
 
-<h2>Testing: the idea</h2>
-<p>A test calls your code with known input and checks the output. Write <strong>pure functions</strong> and they're trivial to test. Here's a mini test framework so you can see there's no magic:</p>
-<textarea class="code" data-lang="js" data-run>
-function test(name, fn) { try { fn(); console.log("✓", name); } catch (e) { console.log("✗", name, "-", e.message); } }
-const expect = (actual) => ({
-  toBe: (x) => { if (actual !== x) throw new Error(`expected ${x}, got ${actual}`); },
-  toEqual: (x) => { if (JSON.stringify(actual) !== JSON.stringify(x)) throw new Error(`expected ${JSON.stringify(x)}, got ${JSON.stringify(actual)}`); },
-  toThrow: () => { try { actual(); } catch { return; } throw new Error("expected to throw"); },
-});
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Use the terminal, Node.js and npm to create and run a project.</li>
+<li>Create a TypeScript project with Vite, and understand every file in it.</li>
+<li>Understand the important <code>tsconfig.json</code> settings.</li>
+<li>Save your work with Git.</li>
+<li>Write automated tests with Vitest.</li>
+</ul><p class="time">About 75 minutes. You'll need Node.js, a code editor (VS Code or Zed) and Git installed (see the Start here lesson).</p></section>
 
-const capitalize = s => s.charAt(0).toUpperCase() + s.slice(1);
-const sum = (...n) => n.reduce((a, b) => a + b, 0);
-
-test("capitalize basics", () => expect(capitalize("hello")).toBe("Hello"));
-test("capitalize empty", () => expect(capitalize("")).toBe(""));
-test("sum", () => expect(sum(1, 2, 3)).toBe(6));
-test("sum is wrong on purpose", () => expect(sum()).toBe(1));
-test("throws", () => expect(() => null.x).toThrow());
+<h2>Step 1: the terminal</h2>
+<p>The <dfn>terminal</dfn> (also called the command line or shell) is a text window where you type commands. Developers use it to create projects, install packages and run tools. Open one:</p>
+<ul>
+<li><strong>In your code editor</strong> (easiest): press <kbd>Ctrl</kbd> + <kbd>`</kbd> in VS Code or Zed. In VS Code there's also the menu <em>Terminal → New Terminal</em>.</li>
+<li><strong>Windows</strong>: "Terminal" or "PowerShell" from the Start menu. <strong>Mac</strong>: "Terminal" from Spotlight.</li>
+</ul>
+<p>A few commands you'll use all the time. Type each, then press <kbd>Enter</kbd>:</p>
+<textarea class="code" data-lang="bash">
+pwd              # "print working directory": which folder am I in?
+ls               # list the files here (on old Windows cmd: dir)
+cd projects      # "change directory": go into the projects folder
+cd ..            # go up one folder
+mkdir my-app     # make a new folder
+node -v          # which version of Node.js is installed?
+npm -v           # which version of npm?
 </textarea>
+<div class="callout tip"><span class="label">Terminal tips</span>Press <kbd>Tab</kbd> to auto-complete file and folder names. Press <kbd>↑</kbd> to bring back the previous command. Press <kbd>Ctrl</kbd> + <kbd>C</kbd> to stop a running program (like a dev server).</div>
 
-<h2>Vitest in a real project</h2>
+<h2>Step 2: Node.js and npm</h2>
+<p><strong>Node.js</strong> runs JavaScript outside the browser. It's what all the developer tools (TypeScript, Vite, test runners) run on. <strong>npm</strong> (Node Package Manager) comes with Node. It downloads <dfn>packages</dfn>: code other people have published for you to use. There are over two million of them.</p>
+<p>Every project has a <code>package.json</code> file listing its packages and its commands (called <dfn>scripts</dfn>):</p>
+<textarea class="code" data-lang="js" data-file="package.json">
+{
+  "name": "my-app",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0",
+    "vitest": "^2.1.0"
+  }
+}
+</textarea>
+<ul>
+<li><code>npm install</code> downloads everything listed into a folder called <code>node_modules</code>. That folder is big and can always be re-created, so it's never shared or committed.</li>
+<li><code>npm install some-package</code> adds a new package. Add <code>-D</code> for tools only needed while developing.</li>
+<li><code>npm run dev</code> runs the <code>"dev"</code> script.</li>
+<li><code>package-lock.json</code> records exact versions, so everyone gets the same ones. Keep it.</li>
+</ul>
+
+<h2>Step 3: create a TypeScript project with Vite</h2>
+<p><dfn>Vite</dfn> is a build tool: a development server that reloads the page instantly as you save, and a command that bundles your code for publishing. It understands TypeScript out of the box. Let's create a project. In your terminal, go to a folder where you keep projects, and run:</p>
+<textarea class="code" data-lang="bash">
+npm create vite@latest my-ts-app -- --template vanilla-ts
+cd my-ts-app
+npm install
+npm run dev
+</textarea>
+<ol class="steps">
+<li><code>npm create vite@latest</code> downloads Vite's project generator and creates a folder <code>my-ts-app</code> from the <code>vanilla-ts</code> template ("vanilla" means plain TypeScript, no framework).</li>
+<li><code>cd my-ts-app</code> moves into it; <code>npm install</code> downloads the packages.</li>
+<li><code>npm run dev</code> starts the dev server. It prints an address like <code>http://localhost:5173</code>. Open it in your browser.</li>
+</ol>
+<p>Now open the folder in your editor:</p>
+<div class="editor-pick"></div>
+<div data-ed="vscode"><p>Type <code>code .</code> in the terminal (the dot means "this folder"), or use <em>File → Open Folder</em>.</p></div>
+<div data-ed="zed"><p>Type <code>zed .</code> in the terminal, or use <em>File → Open…</em>. (On a Mac, the <code>zed</code> command needs a one-time setup: open the command palette and run <em>cli: install cli binary</em>. On Windows, if <code>zed</code> isn't found, just use the menu.)</p></div>
+<p>The important files:</p>
+<table>
+<tr><th>File</th><th>What it is</th></tr>
+<tr><td><code>index.html</code></td><td>The page. It loads <code>/src/main.ts</code> with <code>&lt;script type="module"&gt;</code>. Yes, a <code>.ts</code> file: Vite converts it on the fly.</td></tr>
+<tr><td><code>src/main.ts</code></td><td>Your code's starting point.</td></tr>
+<tr><td><code>src/style.css</code></td><td>Styles, imported from main.ts.</td></tr>
+<tr><td><code>tsconfig.json</code></td><td>TypeScript's settings.</td></tr>
+<tr><td><code>package.json</code></td><td>Packages and scripts.</td></tr>
+<tr><td><code>public/</code></td><td>Files copied as-is (images, icons).</td></tr>
+</table>
+<div class="try"><span class="label">Try it</span><ol>
+<li>Delete everything in <code>src/main.ts</code> and write <code>document.body.textContent = "Hello from TypeScript!";</code>. Save. The browser updates instantly.</li>
+<li>Now write <code>const n: number = "oops";</code>. Your editor underlines it in red, just like the editors on this site. VS Code and Zed both have TypeScript built in.</li>
+<li>Copy the typed to-do app from the Events lesson into <code>main.ts</code> (and its HTML into <code>index.html</code>) and get it running.</li>
+</ol></div>
+
+<h3>Vite doesn't check types; <code>tsc</code> does</h3>
+<p>Here's a detail that surprises people: to stay fast, Vite only <em>removes</em> types; it doesn't check them. Your editor shows errors as you type, and the <code>build</code> script runs the TypeScript compiler, <code>tsc</code>, which checks the whole project and refuses to build if anything's wrong. You can run the check on its own any time:</p>
+<textarea class="code" data-lang="bash">
+npx tsc --noEmit     # check every file for type errors, without producing output
+npm run build        # type-check, then bundle into the dist/ folder for publishing
+</textarea>
+<p>(<code>npx</code> runs a tool installed in the project, without needing a script for it.)</p>
+
+<h2>Step 4: <code>tsconfig.json</code></h2>
+<p>This file tells TypeScript how strict to be and what kind of JavaScript to target. The template's version is good. These are the settings worth understanding:</p>
+<textarea class="code" data-lang="js" data-file="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2022",              // which JavaScript version to output
+    "module": "ESNext",              // use import/export
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],  // which built-in types exist (DOM = browser)
+    "moduleResolution": "bundler",   // find imports the way Vite does
+    "noEmit": true,                  // Vite makes the JavaScript; tsc only checks
+
+    "strict": true,                  // ← the most important line. Always on.
+    "noUnusedLocals": true,          // warn about variables you never use
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,   // catch a missing break in switch
+    "noUncheckedIndexedAccess": true      // arr[i] might be undefined (recommended)
+  },
+  "include": ["src"]
+}
+</textarea>
+<p><code>"strict": true</code> switches on all the checks you've been relying on in this course: parameters must have types, <code>null</code> and <code>undefined</code> must be handled, and more. Never turn it off.</p>
+<p><code>noUncheckedIndexedAccess</code> is worth a mention: with it, <code>arr[0]</code> has type <code>T | undefined</code>, because the array might be empty. It's a little more work, and catches real bugs. Add it to your project.</p>
+
+<h2>Step 5: save your work with Git</h2>
+<p><dfn>Git</dfn> keeps a history of your project. Each time you reach a good point, you make a <dfn>commit</dfn>: a saved snapshot with a message. You can always go back. Vite already created a <code>.gitignore</code> file, which tells Git to skip <code>node_modules</code> and <code>dist</code>.</p>
+<textarea class="code" data-lang="bash">
+git init                                  # start tracking this folder (once)
+git add .                                 # stage all changes for the next snapshot
+git commit -m "Set up TypeScript project" # save the snapshot with a message
+git log --oneline                         # see the history
+
+# ...make more changes, then again:
+git add .
+git commit -m "Add to-do list"
+
+# Put it on GitHub (create an empty repository on github.com first)
+git remote add origin https://github.com/YOUR-NAME/my-ts-app.git
+git push -u origin main
+</textarea>
+<p>Commit small and often, with messages that say what changed. You'll learn branches and team workflows later in the course.</p>
+
+<h2>Step 6: automated tests</h2>
+<p>How do you know your code works? You try it. But every time you change something, you'd have to try <em>everything</em> again. A <dfn>test</dfn> is code that checks your code: it calls a function with known inputs and checks the output is what you expect. Then a computer can re-check everything in a second, every time you save.</p>
+<p>There's no magic in a testing tool. Here's a tiny one you can run right here, to see the idea:</p>
+<textarea class="code" data-lang="ts" data-run>
+// A mini test framework in 15 lines
+function test(name: string, fn: () => void): void {
+  try {
+    fn();
+    console.log("✓", name);
+  } catch (e) {
+    console.log("✗", name, "→", e instanceof Error ? e.message : e);
+  }
+}
+function expectEqual<T>(actual: T, expected: T): void {
+  if (actual !== expected) throw new Error(`expected ${expected}, got ${actual}`);
+}
+
+// The code being tested
+function slugify(title: string): string {
+  return title.trim().toLowerCase().replaceAll(" ", "-");
+}
+
+// The tests
+test("lowercases", () => expectEqual(slugify("Hello"), "hello"));
+test("replaces spaces", () => expectEqual(slugify("my first post"), "my-first-post"));
+test("trims the ends", () => expectEqual(slugify("  hi  "), "hi"));
+test("collapses repeated spaces", () => expectEqual(slugify("a   b"), "a-b"));   // fails!
+</textarea>
+<p>The last test fails: <code>"a   b"</code> becomes <code>"a---b"</code>. The test found a bug. Fix <code>slugify</code> (hint: <code>.split(/\s+/).join("-")</code> from the regex lesson) and run again until everything passes.</p>
+
+<h3>Vitest</h3>
+<p><dfn>Vitest</dfn> is a real test runner that works with Vite and TypeScript with no extra setup. Install it and add a script:</p>
 <textarea class="code" data-lang="bash">
 npm install -D vitest
-# package.json: "scripts": { "test": "vitest" }
-npm test        # watch mode: re-runs on save
+# then in package.json "scripts", add:  "test": "vitest"
+npm test          # runs all tests, and re-runs them every time you save
 </textarea>
-<textarea class="code" data-lang="js" data-file="cart.test.js">
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { addItem, total } from "./cart.js";
+<p>Put the code to test in its own file, and the tests in a file next to it ending in <code>.test.ts</code>:</p>
+<textarea class="code" data-lang="ts" data-file="src/cart.ts">
+export type CartItem = { name: string; price: number; qty: number };
 
-describe("cart", () => {
-  let cart;
-  beforeEach(() => { cart = []; });
+export function cartTotal(items: CartItem[]): number {
+  return items.reduce((sum, item) => sum + item.price * item.qty, 0);
+}
 
-  it("adds an item", () => {
-    expect(addItem(cart, { id: 1, price: 5 })).toEqual([{ id: 1, price: 5 }]);
+export function addItem(items: CartItem[], item: CartItem): CartItem[] {
+  const existing = items.find((i) => i.name === item.name);
+  if (existing) {
+    return items.map((i) => (i.name === item.name ? { ...i, qty: i.qty + item.qty } : i));
+  }
+  return [...items, item];
+}
+</textarea>
+<textarea class="code" data-lang="ts" data-file="src/cart.test.ts">
+import { describe, it, expect } from "vitest";
+import { cartTotal, addItem, type CartItem } from "./cart";
+
+describe("cartTotal", () => {
+  it("is 0 for an empty cart", () => {
+    expect(cartTotal([])).toBe(0);
   });
-  it("totals prices", () => {
-    expect(total([{ price: 5 }, { price: 7.5 }])).toBeCloseTo(12.5);
+
+  it("multiplies price by quantity", () => {
+    expect(cartTotal([{ name: "Pen", price: 1.5, qty: 2 }])).toBe(3);
   });
-  it("calls a callback", () => {
-    const cb = vi.fn();
-    [1, 2].forEach(cb);
-    expect(cb).toHaveBeenCalledTimes(2);
+});
+
+describe("addItem", () => {
+  const pen: CartItem = { name: "Pen", price: 1, qty: 1 };
+
+  it("adds a new item", () => {
+    expect(addItem([], pen)).toEqual([pen]);       // toEqual compares contents
   });
-  it("rejects bad input", async () => {
-    await expect(fetchUser("")).rejects.toThrow("id required");
+
+  it("increases qty for an item already in the cart", () => {
+    expect(addItem([pen], pen)).toEqual([{ ...pen, qty: 2 }]);
+  });
+
+  it("doesn't change the original array", () => {
+    const cart = [pen];
+    addItem(cart, pen);
+    expect(cart).toEqual([pen]);
   });
 });
 </textarea>
 <ul>
-<li><strong>Arrange → Act → Assert</strong> in every test.</li>
-<li>Test behavior, not implementation details. One reason to fail per test.</li>
-<li>Test pyramid: many unit tests, some integration tests, a few end-to-end tests (Playwright).</li>
-<li>Mock only the boundaries (network, clock, randomness).</li>
-<li>When you find a bug, first write a failing test that reproduces it.</li>
+<li><code>describe</code> groups related tests; <code>it</code> is one test, with a sentence saying what should happen.</li>
+<li><code>expect(actual).toBe(expected)</code> for simple values; <code>.toEqual</code> to compare the contents of objects and arrays.</li>
+<li>The tests are TypeScript too, so a test that calls your function wrongly is caught by the type checker.</li>
 </ul>
+<div class="callout"><span class="label">Good testing habits</span><ul>
+<li>Test <strong>pure functions</strong> first (same input → same output, no DOM or network). Keep your logic in functions like that, and they're easy to test.</li>
+<li>Test the edge cases: empty arrays, zero, empty strings, very large values.</li>
+<li>When you find a bug, first write a test that fails because of it, then fix the code. That bug can never sneak back.</li>
+<li>Types and tests work together: TypeScript catches "wrong kind of value", tests catch "wrong answer".</li>
+</ul></div>
 
-<h2>TypeScript primer</h2>
-<p>TypeScript is JavaScript plus types, checked at build time and erased before running. It catches typos, wrong argument shapes, and missing null checks. Most React and Three.js code in the wild is TypeScript.</p>
-<textarea class="code" data-lang="bash">
-npm create vite@latest app -- --template vanilla-ts
-npx tsc --noEmit        # type-check only
-</textarea>
-<textarea class="code" data-lang="js" data-file="types-tour.ts">
-// Basic annotations (usually inferred; annotate function boundaries)
-let count: number = 0;
-const name = "Ada";                       // inferred: string
-const ids: number[] = [1, 2, 3];
-const pair: [string, number] = ["age", 36];   // tuple
+<h3>Linting and formatting</h3>
+<p>Two more tools you'll find in almost every project. You want them working inside your editor, as you type:</p>
+<ul>
+<li><strong>ESLint</strong> finds likely bugs and bad patterns (an unused variable, a missing <code>await</code>). With <code>typescript-eslint</code> it understands types.</li>
+<li><strong>Prettier</strong> formats your code automatically on save, so you never argue about spaces again.</li>
+</ul>
+<div data-ed="vscode"><p>Install the <em>ESLint</em> and <em>Prettier</em> extensions, and turn on "Format On Save" in the settings.</p></div>
+<div data-ed="zed"><p>Both are built in. It formats JavaScript, TypeScript, CSS and HTML with Prettier when you save, and shows ESLint's warnings in projects that have an ESLint config. See the <a href="ide-tools.html">tools guide</a> for the setting that also lets ESLint fix problems on save.</p></div>
 
-// Objects: interface or type
-interface User { id: number; name: string; email?: string; readonly created: Date }
-type Role = "admin" | "editor" | "viewer";          // union of literals
-type ID = number | string;
+<section class="recap"><h2>Recap</h2><ul>
+<li>Terminal basics: <code>cd</code>, <code>ls</code>, <code>mkdir</code>; <kbd>Tab</kbd> completes, <kbd>Ctrl</kbd>+<kbd>C</kbd> stops.</li>
+<li><code>npm install</code> fetches packages into <code>node_modules</code>; <code>npm run &lt;script&gt;</code> runs <code>package.json</code> scripts.</li>
+<li><code>npm create vite@latest app -- --template vanilla-ts</code> creates a TypeScript project; <code>npm run dev</code> runs it.</li>
+<li>Vite strips types; <code>tsc --noEmit</code> (and <code>npm run build</code>) check them. Keep <code>"strict": true</code>.</li>
+<li>Git: <code>git add .</code> then <code>git commit -m "..."</code>, often.</li>
+<li>Vitest: <code>describe</code>, <code>it</code>, <code>expect(...).toBe/toEqual</code> in <code>*.test.ts</code> files; <code>npm test</code>.</li>
+</ul></section>
 
-function greet(u: User, role: Role = "viewer"): string {
-  return `${u.name} (${role})`;
-}
-greet({ id: 1, name: "Ada", created: new Date() });
-// greet({ id: "1" })  // ✖ compile error: wrong type, missing fields
-
-// Narrowing: the compiler tracks what you've checked
-function len(x: string | string[] | null) {
-  if (x === null) return 0;
-  return typeof x === "string" ? x.length : x.length;
-}
-
-// Generics: reusable and type-safe
-function first<T>(arr: T[]): T | undefined { return arr[0]; }
-const n = first([1, 2, 3]);       // number | undefined
-async function getJSON<T>(url: string): Promise<T> { return (await fetch(url)).json(); }
-
-// Utility types
-type Preview = Pick<User, "id" | "name">;
-type Draft = Partial<User>;
-type Dict = Record<string, number>;
-</textarea>
-<div class="callout"><span class="label">Tip</span>Turn on <code>"strict": true</code> in <code>tsconfig.json</code>. Avoid <code>any</code>; use <code>unknown</code> and narrow. Types at the edges (API responses, props) pay off most.</div>
-
-<section class="exercises"><h2>Exercises</h2><ol>
-<li>Write 6 tests for a <code>slugify</code> function, including edge cases (empty string, emoji, multiple spaces). Fix the function until green.</li>
-<li>Write a failing test for a bug in your to-do app, then fix it.</li>
-<li>Convert a small JS utility module to TypeScript with strict mode and fix all errors.</li>
-<li>Type an API response (<code>Todo[]</code>) and a generic <code>fetchJson&lt;T&gt;</code>.</li>
-<li>Model a state machine with a discriminated union: <code>{status:"idle"} | {status:"loading"} | {status:"error", message:string} | {status:"ok", data:T}</code>.</li>
+<section class="exercises"><h2>Practice</h2><ol>
+<li>Create the Vite TypeScript project above, replace the starter code with your own "Hello" page, and commit it with Git.</li>
+<li>Move the <code>slugify</code> function into <code>src/slugify.ts</code>, export it, and write at least five Vitest tests for it, including edge cases (empty string, emoji, several spaces, capital letters). Make them all pass.</li>
+<li>Turn on <code>noUncheckedIndexedAccess</code> in <code>tsconfig.json</code>, run <code>npx tsc --noEmit</code>, and fix whatever it finds.</li>
+<li>Put the project on GitHub.</li>
 </ol></section>
 
-<section class="checkpoint"><h2>Checkpoint</h2>
-<details><summary>Do TypeScript types exist at runtime?</summary>No. They're erased during compilation, so you still need runtime validation (e.g., zod) for external data.</details>
-<details><summary>What makes code easy to test?</summary>Pure functions with explicit inputs/outputs and dependencies passed in rather than hard-coded.</details>
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>Why isn't <code>node_modules</code> committed to Git?</summary>It's huge and can be re-created exactly from <code>package.json</code> and <code>package-lock.json</code> with <code>npm install</code>.</details>
+<details><summary>Does the Vite dev server stop you if you have a type error?</summary>No. Vite only strips types. Your editor, <code>npx tsc --noEmit</code>, and <code>npm run build</code> do the checking.</details>
+<details><summary>What's the difference between <code>toBe</code> and <code>toEqual</code>?</summary><code>toBe</code> checks that two values are exactly the same (<code>===</code>). <code>toEqual</code> checks that objects or arrays have the same contents.</details>
 </section>
 </article></main>
 <script src="assets/lessons.js"></script>

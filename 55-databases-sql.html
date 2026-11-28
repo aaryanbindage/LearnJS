@@ -208,7 +208,7 @@ const hits = await r.incr(`rate:${ip}:${Math.floor(Date.now() / 60000)}`);  // a
 await r.expire(`rate:${ip}:${Math.floor(Date.now() / 60000)}`, 60);
 await r.zAdd("leaderboard", [{ score: 4200, value: "ada" }]);              // sorted set: ranked leaderboards
 const top = await r.zRangeWithScores("leaderboard", 0, 9, { REV: true });
-await r.publish("chat:room1", JSON.stringify({ text: "hi" }));              // pub/sub backplane for WebSockets (Lesson 59)
+await r.publish("chat:room1", JSON.stringify({ text: "hi" }));              // pub/sub backplane for WebSockets (see “Real-time: WebSockets & multiplayer state”)
 // Redis is memory-first: treat it as a cache or fast store with a known recovery story, not your only copy of important data.
 </textarea>
 <h3>SQL vs NoSQL: choosing</h3>

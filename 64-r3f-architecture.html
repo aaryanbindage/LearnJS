@@ -117,7 +117,7 @@ function Loader() { const { progress } = useProgress(); return <Html center>{pro
 <tr><td>Physics</td><td><code>@react-three/rapier</code> (Rapier WASM), <code>@react-three/cannon</code></td></tr>
 <tr><td>Animation</td><td><code>useAnimations</code> (glTF clips), <code>@react-spring/three</code>, <code>maath</code> damping helpers</td></tr>
 <tr><td>Debug</td><td><code>Stats</code>, <code>r3f-perf</code>, <code>leva</code> (tweak panels), React DevTools + <code>three-devtools</code></td></tr>
-<tr><td>XR</td><td><code>@react-three/xr</code> (Lesson 70)</td></tr>
+<tr><td>XR</td><td><code>@react-three/xr</code> (“<a href="70-webxr-audio.html">WebXR, spatial audio &amp; 3D UX</a>”)</td></tr>
 </table>
 
 <h2>Render loop control and performance</h2>
@@ -152,7 +152,7 @@ src/
 </textarea>
 
 <section class="exercises"><h2>Exercises</h2><ol>
-<li>Rebuild the Lesson 36 scene in R3F: lights, shadows, orbit controls, a clickable object that changes color via a store.</li>
+<li>Rebuild the “<a href="36-three-shaders.html">Shaders (GLSL)</a>” scene in R3F: lights, shadows, orbit controls, a clickable object that changes color via a store.</li>
 <li>Take a version that uses <code>setState</code> in <code>useFrame</code>, profile it with the React Profiler, then refactor to refs and show the render count drop.</li>
 <li>Render 5,000 animated cubes with <code>&lt;Instances&gt;</code> and update them in <code>useFrame</code>; display draw calls with <code>r3f-perf</code>.</li>
 <li>Load a glTF with <code>gltfjsx --transform</code>, make individual parts clickable and recolor materials through leva.</li>

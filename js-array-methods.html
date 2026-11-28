@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Array methods: map, filter, find &amp; reduce</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="js-array-methods">
+<main><article>
+<h1>Array methods: map, filter, find &amp; reduce</h1>
+<p class="lede">In the arrays lesson you wrote loops to transform lists, keep some items, and add things up. Those jobs are so common that arrays have built-in methods for each one. You hand them a callback (remember those?) and they do the looping for you.</p>
+
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Transform every item with <code>map</code>.</li>
+<li>Keep only matching items with <code>filter</code>.</li>
+<li>Find one item with <code>find</code>, and test items with <code>some</code> and <code>every</code>.</li>
+<li>Combine everything into one value with <code>reduce</code>.</li>
+<li>Sort arrays correctly, and chain methods together.</li>
+<li>See how TypeScript follows the types through every step.</li>
+</ul><p class="time">About 55 minutes. Make sure you're comfortable with arrow functions and callbacks first.</p></section>
+
+<h2>The idea</h2>
+<p>Here's the "double every number" loop from before:</p>
+<textarea class="code" data-lang="js" data-run>
+const numbers = [1, 2, 3, 4];
+const doubled = [];
+for (const n of numbers) {
+  doubled.push(n * 2);
+}
+console.log(doubled);
+</textarea>
+<p>Only one part of that is about <em>doubling</em>: <code>n * 2</code>. Everything else (making an empty array, looping, pushing) is the same boilerplate every time. Array methods let you write only the interesting part:</p>
+<textarea class="code" data-lang="js" data-run>
+const numbers = [1, 2, 3, 4];
+const doubled = numbers.map((n) => n * 2);
+console.log(doubled);
+</textarea>
+<p>Same result. <code>map</code> does the loop and the pushing; you give it a callback that says what to do with <strong>one</strong> item. It calls your callback once per item.</p>
+<div class="callout analogy"><span class="label">Analogy</span>Think of a factory conveyor belt. Each item on the belt goes past a machine. <code>map</code> is a machine that changes each item. <code>filter</code> is a machine that lets some items through and drops others. <code>reduce</code> is the box at the end that collects everything into one result.</div>
+
+<h2><code>map</code>: transform every item</h2>
+<p><code>map</code> makes a <strong>new array, the same length</strong>, where each item is whatever your callback returned for the original item.</p>
+<textarea class="code" data-lang="js" data-run>
+const prices = [10, 25, 4];
+const withTax = prices.map((p) => p * 1.2);
+console.log(withTax);
+
+const names = ["ada", "grace", "linus"];
+const shouted = names.map((name) => name.toUpperCase());
+console.log(shouted);
+
+const lengths = names.map((name) => name.length);
+console.log(lengths);   // [3, 5, 5]
+
+console.log(names);     // the original is unchanged
+</textarea>
+<p>It's especially useful with arrays of objects, to pull out one property or build something new from each:</p>
+<textarea class="code" data-lang="js" data-run>
+const users = [
+  { name: "Ada", age: 36 },
+  { name: "Grace", age: 45 },
+  { name: "Linus", age: 28 },
+];
+
+const justNames = users.map((u) => u.name);
+console.log(justNames);   // ["Ada", "Grace", "Linus"]
+
+const labels = users.map((u) => `${u.name} (${u.age})`);
+console.log(labels);
+</textarea>
+<p>Your callback can also receive the item's index as a second parameter:</p>
+<textarea class="code" data-lang="js" data-run>
+const podium = ["Ada", "Grace", "Linus"];
+console.log(podium.map((name, i) => `${i + 1}. ${name}`));
+</textarea>
+<div class="try"><span class="label">Try it</span>Given <code>const temps = [0, 20, 37, 100]</code> (Celsius), use <code>map</code> to make an array in Fahrenheit: <code>c * 9 / 5 + 32</code>.</div>
+
+<h2><code>filter</code>: keep some items</h2>
+<p><code>filter</code> makes a new array containing only the items where your callback returns <code>true</code>. The callback is a yes/no question asked of each item.</p>
+<textarea class="code" data-lang="js" data-run>
+const scores = [90, 45, 72, 38, 100];
+const passing = scores.filter((s) => s >= 50);
+console.log(passing);   // [90, 72, 100]
+
+const words = ["sun", "elephant", "cat", "computer"];
+const longWords = words.filter((w) => w.length > 5);
+console.log(longWords);
+
+const users = [
+  { name: "Ada", active: true },
+  { name: "Grace", active: false },
+  { name: "Linus", active: true },
+];
+console.log(users.filter((u) => u.active));
+</textarea>
+<p>A neat trick: to remove an item from a list without changing the original, keep everything that <em>isn't</em> it:</p>
+<textarea class="code" data-lang="js" data-run>
+const todos = ["shop", "cook", "clean"];
+const remaining = todos.filter((t) => t !== "cook");
+console.log(remaining);
+</textarea>
+
+<div class="quiz"><p>What does <code>[1, 2, 3, 4, 5, 6].filter((n) =&gt; n % 2 === 0)</code> give?</p>
+<button>[1, 3, 5]</button><button data-correct>[2, 4, 6]</button><button>[true, false, true, false, true, false]</button><button>3</button>
+<p class="why">It keeps the numbers whose remainder when divided by 2 is 0, which are the even numbers. (The third answer is what <code>map</code> with the same callback would give!)</p></div>
+
+<h2><code>find</code>, <code>some</code>, <code>every</code></h2>
+<p><code>find</code> returns the <strong>first item</strong> that matches (not an array), or <code>undefined</code> if nothing does:</p>
+<textarea class="code" data-lang="js" data-run>
+const users = [
+  { id: 1, name: "Ada" },
+  { id: 2, name: "Grace" },
+  { id: 3, name: "Linus" },
+];
+
+const grace = users.find((u) => u.id === 2);
+console.log(grace);                   // { id: 2, name: "Grace" }
+
+const nobody = users.find((u) => u.id === 99);
+console.log(nobody);                  // undefined
+
+console.log(users.findIndex((u) => u.name === "Linus"));   // 2: its position
+</textarea>
+<p><code>some</code> asks "does at least one item match?" and <code>every</code> asks "do all of them match?". Both return a boolean:</p>
+<textarea class="code" data-lang="js" data-run>
+const ages = [12, 19, 34, 8];
+console.log(ages.some((a) => a >= 18));    // true: at least one adult
+console.log(ages.every((a) => a >= 18));   // false: not all adults
+</textarea>
+
+<h2><code>reduce</code>: combine everything into one value</h2>
+<p><code>reduce</code> is the most powerful method and the hardest to read at first, so let's go slowly. It's the accumulator pattern in method form:</p>
+<textarea class="code" data-lang="js" data-run>
+const prices = [10, 25, 4];
+
+// The loop version:
+let total = 0;
+for (const p of prices) {
+  total = total + p;
+}
+console.log(total);
+
+// The reduce version:
+const total2 = prices.reduce((sum, p) => sum + p, 0);
+console.log(total2);
+</textarea>
+<p>Compare the pieces:</p>
+<table>
+<tr><th>Loop version</th><th>reduce version</th></tr>
+<tr><td><code>let total = 0</code></td><td>the <code>0</code> at the end: the starting value</td></tr>
+<tr><td><code>total = total + p</code></td><td><code>(sum, p) =&gt; sum + p</code>: take the running total and the next item, return the new total</td></tr>
+</table>
+<p>Here's what happens, step by step:</p>
+<table>
+<tr><th>Step</th><th><code>sum</code> (so far)</th><th><code>p</code> (item)</th><th>returns</th></tr>
+<tr><td>1</td><td>0 (the starting value)</td><td>10</td><td>10</td></tr>
+<tr><td>2</td><td>10</td><td>25</td><td>35</td></tr>
+<tr><td>3</td><td>35</td><td>4</td><td>39</td></tr>
+</table>
+<p>Whatever the callback returns becomes <code>sum</code> for the next step. After the last item, that's the result.</p>
+<textarea class="code" data-lang="js" data-run>
+const cart = [
+  { name: "Pen", price: 1, qty: 3 },
+  { name: "Mug", price: 8, qty: 1 },
+];
+const cartTotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+console.log(cartTotal);   // 11
+
+const words = ["one", "three", "five"];
+const longest = words.reduce((best, w) => (w.length > best.length ? w : best), "");
+console.log(longest);     // "three"
+</textarea>
+<div class="callout tip"><span class="label">Tip</span>Always give <code>reduce</code> a starting value (the second argument). And if a <code>reduce</code> gets hard to read, a plain <code>for...of</code> loop is perfectly fine. Clear code beats clever code.</div>
+
+<h2>Sorting</h2>
+<p><code>sort</code> puts an array in order, but it has two surprises. First, by default it sorts everything <em>as text</em>, which gives odd results for numbers:</p>
+<textarea class="code" data-lang="js" data-run>
+console.log(["banana", "apple", "cherry"].sort());   // fine for words
+console.log([10, 9, 100, 1].sort());                 // [1, 10, 100, 9]?!
+</textarea>
+<p>As text, "100" comes before "9" because "1" comes before "9", like in a dictionary. To sort numbers, give <code>sort</code> a compare function. <code>(a, b) =&gt; a - b</code> sorts smallest first; <code>(a, b) =&gt; b - a</code> sorts biggest first:</p>
+<textarea class="code" data-lang="js" data-run>
+const nums = [10, 9, 100, 1];
+console.log([...nums].sort((a, b) => a - b));   // [1, 9, 10, 100]
+console.log([...nums].sort((a, b) => b - a));   // [100, 10, 9, 1]
+
+const users = [{ name: "Grace", age: 45 }, { name: "Ada", age: 36 }, { name: "Linus", age: 28 }];
+console.log([...users].sort((a, b) => a.age - b.age).map((u) => u.name));
+console.log([...users].sort((a, b) => a.name.localeCompare(b.name)).map((u) => u.name));
+</textarea>
+<p>The second surprise: <code>sort</code> changes the original array (unlike <code>map</code> and <code>filter</code>). That's why the examples copy first with <code>[...nums]</code>. Newer browsers also have <code>toSorted()</code>, which returns a sorted copy.</p>
+
+<h2>Chaining methods</h2>
+<p>Since <code>map</code> and <code>filter</code> return arrays, you can call another method straight on the result. Put each step on its own line and it reads like a recipe:</p>
+<textarea class="code" data-lang="js" data-run>
+const products = [
+  { name: "Notebook", price: 3, inStock: true },
+  { name: "Pen", price: 1, inStock: false },
+  { name: "Backpack", price: 25, inStock: true },
+  { name: "Lamp", price: 18, inStock: true },
+];
+
+const affordableInStock = products
+  .filter((p) => p.inStock)          // keep in-stock ones
+  .filter((p) => p.price < 20)       // keep cheaper ones
+  .map((p) => `${p.name}: $${p.price}`);   // turn each into a label
+
+console.log(affordableInStock);
+
+const stockValue = products
+  .filter((p) => p.inStock)
+  .reduce((sum, p) => sum + p.price, 0);
+console.log("Value of stock:", stockValue);
+</textarea>
+
+<h2>Which method do I need?</h2>
+<table>
+<tr><th>I want to…</th><th>Use</th><th>Gives back</th></tr>
+<tr><td>change every item</td><td><code>map</code></td><td>new array, same length</td></tr>
+<tr><td>keep some items</td><td><code>filter</code></td><td>new array, same or shorter</td></tr>
+<tr><td>get the first match</td><td><code>find</code></td><td>one item, or <code>undefined</code></td></tr>
+<tr><td>ask "any?" / "all?"</td><td><code>some</code> / <code>every</code></td><td><code>true</code> or <code>false</code></td></tr>
+<tr><td>combine into one value</td><td><code>reduce</code></td><td>anything (a number, string, object…)</td></tr>
+<tr><td>just do something with each item</td><td><code>for...of</code> (or <code>forEach</code>)</td><td>nothing</td></tr>
+</table>
+
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Forgetting to return</strong> in a braces callback: <code>arr.map((x) =&gt; { x * 2 })</code> gives <code>[undefined, undefined, …]</code>.</li>
+<li><strong>Using <code>map</code> to filter</strong>: <code>map</code> always returns the same number of items.</li>
+<li><strong>Expecting <code>find</code> to return an array</strong>: it returns one item (or <code>undefined</code>). Use <code>filter</code> for all matches.</li>
+<li><strong>Sorting numbers without a compare function.</strong></li>
+<li><strong>Forgetting <code>reduce</code>'s starting value.</strong></li>
+</ul></div>
+
+<h2 class="ts-head">In TypeScript</h2>
+<p>TypeScript follows the types through every method. You almost never need to write types inside the callbacks, because TypeScript already knows what each item is. Hover over the variables below, and over <code>p</code> inside the callbacks:</p>
+<textarea class="code" data-lang="ts" data-run>
+type Product = { name: string; price: number; inStock: boolean };
+
+const products: Product[] = [
+  { name: "Notebook", price: 3, inStock: true },
+  { name: "Pen", price: 1, inStock: false },
+];
+
+const names = products.map((p) => p.name);            // string[]
+const prices = products.map((p) => p.price);          // number[]
+const available = products.filter((p) => p.inStock);  // Product[]
+const total = prices.reduce((sum, n) => sum + n, 0);  // number
+const allCheap = products.every((p) => p.price < 5);  // boolean
+console.log(names, prices, available, total, allCheap);
+</textarea>
+<p>Notice <code>map</code> changes the type: <code>products</code> is a <code>Product[]</code>, but mapping to <code>p.name</code> gives a <code>string[]</code>. TypeScript works that out from what your callback returns.</p>
+
+<h3>Mistakes caught inside callbacks</h3>
+<textarea class="code" data-lang="ts" data-run>
+type User = { name: string; age: number };
+const users: User[] = [{ name: "Ada", age: 36 }, { name: "Grace", age: 45 }];
+
+const adults = users.filter((u) => u.agee >= 18);   // ✖ typo in property
+const upper = users.map((u) => u.age.toUpperCase()); // ✖ age is a number
+const nums = users.map((u) => { u.age * 2 });        // hover: void[] (forgot to return!)
+</textarea>
+<p>Look at the last line. There's no red squiggle, but hover over <code>nums</code>: its type is <code>void[]</code>, "an array of nothing". That's the forgotten-<code>return</code> bug made visible. As soon as you try to use <code>nums</code> as numbers, TypeScript will complain.</p>
+
+<h3><code>find</code> might find nothing</h3>
+<p>This is one of TypeScript's most useful checks. <code>find</code> returns <code>undefined</code> if nothing matches, and TypeScript makes you handle that:</p>
+<textarea class="code" data-lang="ts" data-run>
+type User = { id: number; name: string };
+const users: User[] = [{ id: 1, name: "Ada" }, { id: 2, name: "Grace" }];
+
+const found = users.find((u) => u.id === 3);   // hover: User | undefined
+console.log(found.name);                       // ✖ 'found' is possibly 'undefined'
+
+if (found) {
+  console.log(found.name);     // ✔ inside this if, TypeScript knows it's a User
+} else {
+  console.log("No user with that id");
+}
+</textarea>
+<p>In plain JavaScript, <code>found.name</code> would crash with "Cannot read properties of undefined" the first time someone searched for a missing id, which might be weeks after you wrote the code. TypeScript makes you think about it now. Inside <code>if (found)</code>, the type becomes just <code>User</code>. This "checking narrows the type" idea is the subject of the next lesson.</p>
+
+<h3>Typing <code>reduce</code>'s result</h3>
+<p>When <code>reduce</code> builds something that isn't the same type as the items, give the starting value a type so TypeScript knows what you're building:</p>
+<textarea class="code" data-lang="ts" data-run>
+const words = ["apple", "avocado", "banana", "blueberry", "cherry"];
+
+// Group words by first letter: { a: [...], b: [...], c: [...] }
+const byLetter = words.reduce((groups, w) => {
+  const letter = w[0];
+  groups[letter] = [...(groups[letter] ?? []), w];
+  return groups;
+}, {} as Record<string, string[]>);
+
+console.log(byLetter);
+</textarea>
+<p><code>{} as Record&lt;string, string[]&gt;</code> says "this empty object will be a dictionary of string arrays". Without it, TypeScript would think the result is just <code>{}</code>, an object with no properties, and complain when you add some.</p>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li><code>map</code> transforms each item; <code>filter</code> keeps matching items. Both return new arrays and leave the original alone.</li>
+<li><code>find</code> returns the first match or <code>undefined</code>. <code>some</code>/<code>every</code> return booleans.</li>
+<li><code>reduce((acc, item) =&gt; newAcc, start)</code> combines everything into one value. Always pass a start value.</li>
+<li>Sort numbers with <code>sort((a, b) =&gt; a - b)</code>. <code>sort</code> changes the original, so copy first.</li>
+<li>Chain methods, one step per line.</li>
+<li>TypeScript infers callback parameter types, tracks how <code>map</code> changes types, and makes you handle <code>find</code>'s possible <code>undefined</code>.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<p>Use this data for every exercise:</p>
+<textarea class="code" data-lang="ts" data-run>
+type Movie = { title: string; year: number; rating: number; genre: string };
+
+const movies: Movie[] = [
+  { title: "Arrival", year: 2016, rating: 7.9, genre: "sci-fi" },
+  { title: "Up", year: 2009, rating: 8.3, genre: "animation" },
+  { title: "Alien", year: 1979, rating: 8.5, genre: "sci-fi" },
+  { title: "Paddington 2", year: 2017, rating: 7.8, genre: "comedy" },
+  { title: "Coco", year: 2017, rating: 8.4, genre: "animation" },
+];
+
+// Your answers here
+
+</textarea>
+<ol>
+<li>Get an array of just the titles.
+<details><summary>Show answer</summary><code>movies.map((m) =&gt; m.title)</code></details></li>
+<li>Get all the sci-fi movies.
+<details><summary>Show answer</summary><code>movies.filter((m) =&gt; m.genre === "sci-fi")</code></details></li>
+<li>Find the movie called "Coco" and print its year. Handle the case where it isn't found.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const coco = movies.find((m) => m.title === "Coco");
+if (coco) {
+  console.log(coco.year);
+} else {
+  console.log("Not found");
+}
+// or, shorter: console.log(coco?.year ?? "Not found");
+</textarea></details></li>
+<li>Calculate the average rating.
+<details><summary>Show answer</summary><code>movies.reduce((sum, m) =&gt; sum + m.rating, 0) / movies.length</code></details></li>
+<li>Get the titles of movies made after 2010, sorted by rating, best first.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const recentBest = movies
+  .filter((m) => m.year > 2010)
+  .sort((a, b) => b.rating - a.rating)
+  .map((m) => m.title);
+console.log(recentBest);   // ["Coco", "Arrival", "Paddington 2"]
+</textarea></details></li>
+<li>Is any movie rated above 8.4? Are all of them from after 1980?
+<details><summary>Show answer</summary><code>movies.some((m) =&gt; m.rating &gt; 8.4)</code> is true (Alien). <code>movies.every((m) =&gt; m.year &gt; 1980)</code> is false (Alien again).</details></li>
+</ol></section>
+
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>What's the difference between <code>map</code> and <code>filter</code>?</summary><code>map</code> changes every item and returns the same number of items. <code>filter</code> keeps or drops items unchanged, so it may return fewer.</details>
+<details><summary>Why is the type of <code>arr.find(...)</code> <code>Item | undefined</code>?</summary>Because nothing might match, in which case <code>find</code> returns <code>undefined</code>.</details>
+<details><summary>What does the <code>0</code> in <code>reduce((s, x) =&gt; s + x, 0)</code> do?</summary>It's the starting value of the accumulator <code>s</code>.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

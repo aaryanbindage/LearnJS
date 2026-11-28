@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strings: working with text</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="js-strings">
+<main><article>
+<h1>Strings: working with text</h1>
+<p class="lede">Names, messages, search boxes, URLs, passwords: a huge amount of programming is working with text. In this lesson you'll learn to build strings, take them apart, and transform them.</p>
+
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Write strings with quotes, and put quotes or new lines inside them.</li>
+<li>Build strings from variables with <strong>template literals</strong>.</li>
+<li>Get a string's length and pick out single characters.</li>
+<li>Use the most common string methods: changing case, trimming, searching, cutting and replacing.</li>
+<li>Use TypeScript's autocomplete to explore what strings can do.</li>
+</ul><p class="time">About 45 minutes.</p></section>
+
+<h2>Making strings</h2>
+<p>A <dfn>string</dfn> is a sequence of characters (letters, digits, spaces, symbols, emoji) wrapped in quotes. There are three kinds of quotes:</p>
+<textarea class="code" data-lang="js" data-run>
+const a = "double quotes";
+const b = 'single quotes';
+const c = `backticks`;
+console.log(a, b, c);
+</textarea>
+<p>Double and single quotes work exactly the same; pick one and be consistent. Backticks (the <kbd>`</kbd> key, usually top-left of your keyboard, under <kbd>Esc</kbd>) have superpowers you'll see in a moment.</p>
+
+<h3>Quotes inside strings</h3>
+<p>What if your text contains a quote mark? If it matches the outer quotes, JavaScript thinks the string has ended early:</p>
+<textarea class="code" data-lang="js" data-run>
+const broken = 'It's sunny';   // the ' in It's ends the string! Notice the red squiggle.
+</textarea>
+<p>Three ways to fix it:</p>
+<textarea class="code" data-lang="js" data-run>
+const fix1 = "It's sunny";          // use the other kind of quote outside
+const fix2 = 'It\'s sunny';         // or "escape" the quote with a backslash
+const fix3 = `It's "really" sunny`; // backticks can hold both kinds
+console.log(fix1, fix2, fix3);
+</textarea>
+<p>The backslash <code>\</code> is called an <dfn>escape character</dfn>. It means "the next character is special". The most useful one is <code>\n</code>, which means "new line":</p>
+<textarea class="code" data-lang="js" data-run>
+console.log("Line one\nLine two\nLine three");
+</textarea>
+
+<h2>Joining strings together</h2>
+<p>You've seen that <code>+</code> glues strings together. Remember to add spaces yourself, because JavaScript won't:</p>
+<textarea class="code" data-lang="js" data-run>
+const first = "Ada";
+const last = "Lovelace";
+console.log(first + last);          // "AdaLovelace" (no space!)
+console.log(first + " " + last);    // "Ada Lovelace"
+
+const age = 36;
+console.log(first + " is " + age + " years old.");
+</textarea>
+<p>That last line works, but it's hard to read, and it's easy to forget a space. There's a much better way.</p>
+
+<h2>Template literals: the easy way to build strings</h2>
+<p>A string in backticks is called a <dfn>template literal</dfn>. Inside it, you can drop in any value with <code>${ }</code> (a dollar sign and curly braces):</p>
+<textarea class="code" data-lang="js" data-run>
+const name = "Ada";
+const age = 36;
+console.log(`${name} is ${age} years old.`);
+</textarea>
+<p>Read <code>${name}</code> as "put the value of <code>name</code> here". It reads like a fill-in-the-blanks sentence, and the spaces are exactly where you can see them.</p>
+<p>You can put any expression inside <code>${ }</code>, even math:</p>
+<textarea class="code" data-lang="js" data-run>
+const price = 4;
+const qty = 3;
+console.log(`${qty} items at $${price} each = $${price * qty}`);
+console.log(`Next year, Ada will be ${36 + 1}.`);
+</textarea>
+<p>(In <code>$${price}</code>, the first <code>$</code> is just a normal dollar sign that gets printed. The <code>${</code> after it starts the slot.)</p>
+<p>Template literals can also span several lines, with no <code>\n</code> needed:</p>
+<textarea class="code" data-lang="js" data-run>
+const poem = `Roses are red,
+Violets are blue,
+I'm learning JavaScript,
+And TypeScript too.`;
+console.log(poem);
+</textarea>
+<div class="callout"><span class="label">The rule</span>Whenever you're combining strings with variables, use a template literal. It's what nearly all modern code does.</div>
+<div class="try"><span class="label">Try it</span>Make variables for a city and a temperature, then print <code>It's 21°C in Lisbon today.</code> using a template literal.</div>
+
+<h2>Length and individual characters</h2>
+<p>Every string knows how many characters it has. Spaces and punctuation count too:</p>
+<textarea class="code" data-lang="js" data-run>
+const word = "JavaScript";
+console.log(word.length);          // 10
+console.log("hi there!".length);   // 9
+console.log("".length);            // 0: the empty string
+</textarea>
+<p>Notice <code>length</code> has no parentheses. It's a <dfn>property</dfn>: a piece of information the string has, not an action it does.</p>
+<p>Each character has a position number called its <dfn>index</dfn>. The important, slightly weird part: <strong>counting starts at 0</strong>, not 1.</p>
+<table>
+<tr><th>Character</th><td>J</td><td>a</td><td>v</td><td>a</td><td>S</td><td>c</td><td>r</td><td>i</td><td>p</td><td>t</td></tr>
+<tr><th>Index</th><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td></tr>
+</table>
+<textarea class="code" data-lang="js" data-run>
+const word = "JavaScript";
+console.log(word[0]);                 // "J": the first character
+console.log(word[4]);                 // "S": the fifth character
+console.log(word[word.length - 1]);   // "t": the last character (index 9, not 10!)
+console.log(word.at(-1));             // "t": at() with a negative number counts from the end
+console.log(word[50]);                // undefined: there's nothing there
+</textarea>
+<p>Because counting starts at 0, the last index is always <code>length - 1</code>. This "off by one" idea trips everyone up at first, so it's worth re-reading that table.</p>
+
+<div class="quiz"><p>For <code>const s = "hello"</code>, what is <code>s[1]</code>?</p>
+<button>"h"</button><button data-correct>"e"</button><button>"l"</button><button>undefined</button>
+<p class="why">Indexes start at 0, so <code>s[0]</code> is "h" and <code>s[1]</code> is "e".</p></div>
+
+<h2>String methods</h2>
+<p>A <dfn>method</dfn> is an action that a value can do. You call a method with a dot, its name, and parentheses: <code>word.toUpperCase()</code>. Strings come with dozens of methods. Here are the ones you'll use all the time.</p>
+
+<h3>Changing case and trimming spaces</h3>
+<textarea class="code" data-lang="js" data-run>
+const shout = "hello".toUpperCase();
+console.log(shout);                         // "HELLO"
+console.log("WHISPER".toLowerCase());       // "whisper"
+
+const typed = "   ada@example.com   ";      // a user typed extra spaces
+console.log(`[${typed.trim()}]`);           // "[ada@example.com]"
+</textarea>
+<p><code>trim()</code> removes spaces from the start and end. It's useful for anything a person types.</p>
+
+<h3>Searching</h3>
+<textarea class="code" data-lang="js" data-run>
+const sentence = "The quick brown fox";
+
+console.log(sentence.includes("quick"));    // true: does it contain this?
+console.log(sentence.includes("Quick"));    // false: capitals matter!
+console.log(sentence.startsWith("The"));    // true
+console.log(sentence.endsWith("dog"));      // false
+console.log(sentence.indexOf("brown"));     // 10: where does it start?
+console.log(sentence.indexOf("cat"));       // -1: means "not found"
+</textarea>
+<div class="callout tip"><span class="label">Case-insensitive search</span>To search without caring about capitals, lowercase both sides first: <code>sentence.toLowerCase().includes(search.toLowerCase())</code>.</div>
+
+<h3>Cutting out part of a string</h3>
+<p><code>slice(start, end)</code> copies the part from index <code>start</code> up to, but <strong>not including</strong>, index <code>end</code>:</p>
+<textarea class="code" data-lang="js" data-run>
+const word = "JavaScript";
+console.log(word.slice(0, 4));    // "Java"   (indexes 0,1,2,3)
+console.log(word.slice(4));       // "Script" (from 4 to the end)
+console.log(word.slice(-3));      // "ipt"    (the last 3 characters)
+</textarea>
+
+<h3>Replacing, splitting, repeating, padding</h3>
+<textarea class="code" data-lang="js" data-run>
+console.log("I like cats".replace("cats", "dogs"));     // replaces the first match
+console.log("a-b-c-d".replaceAll("-", " "));            // replaces every match
+
+console.log("red,green,blue".split(","));   // ["red", "green", "blue"]: a list (an array)
+console.log("ha".repeat(3));                // "hahaha"
+console.log("7".padStart(3, "0"));          // "007": pad the start to length 3 using "0"
+</textarea>
+<p><code>split</code> gives you an <dfn>array</dfn>, which is a list of values. Arrays get a whole lesson soon.</p>
+
+<h3>Strings never change; methods give you new ones</h3>
+<p>This is an important detail. String methods don't change the original string. They give you back a <em>new</em> string, and the original stays as it was:</p>
+<textarea class="code" data-lang="js" data-run>
+let name = "ada";
+name.toUpperCase();          // makes "ADA"... and throws it away
+console.log(name);           // still "ada"!
+
+name = name.toUpperCase();   // store the new string back in the variable
+console.log(name);           // "ADA"
+</textarea>
+<p>The technical word is <dfn>immutable</dfn>: a string can't be modified, only replaced.</p>
+
+<h3>Chaining methods</h3>
+<p>Since each method gives back a new string, you can call another method on the result straight away. This is called <dfn>chaining</dfn>, and it reads left to right:</p>
+<textarea class="code" data-lang="js" data-run>
+const raw = "   Hello World   ";
+const clean = raw.trim().toLowerCase().replaceAll(" ", "-");
+console.log(clean);   // "hello-world"
+</textarea>
+<p>Step by step: <code>trim()</code> gives <code>"Hello World"</code>, <code>toLowerCase()</code> gives <code>"hello world"</code>, <code>replaceAll</code> gives <code>"hello-world"</code>. That's how websites turn a blog post title into a web address (called a "slug").</p>
+
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Forgetting to store the result</strong>: <code>name.trim();</code> on its own does nothing useful. Write <code>name = name.trim();</code>.</li>
+<li><strong>Parentheses on <code>length</code></strong>: it's <code>word.length</code>, not <code>word.length()</code>.</li>
+<li><strong>Missing parentheses on methods</strong>: <code>word.toUpperCase</code> without <code>()</code> doesn't run the method. It just refers to it.</li>
+<li><strong>Using normal quotes for a template</strong>: <code>"Hi ${name}"</code> prints the <code>${name}</code> literally. Template slots only work in backticks.</li>
+</ul></div>
+
+<h2 class="ts-head">In TypeScript</h2>
+<p>Text values have the type <code>string</code>. TypeScript knows every string method, which gives you two big advantages: autocomplete, and catching the mistakes from the box above.</p>
+<h3>Autocomplete: let the editor show you what's possible</h3>
+<div class="try"><span class="label">Try it</span><ol>
+<li>In the editor below, click at the end of line 2, after the dot.</li>
+<li>Press <kbd>Ctrl</kbd> + <kbd>Space</kbd>. A list of every string method appears.</li>
+<li>Use the arrow keys to browse it. Next to each one you'll see what it takes and what it gives back.</li>
+<li>Pick <code>toUpperCase</code>, add <code>()</code>, and run.</li>
+</ol></div>
+<textarea class="code" data-lang="ts" data-run>
+const city = "lisbon";
+console.log(city.);
+</textarea>
+
+<h3>TypeScript catches string mistakes</h3>
+<textarea class="code" data-lang="ts" data-run>
+const word = "TypeScript";
+
+console.log(word.length());     // ✖ length is a property, not a method
+console.log(word.toUppercase()); // ✖ wrong capitals
+const n: number = word.slice(0, 4);  // ✖ slice gives a string, not a number
+</textarea>
+<p>Hover over each error. The first says <code>This expression is not callable. Type 'Number' has no call signatures</code>, which means "you put <code>()</code> after something that isn't a function". Each of these would be a confusing bug in plain JavaScript; here they're caught as you type.</p>
+
+<h3>Types of method results</h3>
+<p>Hover over each variable below to see what each method returns. Notice <code>includes</code> returns a <code>boolean</code>, and <code>split</code> returns <code>string[]</code>, which is TypeScript for "an array of strings". You'll use that notation a lot soon.</p>
+<textarea class="code" data-lang="ts" data-run>
+const email = "  Ada@Example.com ";
+
+const clean = email.trim().toLowerCase();   // string
+const hasAt = clean.includes("@");          // boolean
+const position = clean.indexOf("@");        // number
+const parts = clean.split("@");             // string[]
+
+console.log(clean, hasAt, position, parts);
+</textarea>
+
+<h3>Template literals and types</h3>
+<p>Anything can go inside <code>${ }</code>, and the result is always a <code>string</code>. That's a handy way to turn a number into text on purpose:</p>
+<textarea class="code" data-lang="ts" data-run>
+const score = 42;
+const message = `Score: ${score}`;   // hover: string
+const asText = `${score}`;           // "42" as a string
+const back = Number(asText);         // 42 as a number again
+console.log(message, asText, back);
+</textarea>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li>Strings use <code>"</code>, <code>'</code> or <code>`</code>. Escape special characters with <code>\</code>; <code>\n</code> is a new line.</li>
+<li><strong>Template literals</strong> (backticks) with <code>${value}</code> are the best way to build strings.</li>
+<li><code>.length</code> gives the number of characters. Indexes start at <strong>0</strong>; the last is <code>length - 1</code>.</li>
+<li>Key methods: <code>toUpperCase</code>, <code>toLowerCase</code>, <code>trim</code>, <code>includes</code>, <code>indexOf</code>, <code>slice</code>, <code>replace</code>, <code>split</code>.</li>
+<li>Strings are <strong>immutable</strong>: methods return new strings, so store the result.</li>
+<li>In TypeScript, press <kbd>Ctrl</kbd> + <kbd>Space</kbd> after a dot to explore methods, and hover to see result types.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space
+
+</textarea>
+<ol>
+<li>Given <code>const first = "grace"</code> and <code>const last = "hopper"</code>, print <code>Hopper, Grace</code>. (Hint: capitalize with <code>word[0].toUpperCase() + word.slice(1)</code>.)
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const first = "grace";
+const last = "hopper";
+const lastCap = last[0].toUpperCase() + last.slice(1);
+const firstCap = first[0].toUpperCase() + first.slice(1);
+console.log(`${lastCap}, ${firstCap}`);
+</textarea></details></li>
+<li>Get the domain from an email address: from <code>"ada@example.com"</code>, print <code>example.com</code>. (Hint: <code>indexOf("@")</code> and <code>slice</code>.)
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const email = "ada@example.com";
+const at = email.indexOf("@");
+console.log(email.slice(at + 1));
+// or: email.split("@")[1]
+</textarea></details></li>
+<li>Check whether the text <code>"Learning TYPESCRIPT is fun"</code> mentions "typescript", ignoring capitals.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const text = "Learning TYPESCRIPT is fun";
+console.log(text.toLowerCase().includes("typescript"));   // true
+</textarea></details></li>
+<li>Turn <code>"  My First Blog Post!  "</code> into the slug <code>my-first-blog-post!</code> using one chain of methods.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const title = "  My First Blog Post!  ";
+console.log(title.trim().toLowerCase().replaceAll(" ", "-"));
+</textarea></details></li>
+</ol></section>
+
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>What's the index of the last character of a string <code>s</code>?</summary><code>s.length - 1</code>, because indexes start at 0. Or use <code>s.at(-1)</code> to get the character directly.</details>
+<details><summary>Why doesn't <code>name.trim();</code> change <code>name</code>?</summary>Strings are immutable. <code>trim()</code> returns a new string; you have to store it: <code>name = name.trim();</code>.</details>
+<details><summary>What does <code>`2 + 2 = ${2 + 2}`</code> produce?</summary>The string <code>"2 + 2 = 4"</code>. The part outside <code>${}</code> is plain text; the part inside is calculated.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

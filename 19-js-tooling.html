@@ -3,124 +3,329 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 19 — Errors, Debugging, Storage & Tooling</title>
+<title>Errors, debugging &amp; saving data</title>
 <link rel="stylesheet" href="assets/course.css">
 </head>
 <body data-slug="19-js-tooling">
 <main><article>
-<h1>Lesson 19 — Errors, debugging, storage &amp; tooling</h1>
-<p class="lede">Real programs fail. Learn to handle errors, find bugs fast, persist data, and use the Node/npm ecosystem.</p>
+<h1>Errors, debugging &amp; saving data</h1>
+<p class="lede">Every program has bugs, and every program meets bad input. This lesson is about handling errors on purpose, finding bugs quickly with the browser's debugger, and saving data so it's still there after the page reloads.</p>
 
-<h2>Errors</h2>
-<textarea class="code" data-lang="js" data-run>
-try {
-  JSON.parse("{ bad json");
-} catch (err) {
-  console.log(err.name, "-", err.message);
-} finally {
-  console.log("always runs");
-}
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Throw your own errors, and catch errors with <code>try</code>/<code>catch</code>/<code>finally</code>.</li>
+<li>Know the common error types and what each one usually means.</li>
+<li>Debug with <code>console</code> methods and the browser's DevTools debugger.</li>
+<li>Save data in the browser with <code>localStorage</code> and <code>JSON</code>.</li>
+<li>Type errors and stored data safely in TypeScript.</li>
+</ul><p class="time">About 50 minutes, plus time to practise in DevTools.</p></section>
 
-class ValidationError extends Error {
-  constructor(field, message) { super(message); this.name = "ValidationError"; this.field = field; }
-}
-function validate(user) {
-  if (!user.email?.includes("@")) throw new ValidationError("email", "Invalid email");
-  return true;
-}
-try { validate({ email: "nope" }); }
-catch (e) {
-  if (e instanceof ValidationError) console.log("fix field:", e.field);
-  else throw e;                          // don't swallow unknown errors
-}
-
-const err = new Error("outer", { cause: new Error("inner") });   // error chaining
-console.log(err.cause.message);
-</textarea>
-<p>Common types: <code>TypeError</code> (undefined is not a function, reading property of undefined), <code>ReferenceError</code>, <code>SyntaxError</code>, <code>RangeError</code>. Global nets: <code>window.onerror</code> and <code>unhandledrejection</code> for logging.</p>
-
-<h2>Debugging like a professional</h2>
+<h2>Errors: the three kinds of problem</h2>
 <ol>
-<li><strong>Read the error and the stack trace</strong>: first line = what, first stack frame in your code = where.</li>
-<li><strong><code>console</code> beyond log</strong>: <code>console.table(array)</code>, <code>console.dir(obj)</code>, <code>console.group</code>, <code>console.time</code>, <code>console.assert</code>, <code>console.trace</code>.</li>
-<li><strong><code>debugger;</code> / breakpoints</strong>: Sources panel → click a line number. Inspect scope variables, watch expressions, step over (<kbd>F10</kbd>), step into (<kbd>F11</kbd>), call stack.</li>
-<li><strong>Conditional breakpoints</strong> and <em>logpoints</em> (right-click a line number).</li>
-<li><strong>Network panel</strong> for API bugs: status, request payload, response.</li>
-<li><strong>Binary search the bug</strong>: disable half the code. Make the smallest reproduction.</li>
-<li>Ask: "what did I assume that isn't true?" Then print the assumption.</li>
+<li><strong>Syntax errors</strong>: the code isn't valid JavaScript (a missing bracket). Nothing runs. The editor's red squiggles show you where.</li>
+<li><strong>Runtime errors</strong>: the code is valid but something goes wrong while it runs (using a property of <code>undefined</code>). The program stops at that line.</li>
+<li><strong>Logic errors</strong> (bugs): no error message at all, but the result is wrong. The hardest kind. Debugging and tests are your tools here.</li>
 </ol>
-<textarea class="code" data-lang="js" data-run>
-const rows = [{ id: 1, name: "Ada", langs: ["js", "c"] }, { id: 2, name: "Linus", langs: ["c"] }];
-console.log(rows);                          // in real DevTools console.table(rows) is great
-console.log(rows.map(r => `${r.id}:${r.langs.length}`).join(" "));
-console.assert(rows.length === 3, "expected 3 rows");
-</textarea>
-
-<h2>Browser storage</h2>
+<p>Runtime errors have a type that hints at the cause:</p>
 <table>
-<tr><th>API</th><th>Size</th><th>Lifetime</th><th>Use for</th></tr>
-<tr><td><code>localStorage</code></td><td>~5 MB</td><td>until cleared</td><td>settings, small data</td></tr>
-<tr><td><code>sessionStorage</code></td><td>~5 MB</td><td>per tab</td><td>temporary state</td></tr>
-<tr><td>Cookies</td><td>4 KB</td><td>configurable</td><td>sessions sent to server (use <code>HttpOnly</code>)</td></tr>
-<tr><td>IndexedDB</td><td>large</td><td>until cleared</td><td>structured offline data</td></tr>
-<tr><td>Cache API / Service Worker</td><td>large</td><td>—</td><td>offline apps (PWAs)</td></tr>
+<tr><th>Error</th><th>Usually means</th></tr>
+<tr><td><code>ReferenceError</code></td><td>A name that doesn't exist: typo, or used before it was created.</td></tr>
+<tr><td><code>TypeError</code></td><td>Using a value the wrong way: calling something that isn't a function, or using <code>.x</code> on <code>undefined</code>/<code>null</code>.</td></tr>
+<tr><td><code>SyntaxError</code></td><td>Invalid code, or invalid JSON passed to <code>JSON.parse</code>.</td></tr>
+<tr><td><code>RangeError</code></td><td>A number outside the allowed range, or a function calling itself forever.</td></tr>
 </table>
-<textarea class="code" data-lang="js" data-file="storage.js">
-// Strings only → JSON.stringify/parse. Always guard: it can throw (private mode, quota).
-export const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
-export const load = (k, fallback = null) => {
-  try { const s = localStorage.getItem(k); return s === null ? fallback : JSON.parse(s); }
-  catch { return fallback; }
-};
-save("todos", [{ id: 1, text: "learn", done: false }]);
-console.log(load("todos", []));
+
+<h2>Throwing your own errors</h2>
+<p>When your function receives something it can't sensibly handle, the right move is often to stop with a clear message, rather than carry on and produce nonsense. <code>throw</code> does that:</p>
+<textarea class="code" data-lang="js" data-run>
+function divide(a, b) {
+  if (b === 0) {
+    throw new Error("Can't divide by zero");
+  }
+  return a / b;
+}
+
+console.log(divide(10, 2));
+console.log(divide(1, 0));      // stops here with your message
+console.log("never reached");
 </textarea>
-<div class="callout warn"><span class="label">Security</span>Never store passwords or tokens you can't afford to leak in localStorage; any XSS bug can read it.</div>
+<p><code>new Error("message")</code> creates an error object; <code>throw</code> stops the function and sends the error up to whoever called it, and so on up, until something catches it, or the program stops.</p>
 
-<h2>Node &amp; npm</h2>
-<textarea class="code" data-lang="bash">
-node -v && npm -v
+<h2>Catching errors: <code>try</code> / <code>catch</code> / <code>finally</code></h2>
+<p>You met <code>try</code>/<code>catch</code> in the async lesson. Here it is properly:</p>
+<textarea class="code" data-lang="js" data-run>
+function divide(a, b) {
+  if (b === 0) throw new Error("Can't divide by zero");
+  return a / b;
+}
 
-mkdir myapp && cd myapp
-npm init -y                      # creates package.json
-npm install canvas-confetti      # dependency -> node_modules + package-lock.json
-npm install -D vite eslint prettier   # dev dependencies
-npx vite                         # run a locally installed tool
+try {
+  console.log("Trying…");
+  const result = divide(1, 0);   // throws, so we jump straight to catch
+  console.log("Result:", result);  // skipped
+} catch (error) {
+  console.log("Caught:", error.message);
+  console.log("Error type:", error.name);
+} finally {
+  console.log("finally always runs, error or not");
+}
 
-# package.json "scripts" are your project's commands:
-#   "dev": "vite", "build": "vite build", "lint": "eslint ."
-npm run dev
+console.log("The program carries on");
 </textarea>
 <ul>
-<li><code>package.json</code>: metadata, dependencies, scripts. <code>package-lock.json</code>: exact versions (commit it). <code>node_modules</code>: never commit (add to <code>.gitignore</code>).</li>
-<li>Semver: <code>^1.2.3</code> accepts minor/patch updates; <code>~1.2.3</code> only patches.</li>
-<li><strong>Vite</strong> gives a dev server with instant reload and an optimized production build. Quick start: <code>npm create vite@latest myapp -- --template vanilla</code>.</li>
-<li><strong>ESLint</strong> finds bugs; <strong>Prettier</strong> formats code. Run both in your editor.</li>
-<li>Be careful with dependencies: fewer is safer. Check <code>npm audit</code>.</li>
+<li><code>try { }</code>: run this code.</li>
+<li><code>catch (error) { }</code>: if anything inside <code>try</code> throws, jump here. <code>error</code> is the thrown error.</li>
+<li><code>finally { }</code> (optional): runs at the end either way. Good for clean-up, like hiding a loading spinner.</li>
 </ul>
+<div class="callout tip"><span class="label">When to catch</span>Catch errors where you can <em>do something useful</em>: show a message to the user, try again, or use a fallback. Don't wrap everything in try/catch "just in case" and ignore the error. A silently swallowed error is much harder to debug than a loud crash.</div>
 
-<h2>Git in 6 commands</h2>
-<textarea class="code" data-lang="bash">
-git init
-git add -A && git commit -m "Add feature"
-git switch -c feature/nav          # branch
-git switch main && git merge feature/nav
-git remote add origin https://github.com/you/repo.git && git push -u origin main
-git log --oneline --graph
+<h3>Custom error types</h3>
+<p>For bigger programs, you can make your own error classes (using <code>extends</code> from the Classes lesson), so <code>catch</code> can tell different problems apart:</p>
+<textarea class="code" data-lang="js" data-run>
+class ValidationError extends Error {
+  constructor(field, message) {
+    super(message);
+    this.name = "ValidationError";
+    this.field = field;
+  }
+}
+
+function checkAge(age) {
+  if (!Number.isInteger(age)) throw new ValidationError("age", "Age must be a whole number");
+  if (age < 0) throw new ValidationError("age", "Age can't be negative");
+  return age;
+}
+
+for (const input of [30, -5, 2.5]) {
+  try {
+    console.log("OK:", checkAge(input));
+  } catch (e) {
+    if (e instanceof ValidationError) {
+      console.log(`Problem with ${e.field}: ${e.message}`);
+    } else {
+      throw e;   // not one of ours: let it continue up
+    }
+  }
+}
 </textarea>
 
-<section class="exercises"><h2>Exercises</h2><ol>
-<li>Add a bug to your to-do app and find it using only breakpoints (no <code>console.log</code>).</li>
-<li>Make the to-do app persist to <code>localStorage</code> and survive reloads.</li>
-<li>Create a custom <code>HttpError</code> class with a <code>status</code> and use it in a <code>fetchJson</code> helper.</li>
-<li>Scaffold a Vite vanilla project, install a package, import it, and run <code>npm run build</code>. Inspect <code>dist/</code>.</li>
-<li>Set up ESLint and Prettier, and make them run on save.</li>
-<li>Push a project to GitHub and enable GitHub Pages.</li>
+<h2>Debugging</h2>
+<h3>Reading a stack trace</h3>
+<p>In your browser's DevTools console, an error comes with a <dfn>stack trace</dfn>: the list of function calls that led to it, most recent first. Each line names a function, a file and a line number. Start at the top line in <em>your</em> code and work down.</p>
+<textarea class="code" data-lang="bash">
+Uncaught TypeError: Cannot read properties of undefined (reading 'name')
+    at formatUser (app.js:12:20)      ← where it crashed
+    at renderList (app.js:30:15)      ← who called formatUser
+    at HTMLButtonElement.<anonymous> (app.js:44:5)   ← the click handler that started it
+</textarea>
+
+<h3>Console power tools</h3>
+<p><code>console.log</code> is the debugger everyone uses first, and it's fine. A few tricks make it better:</p>
+<textarea class="code" data-lang="js" data-run>
+const user = { name: "Ada", age: 36 };
+const cart = [{ item: "pen", qty: 2 }, { item: "mug", qty: 1 }];
+
+console.log({ user, cart });         // wrap in {} to see the variable NAMES too
+console.warn("This is a warning");
+console.error("This is an error message");
+console.table(cart);                 // in DevTools, shows a real table
+</textarea>
+
+<h3>The debugger: pausing your code</h3>
+<p>For tricky bugs, pausing the program and looking around is far quicker than adding <code>console.log</code>s. Every browser has a debugger built in. Try this on your own computer:</p>
+<ol class="steps">
+<li>Make an HTML page with a script, open it in Chrome or Firefox, and press <kbd>F12</kbd> to open DevTools.</li>
+<li>Go to the <strong>Sources</strong> tab (Firefox: <strong>Debugger</strong>) and open your script file.</li>
+<li>Click a line number to set a <dfn>breakpoint</dfn> (a blue marker). Then do whatever runs that line (reload, or click your button).</li>
+<li>The program pauses on that line. Hover over any variable to see its value. The right-hand panel shows all variables in scope and the call stack.</li>
+<li>Use the step buttons: <strong>Step over</strong> (run this line, go to the next), <strong>Step into</strong> (go inside the function being called), <strong>Resume</strong> (continue to the next breakpoint).</li>
+</ol>
+<p>You can also put the word <code>debugger;</code> in your code, which pauses there whenever DevTools is open.</p>
+<textarea class="code" data-lang="js" data-file="app.js">
+function total(items) {
+  let sum = 0;
+  for (const item of items) {
+    debugger;               // pauses here on each loop when DevTools is open
+    sum += item.price * item.qty;
+  }
+  return sum;
+}
+</textarea>
+<div class="callout"><span class="label">A debugging method that always works</span><ol>
+<li><strong>Reproduce</strong>: find exact steps that cause the bug every time.</li>
+<li><strong>Read</strong> the error message and stack trace slowly.</li>
+<li><strong>Check your assumptions</strong>: log or inspect the values just before things go wrong. Is that variable really what you think it is?</li>
+<li><strong>Narrow down</strong>: comment out half the code; does the bug remain? Repeat.</li>
+<li><strong>Fix, then re-test</strong> the original steps.</li>
+</ol>And if you're stuck for more than 20 minutes, explain the problem out loud, line by line, to someone (or a rubber duck). It works surprisingly often.</div>
+
+<h2>Saving data in the browser</h2>
+<p>All your variables vanish when the page reloads. To keep data, the simplest tool is <code>localStorage</code>: a small store of text, kept in the browser for that website, that survives reloads and restarts.</p>
+<textarea class="code" data-lang="js" data-run>
+localStorage.setItem("theme", "dark");        // save
+console.log(localStorage.getItem("theme"));   // load: "dark"
+console.log(localStorage.getItem("missing")); // null: nothing saved under that key
+localStorage.removeItem("theme");             // delete
+</textarea>
+<p>(The editors on this site run in a sandbox, so they use a temporary stand-in for <code>localStorage</code> that's emptied every time you press Run. On a normal web page, the data stays.)</p>
+<p><code>localStorage</code> can only store <strong>strings</strong>. To save arrays and objects, convert them to JSON text first with <code>JSON.stringify</code>, and back with <code>JSON.parse</code>:</p>
+<textarea class="code" data-lang="js" data-run>
+const todos = [{ text: "Learn JSON", done: false }];
+
+const text = JSON.stringify(todos);   // object → string
+console.log(text, typeof text);
+
+const back = JSON.parse(text);        // string → object
+console.log(back[0].text);
+
+JSON.parse("{not valid json}");       // throws a SyntaxError
+</textarea>
+<p>Put together, a safe save/load pair looks like this. Note the <code>try</code>/<code>catch</code>: stored data might be missing, corrupted, or storage might be blocked (private browsing):</p>
+<textarea class="code" data-lang="js" data-file="storage.js">
+function save(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // storage full or blocked: the app still works, just without saving
+  }
+}
+
+function load(key, fallback) {
+  try {
+    const text = localStorage.getItem(key);
+    return text === null ? fallback : JSON.parse(text);
+  } catch {
+    return fallback;
+  }
+}
+
+// In the to-do app: load once at the start, save after every change.
+let todos = load("todos", []);
+// ... after each change:
+save("todos", todos);
+</textarea>
+<div class="callout warn"><span class="label">Don't store secrets</span>Any JavaScript on your page can read <code>localStorage</code>. Never store passwords or other secrets there. It's for preferences and app data.</div>
+
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Empty catch blocks</strong> that hide real bugs.</li>
+<li><strong>Saving objects without <code>JSON.stringify</code></strong>: you get the useless string <code>"[object Object]"</code>.</li>
+<li><strong>Forgetting <code>getItem</code> returns <code>null</code></strong> when nothing is saved.</li>
+<li><strong>Debugging by guessing</strong>: change one thing at a time, and check your assumptions.</li>
+</ul></div>
+
+<h2 class="ts-head">In TypeScript</h2>
+<h3>Errors in <code>catch</code> are <code>unknown</code></h3>
+<p>As you saw in the async lesson, anything can be thrown, so the <code>catch</code> variable is <code>unknown</code>. A small helper keeps catch blocks tidy:</p>
+<textarea class="code" data-lang="ts" data-run>
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+try {
+  JSON.parse("{oops");
+} catch (err) {
+  console.log("Couldn't parse:", errorMessage(err));
+}
+</textarea>
+
+<h3>Typed custom errors</h3>
+<textarea class="code" data-lang="ts" data-run>
+class ValidationError extends Error {
+  constructor(public field: string, message: string) {
+    super(message);
+    this.name = "ValidationError";
+  }
+}
+
+function checkEmail(email: string): string {
+  if (!email.includes("@")) throw new ValidationError("email", "That doesn't look like an email");
+  return email.trim().toLowerCase();
+}
+
+try {
+  checkEmail("ada.example.com");
+} catch (err) {
+  if (err instanceof ValidationError) {
+    console.log(`${err.field}: ${err.message}`);   // err narrowed to ValidationError
+  }
+}
+</textarea>
+
+<h3>Functions that never return: <code>never</code></h3>
+<p>A function that always throws never returns normally. Its return type is <code>never</code>, and TypeScript uses that to narrow the code after a call:</p>
+<textarea class="code" data-lang="ts" data-run>
+function fail(message: string): never {
+  throw new Error(message);
+}
+
+function getEnv(name: string, value: string | undefined): string {
+  if (value === undefined) fail(`Missing setting: ${name}`);
+  return value;   // TypeScript knows value is a string here, because fail() never returns
+}
+console.log(getEnv("theme", "dark"));
+</textarea>
+
+<h3>Typing <code>JSON.parse</code> and stored data</h3>
+<p><code>JSON.parse</code> returns <code>any</code> (it can't know what's in the string), which switches off checking. Be explicit instead. The simplest honest version uses a generic (the <code>&lt;T&gt;</code>), which you'll study properly in the Generics lesson; for now, read <code>T</code> as "the type you ask for":</p>
+<textarea class="code" data-lang="ts" data-run>
+type Settings = { theme: "light" | "dark"; fontSize: number };
+
+function load<T>(key: string, fallback: T): T {
+  try {
+    const text = localStorage.getItem(key);
+    return text === null ? fallback : (JSON.parse(text) as T);
+  } catch {
+    return fallback;
+  }
+}
+
+function save<T>(key: string, value: T): void {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
+const settings = load<Settings>("settings", { theme: "light", fontSize: 16 });  // Settings
+console.log(settings.theme);
+save("settings", { ...settings, fontSize: 18 });
+settings.fontSize = "big";   // ✖ still typed
+</textarea>
+<div class="callout ts"><span class="label">Remember</span><code>as T</code> trusts that the stored data has the right shape. That's usually fine for data your own app saved. If it might be old or edited by hand, validate it with a type guard, as in the async lesson.</div>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li><code>throw new Error("message")</code> stops with a clear error. <code>try</code>/<code>catch</code>/<code>finally</code> handles errors where you can do something useful.</li>
+<li>Error types hint at causes: <code>ReferenceError</code> (unknown name), <code>TypeError</code> (wrong kind of value), <code>SyntaxError</code>, <code>RangeError</code>.</li>
+<li>Debug with <code>console.log({ x })</code>, stack traces, and breakpoints in DevTools.</li>
+<li><code>localStorage</code> stores strings per site. Use <code>JSON.stringify</code>/<code>JSON.parse</code>, handle <code>null</code> and errors.</li>
+<li>TypeScript: <code>catch (err)</code> is <code>unknown</code>; always-throwing functions return <code>never</code>; type parsed JSON explicitly.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space
+
+</textarea>
+<ol>
+<li>Write <code>parseAge(text: string): number</code> that throws a helpful error if the text isn't a whole number between 0 and 150. Test it with a loop over several inputs inside try/catch.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function parseAge(text: string): number {
+  const n = Number(text);
+  if (!Number.isInteger(n)) throw new Error(`"${text}" is not a whole number`);
+  if (n < 0 || n > 150) throw new Error(`${n} is not a realistic age`);
+  return n;
+}
+for (const t of ["36", "abc", "-1", "4.5"]) {
+  try { console.log(parseAge(t)); }
+  catch (e) { console.log(e instanceof Error ? e.message : e); }
+}
+</textarea></details></li>
+<li>Add saving to the to-do app from the Events lesson on your own computer: load the list from <code>localStorage</code> at the start, and save it in <code>render()</code>.</li>
+<li>Find the bug using the debugger or logging: <code>function average(nums: number[]) { let total = 0; for (let i = 1; i &lt; nums.length; i++) total += nums[i]; return total / nums.length; }</code>
+<details><summary>Show answer</summary>The loop starts at <code>i = 1</code>, so it skips the first number. Start at 0, or use <code>for (const n of nums)</code>.</details></li>
 </ol></section>
 
-<section class="checkpoint"><h2>Checkpoint</h2>
-<details><summary>Why rethrow unknown errors?</summary>Swallowing hides real bugs. Handle what you expect and let the rest propagate to be logged.</details>
-<details><summary>Should package-lock.json be committed?</summary>Yes, for reproducible installs. node_modules should not.</details>
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>When does the <code>finally</code> block run?</summary>Always, after <code>try</code> (and <code>catch</code> if there was an error), whether or not an error happened.</details>
+<details><summary>Why do you need <code>JSON.stringify</code> with <code>localStorage</code>?</summary><code>localStorage</code> only stores strings. <code>JSON.stringify</code> turns objects and arrays into a string; <code>JSON.parse</code> turns it back.</details>
+<details><summary>Why is the error in <code>catch (err)</code> typed <code>unknown</code>?</summary>JavaScript lets you throw any value, not just <code>Error</code> objects, so TypeScript can't assume what it is.</details>
 </section>
 </article></main>
 <script src="assets/lessons.js"></script>

@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arrow functions, scope &amp; callbacks</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="js-functions-2">
+<main><article>
+<h1>Arrow functions, scope &amp; callbacks</h1>
+<p class="lede">In JavaScript, a function is a value, just like a number or a string. You can store it in a variable and pass it to another function. That one idea unlocks most of modern JavaScript: array methods, event handlers, React. This lesson builds it up step by step.</p>
+
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Store functions in variables, and write them with the short <strong>arrow</strong> syntax.</li>
+<li>Understand <strong>scope</strong>: which variables a piece of code can see.</li>
+<li>Pass a function into another function (a <strong>callback</strong>).</li>
+<li>Meet <strong>closures</strong>: functions that remember where they were made.</li>
+<li>Write function types in TypeScript.</li>
+</ul><p class="time">About 50 minutes. If this feels abstract, that's normal. It will click when you use it in the array lessons.</p></section>
+
+<h2>Functions are values</h2>
+<p>You can put a function in a variable, just like a number:</p>
+<textarea class="code" data-lang="js" data-run>
+const double = function (n) {
+  return n * 2;
+};
+
+console.log(double(4));   // 8
+console.log(typeof double);   // "function"
+</textarea>
+<p>This is called a <dfn>function expression</dfn>. It works the same as the <code>function double(n) { ... }</code> you wrote last lesson; the function just has no name of its own, and lives in the variable <code>double</code>.</p>
+
+<h2>Arrow functions</h2>
+<p>Modern JavaScript has a shorter way to write function expressions, called <dfn>arrow functions</dfn> (because of the <code>=&gt;</code>, which looks like an arrow). Let's shrink <code>double</code> one step at a time. All four versions do exactly the same thing:</p>
+<textarea class="code" data-lang="js" data-run>
+// 1. A function expression
+const double1 = function (n) {
+  return n * 2;
+};
+
+// 2. Arrow function: drop the word "function", add => after the parameters
+const double2 = (n) => {
+  return n * 2;
+};
+
+// 3. If the body is just "return something", drop the braces AND the word return
+const double3 = (n) => n * 2;
+
+// 4. With exactly one parameter, the parentheses are optional
+const double4 = n => n * 2;
+
+console.log(double1(5), double2(5), double3(5), double4(5));
+</textarea>
+<p>Read <code>n =&gt; n * 2</code> as "take <code>n</code>, give back <code>n * 2</code>". Version 3 is the style you'll see most.</p>
+<p>A few more shapes:</p>
+<textarea class="code" data-lang="js" data-run>
+const add = (a, b) => a + b;                  // two parameters: parentheses required
+const sayHi = () => console.log("Hi!");       // no parameters: empty parentheses
+const describe = (name, age) => {             // several lines: use braces and return
+  const years = age === 1 ? "year" : "years";
+  return `${name} is ${age} ${years} old`;
+};
+
+console.log(add(2, 3));
+sayHi();
+console.log(describe("Rex", 4));
+</textarea>
+<div class="callout"><span class="label">The one gotcha</span>With braces, you <strong>must</strong> write <code>return</code>. <code>(n) =&gt; { n * 2 }</code> returns <code>undefined</code>, because braces mean "here's a block of statements", and no statement returned anything.</div>
+<div class="try"><span class="label">Try it</span>Rewrite these as one-line arrow functions, and test them: <code>function triple(x) { return x * 3; }</code> and <code>function isAdult(age) { return age &gt;= 18; }</code>.</div>
+<p>Which style should you use? Both are fine and you'll see both everywhere. A common habit is <code>function</code> declarations for main, named functions, and arrows for short functions, especially ones passed to other functions (coming up next).</p>
+
+<h2>Scope: who can see which variables</h2>
+<p><dfn>Scope</dfn> is the area of code where a variable exists. You've seen the rule already: variables made inside <code>{ }</code> stay inside. The other half of the rule is that code inside can see <em>out</em>:</p>
+<textarea class="code" data-lang="js" data-run>
+const siteName = "Web Mastery";     // global: visible everywhere below
+
+function welcome(user) {
+  const message = `Welcome to ${siteName}, ${user}!`;   // can see siteName (outside)
+  return message;
+}
+
+console.log(welcome("Ada"));
+console.log(message);               // ✖ can't see message (it's inside the function)
+</textarea>
+<div class="callout analogy"><span class="label">Analogy</span>Scopes are like rooms with one-way windows. From inside a room you can see out into the hallway (outer scopes), but people in the hallway can't see into the room. A function inside a function is a room inside a room: it can see both outer rooms.</div>
+<p>When two scopes have a variable with the same name, the closest one wins:</p>
+<textarea class="code" data-lang="js" data-run>
+const name = "outer";
+
+function show() {
+  const name = "inner";   // a different variable that happens to share the name
+  console.log(name);      // "inner": the closest one wins
+}
+
+show();
+console.log(name);        // "outer": unchanged
+</textarea>
+<p>This is called <dfn>shadowing</dfn>. It's legal, but it can be confusing, so pick distinct names when you can.</p>
+
+<h2>Callbacks: passing a function to a function</h2>
+<p>Because functions are values, you can pass one as an argument to another function. A function passed in like this is called a <dfn>callback</dfn>: the other function will "call it back" when it's ready.</p>
+<textarea class="code" data-lang="js" data-run>
+function doTwice(action) {
+  action();
+  action();
+}
+
+doTwice(() => console.log("Hip hip hooray!"));
+</textarea>
+<p><code>doTwice</code> doesn't know or care what <code>action</code> does. It just calls it twice. Here's one that passes a value into the callback:</p>
+<textarea class="code" data-lang="js" data-run>
+function repeat(times, action) {
+  for (let i = 1; i <= times; i++) {
+    action(i);
+  }
+}
+
+repeat(3, (n) => console.log(`Round ${n}`));
+repeat(4, (n) => console.log("*".repeat(n)));
+</textarea>
+<p>Same <code>repeat</code> function, totally different behaviour, depending on which callback you hand it. That's the power: <code>repeat</code> handles "how many times", the callback handles "what to do".</p>
+
+<h3>Pass the function, don't call it</h3>
+<p>When passing a named function as a callback, leave off the parentheses. With them, you'd be calling it right away and passing its <em>result</em>:</p>
+<textarea class="code" data-lang="js" data-run>
+function cheer() {
+  console.log("Yay!");
+}
+
+doTwice(cheer);      // ✔ pass the function itself
+// doTwice(cheer()); // ✖ this calls cheer once now, then passes undefined
+
+function doTwice(action) {
+  action();
+  action();
+}
+</textarea>
+<p>(Notice <code>doTwice</code> is used before the line it's defined on, and it works. Functions made with the <code>function</code> keyword are set up before the rest of the code runs, so they can be called from anywhere in the file. This is called <dfn>hoisting</dfn>. Arrow functions in <code>const</code> variables don't get this, and must be defined before use.)</p>
+
+<h3>You've already seen callbacks</h3>
+<p>Callbacks are everywhere in JavaScript. A few real examples you'll use soon:</p>
+<textarea class="code" data-lang="js" data-run>
+// Run something later (after 1000 milliseconds = 1 second)
+setTimeout(() => console.log("One second later..."), 1000);
+console.log("This prints first!");
+
+// Transform every item in a list (next lessons)
+const prices = [10, 20, 30];
+console.log(prices.map((p) => p * 2));
+</textarea>
+<p>Look at the output order. <code>setTimeout</code> doesn't wait: it stores your callback, and the rest of the code continues straight away. A second later, your callback is called. You'll learn much more about this in the lesson on async code.</p>
+
+<h2>Closures: functions that remember</h2>
+<p>Here's something surprising. A function can create and return another function. The inner function still has access to the outer function's variables, <em>even after the outer function has finished</em>:</p>
+<textarea class="code" data-lang="js" data-run>
+function makeCounter() {
+  let count = 0;
+  return () => {
+    count++;
+    return count;
+  };
+}
+
+const counter = makeCounter();
+console.log(counter());   // 1
+console.log(counter());   // 2
+console.log(counter());   // 3
+
+const other = makeCounter();   // a brand new, separate count
+console.log(other());     // 1
+</textarea>
+<p><code>makeCounter</code> finished running on line 9, but the arrow function it returned still remembers <code>count</code>, and keeps updating it. A function bundled together with the variables it can see is called a <dfn>closure</dfn>. Each call to <code>makeCounter</code> creates a fresh <code>count</code>, so <code>counter</code> and <code>other</code> don't interfere.</p>
+<p>Closures let you make functions that are customized when you create them:</p>
+<textarea class="code" data-lang="js" data-run>
+function makeMultiplier(factor) {
+  return (n) => n * factor;
+}
+
+const double = makeMultiplier(2);
+const triple = makeMultiplier(3);
+console.log(double(10), triple(10));   // 20 30
+</textarea>
+<div class="callout tip"><span class="label">Don't worry</span>If closures feel mind-bending, you're in good company. You don't need to master them now. Just remember: <em>a function can use the variables around where it was written</em>. You'll use this naturally in React later.</div>
+
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Braces without <code>return</code></strong> in an arrow function: <code>x =&gt; { x * 2 }</code> returns <code>undefined</code>.</li>
+<li><strong>Calling instead of passing</strong>: <code>setTimeout(sayHi(), 1000)</code> runs <code>sayHi</code> immediately. Write <code>setTimeout(sayHi, 1000)</code>.</li>
+<li><strong>Using an arrow function in a <code>const</code> before its line</strong>: only <code>function</code> declarations are hoisted.</li>
+</ul></div>
+
+<h2 class="ts-head">In TypeScript</h2>
+<h3>Typing arrow functions</h3>
+<p>Parameter and return types go in the same places as before:</p>
+<textarea class="code" data-lang="ts" data-run>
+const add = (a: number, b: number): number => a + b;
+const shout = (text: string) => text.toUpperCase() + "!";   // return type inferred: string
+
+console.log(add(2, 3), shout("hello"));
+</textarea>
+
+<h3>Function types</h3>
+<p>Since functions are values, they have types too. Hover over <code>add</code> above and you'll see <code>(a: number, b: number) =&gt; number</code>. That's how TypeScript writes "a function that takes two numbers and returns a number". It looks just like an arrow function, with types instead of code.</p>
+<p>You need to write function types for callback parameters, so TypeScript knows what kind of function is allowed:</p>
+<textarea class="code" data-lang="ts" data-run>
+function repeat(times: number, action: (round: number) => void): void {
+  for (let i = 1; i <= times; i++) {
+    action(i);
+  }
+}
+
+repeat(2, (n) => console.log(`Round ${n}`));   // hover over n: TypeScript knows it's a number
+repeat(2, (n) => console.log(n.toUpperCase()));  // ✖ numbers don't have toUpperCase
+repeat("2", (n) => console.log(n));             // ✖ times must be a number
+</textarea>
+<p>Look at line 7: we didn't write a type for <code>n</code>, yet TypeScript knows it's a <code>number</code>. Because <code>repeat</code> says its callback receives a number, TypeScript fills that in for any function you pass. This is called <dfn>contextual typing</dfn>, and it's why you rarely need to annotate callback parameters yourself.</p>
+
+<h3>Naming a function type</h3>
+<p>Long function types can be given a name with <code>type</code>, which makes code easier to read:</p>
+<textarea class="code" data-lang="ts" data-run>
+type MathOp = (a: number, b: number) => number;
+
+const add: MathOp = (a, b) => a + b;        // a and b are numbers: no need to repeat it
+const multiply: MathOp = (a, b) => a * b;
+const broken: MathOp = (a, b) => `${a}${b}`;  // ✖ returns a string, not a number
+
+function calculate(op: MathOp, x: number, y: number): number {
+  return op(x, y);
+}
+console.log(calculate(add, 3, 4), calculate(multiply, 3, 4));
+</textarea>
+
+<h3>Closures are typed too</h3>
+<p>Hover over <code>makeMultiplier</code> and <code>double</code>:</p>
+<textarea class="code" data-lang="ts" data-run>
+function makeMultiplier(factor: number) {
+  return (n: number) => n * factor;
+}
+const double = makeMultiplier(2);   // (n: number) => number
+console.log(double(21));
+console.log(double("21"));          // ✖ still checked
+</textarea>
+<p><code>makeMultiplier</code>'s return type is <code>(n: number) =&gt; number</code>, a function. TypeScript tracks function types through every step, so even the function you got back is fully checked.</p>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li>Functions are values: store them in variables, pass them around.</li>
+<li>Arrow functions: <code>(a, b) =&gt; a + b</code>. With braces you need <code>return</code>.</li>
+<li><strong>Scope</strong>: inner code can see outer variables; outer code can't see inner ones.</li>
+<li>A <strong>callback</strong> is a function passed to another function. Pass it without <code>()</code>.</li>
+<li>A <strong>closure</strong> is a function that remembers the variables from where it was made.</li>
+<li>TypeScript function types look like <code>(n: number) =&gt; string</code>. Callback parameters are inferred from context.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space
+
+</textarea>
+<ol>
+<li>Write an arrow function <code>isLongWord</code> that returns true if a string has more than 6 characters. Add types.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const isLongWord = (word: string): boolean => word.length > 6;
+console.log(isLongWord("cat"), isLongWord("elephant"));
+</textarea></details></li>
+<li>Write <code>applyToNumbers(from, to, fn)</code> that calls <code>fn</code> with every number from <code>from</code> to <code>to</code>. Use it to print the squares of 1 to 5.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function applyToNumbers(from: number, to: number, fn: (n: number) => void): void {
+  for (let i = from; i <= to; i++) {
+    fn(i);
+  }
+}
+applyToNumbers(1, 5, (n) => console.log(n * n));
+</textarea></details></li>
+<li>Write <code>makeGreeter(greeting)</code> that returns a function taking a name. <code>makeGreeter("Hola")("Ada")</code> should return <code>"Hola, Ada!"</code>.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function makeGreeter(greeting: string) {
+  return (name: string) => `${greeting}, ${name}!`;
+}
+const spanish = makeGreeter("Hola");
+console.log(spanish("Ada"), makeGreeter("Hi")("Grace"));
+</textarea></details></li>
+<li>Write a counter with a closure that also has a step size: <code>makeCounter(5)</code> returns a function that gives 5, 10, 15… each time it's called.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function makeCounter(step: number) {
+  let count = 0;
+  return () => {
+    count += step;
+    return count;
+  };
+}
+const byFive = makeCounter(5);
+console.log(byFive(), byFive(), byFive());
+</textarea></details></li>
+</ol></section>
+
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>What's wrong with <code>const half = n =&gt; { n / 2 };</code>?</summary>It has braces but no <code>return</code>, so it returns <code>undefined</code>. Write <code>n =&gt; n / 2</code> or <code>n =&gt; { return n / 2; }</code>.</details>
+<details><summary>What's a callback?</summary>A function you pass to another function, which that function calls when it needs to.</details>
+<details><summary>How do you write the type "a function that takes a string and returns nothing"?</summary><code>(s: string) =&gt; void</code></details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>

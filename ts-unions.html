@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Union types, null &amp; narrowing</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="ts-unions">
+<main><article>
+<h1>Union types, null &amp; narrowing</h1>
+<p class="lede">Real values aren't always one neat type. A search might find a user or nothing. An ID might be a number or a string. A request might be loading, finished or failed. This lesson teaches you how TypeScript describes "one of several things", and how your code safely works out which one it has. It's the most important TypeScript skill after the basics.</p>
+
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Write <strong>union types</strong> with <code>|</code>, including unions of exact values.</li>
+<li><strong>Narrow</strong> a union with <code>typeof</code>, <code>===</code> and truthiness checks.</li>
+<li>Handle <code>null</code> and <code>undefined</code> safely with <code>?.</code> and <code>??</code> (these are JavaScript features, useful with or without TypeScript).</li>
+<li>Model things that can be in different states with <strong>discriminated unions</strong>.</li>
+<li>Use <code>unknown</code> instead of <code>any</code>.</li>
+</ul><p class="time">About 60 minutes. Most of this lesson is TypeScript, with JavaScript features mixed in where they belong.</p></section>
+
+<h2>Union types: "this or that"</h2>
+<p>You've already seen a few types with a <code>|</code> in them when hovering, like <code>string | undefined</code>. The <code>|</code> means <strong>or</strong>. A type made of several options joined with <code>|</code> is called a <dfn>union type</dfn>.</p>
+<textarea class="code" data-lang="ts" data-run>
+let id: number | string;
+
+id = 42;        // ✔ a number is allowed
+id = "abc-42";  // ✔ so is a string
+id = true;      // ✖ but not a boolean
+console.log(id);
+</textarea>
+<p>Read <code>number | string</code> as "a number or a string". The variable can hold either one, at different times.</p>
+
+<h3>Unions of exact values</h3>
+<p>The most useful unions are lists of exact allowed values. You met these briefly in the decisions lesson:</p>
+<textarea class="code" data-lang="ts" data-run>
+type Size = "small" | "medium" | "large";
+
+let coffee: Size = "medium";
+coffee = "large";    // ✔
+coffee = "huge";     // ✖ not one of the three options
+coffee = "Large";    // ✖ capitals matter
+
+function price(size: Size): number {
+  if (size === "small") return 2;
+  if (size === "medium") return 3;
+  return 4;
+}
+console.log(price("large"));
+</textarea>
+<p>This is far safer than accepting any <code>string</code>. Typos are impossible, and when you call <code>price("</code>, the editor offers the three valid options. Try it: on a new line, type <code>price("</code> and look at the suggestions.</p>
+
+<h2>Narrowing: finding out which one you have</h2>
+<p>A union creates a small problem. If a value might be a number <em>or</em> a string, which methods can you use on it?</p>
+<textarea class="code" data-lang="ts" data-run>
+function shout(value: number | string) {
+  return value.toUpperCase();   // ✖ what if it's a number?
+}
+</textarea>
+<p>TypeScript only allows what's safe for <strong>every</strong> option. Numbers don't have <code>toUpperCase</code>, so it's an error. The fix is to check which one you have first, using a normal JavaScript <code>if</code>:</p>
+<textarea class="code" data-lang="ts" data-run>
+function shout(value: number | string): string {
+  if (typeof value === "string") {
+    return value.toUpperCase();     // hover value here: string
+  }
+  return value.toFixed(1);          // hover value here: number
+}
+
+console.log(shout("hi"), shout(3.14159));
+</textarea>
+<p>This is called <dfn>narrowing</dfn>. Inside the <code>if</code>, TypeScript knows <code>value</code> must be a string, so the type is narrowed from <code>number | string</code> to just <code>string</code>. After the <code>if</code> (which returned), the only possibility left is <code>number</code>.</p>
+<div class="callout analogy"><span class="label">Analogy</span>You're handed a wrapped present that's either a book or a mug. You can't start reading it or drinking from it yet. First you check (narrow), and once you know which it is, you use it the right way. TypeScript follows your checks and remembers what you learned.</div>
+<p>Notice that narrowing isn't new syntax. <code>typeof</code>, <code>if</code> and <code>===</code> are plain JavaScript that you already know. TypeScript just reads your checks and updates the types to match.</p>
+
+<h3>Ways to narrow</h3>
+<textarea class="code" data-lang="ts" data-run>
+function describe(x: string | number | boolean | string[]): string {
+  if (typeof x === "boolean") {
+    return x ? "yes" : "no";               // x: boolean
+  }
+  if (typeof x === "number") {
+    return `the number ${x}`;              // x: number
+  }
+  if (Array.isArray(x)) {
+    return `a list of ${x.length} items`;  // x: string[]
+  }
+  return `the text "${x}"`;                // x: string (the only option left)
+}
+
+console.log(describe(true));
+console.log(describe(7));
+console.log(describe(["a", "b"]));
+console.log(describe("hi"));
+</textarea>
+<table>
+<tr><th>Check</th><th>Narrows to</th></tr>
+<tr><td><code>typeof x === "string"</code> (also "number", "boolean", "function"…)</td><td>that basic type</td></tr>
+<tr><td><code>Array.isArray(x)</code></td><td>an array</td></tr>
+<tr><td><code>x === "small"</code></td><td>that exact value</td></tr>
+<tr><td><code>if (x)</code></td><td>removes <code>null</code>, <code>undefined</code> (and other falsy values)</td></tr>
+<tr><td><code>x !== null</code>, <code>x !== undefined</code></td><td>removes that one</td></tr>
+</table>
+
+<h2><code>null</code> and <code>undefined</code>: the billion-dollar mistake</h2>
+<p>The most common crash in JavaScript is using something that turned out to be missing:</p>
+<textarea class="code" data-lang="js" data-run>
+const users = [{ name: "Ada" }];
+const user = users.find((u) => u.name === "Bob");   // not found: undefined
+console.log(user.name.toUpperCase());               // 💥 crash
+</textarea>
+<p><code>Cannot read properties of undefined</code>. You'll see this error message a lot in your career. The inventor of <code>null</code>, Tony Hoare, later called it his "billion-dollar mistake" because of how many bugs it has caused.</p>
+<p>TypeScript's answer is simple: <code>null</code> and <code>undefined</code> are <em>not</em> included in other types. A <code>string</code> is always a real string. If something might be missing, its type has to say so, with a union like <code>string | undefined</code> or <code>User | null</code>. And then TypeScript makes you check before using it.</p>
+<textarea class="code" data-lang="ts" data-run>
+let name: string = "Ada";
+name = null;              // ✖ a string can't be null
+
+let middleName: string | null = null;   // ✔ this one says it might be null
+middleName = "Augusta";
+console.log(name, middleName);
+</textarea>
+
+<h3>Three ways to handle "might be missing"</h3>
+<p><strong>1. Check with <code>if</code>.</strong> The clearest option when you want to do something different when the value is missing:</p>
+<textarea class="code" data-lang="ts" data-run>
+function greet(name: string | null): string {
+  if (name === null) {
+    return "Hello, stranger!";
+  }
+  return `Hello, ${name.toUpperCase()}!`;   // name: string here
+}
+console.log(greet("ada"), greet(null));
+</textarea>
+
+<p><strong>2. Optional chaining <code>?.</code></strong> When you just want to read something from a value that might be missing. If the left side is <code>null</code> or <code>undefined</code>, the whole thing stops and gives <code>undefined</code> instead of crashing. This is a JavaScript feature, so it works in plain JS too:</p>
+<textarea class="code" data-lang="js" data-run>
+const user = undefined;
+console.log(user?.name);              // undefined, no crash
+
+const data = { profile: { address: null } };
+console.log(data.profile?.address?.city);   // undefined, no crash
+console.log(data.settings?.theme);          // undefined, no crash
+</textarea>
+
+<p><strong>3. The nullish coalescing operator <code>??</code></strong> Gives a fallback value when the left side is <code>null</code> or <code>undefined</code>. Read <code>a ?? b</code> as "a, or if that's missing, b". Also plain JavaScript:</p>
+<textarea class="code" data-lang="js" data-run>
+const nickname = null;
+console.log(nickname ?? "Anonymous");    // "Anonymous"
+
+const user = undefined;
+console.log(user?.name ?? "Guest");      // ?. and ?? work great together
+</textarea>
+
+<h3><code>??</code> vs <code>||</code></h3>
+<p>You might see <code>||</code> used for fallbacks in older code. The difference: <code>||</code> falls back on <em>any falsy</em> value, including <code>0</code> and <code>""</code>, which are often perfectly valid. <code>??</code> only falls back on <code>null</code> and <code>undefined</code>.</p>
+<textarea class="code" data-lang="js" data-run>
+const settings = { volume: 0, username: "" };
+
+console.log(settings.volume || 50);    // 50: wrong! The user chose 0 (mute)
+console.log(settings.volume ?? 50);    // 0:  right
+
+console.log(settings.username || "Guest");   // "Guest"
+console.log(settings.username ?? "Guest");   // "": the empty string is kept
+</textarea>
+<div class="callout"><span class="label">The rule</span>For "use this default if it's missing", use <code>??</code>. Use <code>||</code> only when you really mean "if it's falsy".</div>
+<p>There's also a short way to fill in a missing value: <code>x ??= 10</code> means "if <code>x</code> is null or undefined, set it to 10".</p>
+
+<h3>The <code>!</code> escape hatch (use rarely)</h3>
+<p>Sometimes you know a value isn't missing, but TypeScript can't tell. Putting <code>!</code> after it tells TypeScript "trust me, this isn't null or undefined":</p>
+<textarea class="code" data-lang="ts" data-run>
+const scores = [90, 72, 85];
+const top = scores.find((s) => s > 80)!;   // "I promise this finds something"
+console.log(top.toFixed(1));
+</textarea>
+<div class="callout warn"><span class="label">Careful</span><code>!</code> switches off the safety check, and if you're wrong, you get the crash TypeScript was trying to prevent. Prefer an <code>if</code> check or <code>??</code>. Reach for <code>!</code> only when you're truly certain.</div>
+
+<h2>Discriminated unions: modeling states</h2>
+<p>Here's where unions get really powerful. Think about loading data from the internet. At any moment it's in one of three states: still loading, finished with data, or failed with an error message. Beginners often model this with several separate variables:</p>
+<textarea class="code" data-lang="js">
+let isLoading = true;
+let data = null;
+let error = null;
+// Can isLoading be true while error is set? Can data and error both be set?
+// Nothing stops these impossible combinations.
+</textarea>
+<p>A union of object types models it exactly. Each option has a <code>status</code> property with a different exact value, which says which state you're in:</p>
+<textarea class="code" data-lang="ts" data-run>
+type Request =
+  | { status: "loading" }
+  | { status: "success"; data: string[] }
+  | { status: "error"; message: string };
+
+function render(req: Request): string {
+  if (req.status === "loading") {
+    return "Loading…";
+  }
+  if (req.status === "error") {
+    return `Something went wrong: ${req.message}`;   // message exists here
+  }
+  return `Got ${req.data.length} items`;             // data exists here
+}
+
+console.log(render({ status: "loading" }));
+console.log(render({ status: "error", message: "No internet" }));
+console.log(render({ status: "success", data: ["a", "b"] }));
+</textarea>
+<p>The shared property (<code>status</code>) is called the <dfn>discriminant</dfn>, because it tells the options apart. Checking it narrows to exactly one option. Try these, and read the errors:</p>
+<div class="try"><span class="label">Try it</span><ol>
+<li>Inside the first <code>if</code> (loading), try to use <code>req.data</code>. TypeScript says it doesn't exist in the loading state.</li>
+<li>Add a call <code>render({ status: "error" })</code>. TypeScript says <code>message</code> is missing.</li>
+<li>Add <code>render({ status: "success", data: ["a"], message: "hi" })</code>. TypeScript says <code>message</code> doesn't belong on a success.</li>
+</ol></div>
+<p>Impossible combinations can't even be written. This pattern is everywhere in professional TypeScript, especially in React apps.</p>
+
+<h3>Making sure every case is handled</h3>
+<p>With a <code>switch</code>, you can get TypeScript to check that you've handled every option. That's useful when someone adds a new option later:</p>
+<textarea class="code" data-lang="ts" data-run>
+type Shape =
+  | { kind: "circle"; radius: number }
+  | { kind: "square"; side: number }
+  | { kind: "triangle"; base: number; height: number };
+
+function area(shape: Shape): number {
+  switch (shape.kind) {
+    case "circle":
+      return Math.PI * shape.radius ** 2;
+    case "square":
+      return shape.side ** 2;
+    default:
+      // If every kind was handled above, shape has type "never" here: nothing is left.
+      const unhandled: never = shape;   // ✖ "triangle" was forgotten!
+      return unhandled;
+  }
+}
+</textarea>
+<p><code>never</code> is the type with no possible values. If every kind of shape has been handled, nothing can reach the <code>default</code>, so assigning to <code>never</code> is fine. Here, triangle isn't handled, so TypeScript says <code>Type '{ kind: "triangle"; ... }' is not assignable to type 'never'</code>. Add a <code>case "triangle":</code> returning <code>0.5 * shape.base * shape.height</code>, and the error disappears.</p>
+
+<h2><code>unknown</code>: the safe version of <code>any</code></h2>
+<p>Sometimes you genuinely don't know what type a value is, for example data from the internet or from a file. The <code>Meet TypeScript</code> lesson warned you off <code>any</code>, which switches checking off. <code>unknown</code> means "could be anything" but, unlike <code>any</code>, you <strong>must narrow it before using it</strong>:</p>
+<textarea class="code" data-lang="ts" data-run>
+function printLength(value: unknown): void {
+  console.log(value.length);           // ✖ can't use it until you check what it is
+
+  if (typeof value === "string") {
+    console.log(value.length);         // ✔ now it's a string
+  } else if (Array.isArray(value)) {
+    console.log(value.length);         // ✔ now it's an array
+  } else {
+    console.log("No length here");
+  }
+}
+printLength("hello");
+printLength([1, 2, 3]);
+printLength(42);
+</textarea>
+<div class="callout ts"><span class="label">any vs unknown</span><code>any</code>: "don't check this". <code>unknown</code>: "check this before you use it". Whenever you're tempted to write <code>any</code>, try <code>unknown</code> instead.</div>
+
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Using <code>||</code> for defaults</strong> when 0 or "" are valid values. Use <code>??</code>.</li>
+<li><strong>Sprinkling <code>!</code></strong> to make errors go away. Each one is a possible crash.</li>
+<li><strong>Using <code>typeof x === "array"</code></strong>: arrays are <code>"object"</code> to typeof. Use <code>Array.isArray(x)</code>.</li>
+<li><strong>Using <code>typeof x === "null"</code></strong>: <code>typeof null</code> is <code>"object"</code> (a famous old JavaScript quirk). Use <code>x === null</code>.</li>
+<li><strong>Several booleans for one state</strong> (<code>isLoading</code>, <code>hasError</code>…). Use a discriminated union.</li>
+</ul></div>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li><code>A | B</code> is a <strong>union</strong>: a value that is A or B. Unions of exact values (<code>"small" | "large"</code>) are great for options.</li>
+<li><strong>Narrowing</strong>: normal checks (<code>typeof</code>, <code>===</code>, <code>if (x)</code>, <code>Array.isArray</code>) make TypeScript update the type inside that branch.</li>
+<li>In TypeScript, <code>null</code>/<code>undefined</code> must be part of the type to be allowed, and must be checked before use.</li>
+<li><code>a?.b</code> stops safely if <code>a</code> is missing. <code>a ?? b</code> uses <code>b</code> when <code>a</code> is null or undefined. Both are plain JavaScript.</li>
+<li><strong>Discriminated unions</strong> (a shared <code>status</code> or <code>kind</code> property) model states without impossible combinations. <code>never</code> checks every case is handled.</li>
+<li>Prefer <code>unknown</code> over <code>any</code>. Avoid <code>!</code> unless certain.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space
+
+</textarea>
+<ol>
+<li>Write <code>formatId(id: number | string): string</code>. Numbers should be padded to 5 digits (<code>42</code> → <code>"00042"</code>); strings returned in upper case.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+function formatId(id: number | string): string {
+  if (typeof id === "number") {
+    return String(id).padStart(5, "0");
+  }
+  return id.toUpperCase();
+}
+console.log(formatId(42), formatId("ab-7"));
+</textarea></details></li>
+<li>Create <code>type Direction = "up" | "down" | "left" | "right"</code> and write <code>move(x: number, y: number, dir: Direction)</code> that returns the new position as <code>{ x, y }</code>.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+type Direction = "up" | "down" | "left" | "right";
+function move(x: number, y: number, dir: Direction): { x: number; y: number } {
+  switch (dir) {
+    case "up": return { x, y: y - 1 };
+    case "down": return { x, y: y + 1 };
+    case "left": return { x: x - 1, y };
+    case "right": return { x: x + 1, y };
+  }
+}
+console.log(move(0, 0, "right"));
+</textarea></details></li>
+<li>Given <code>const user: { name: string; address?: { city?: string } } = { name: "Ada" }</code>, print the city or <code>"Unknown city"</code> in one line.
+<details><summary>Show answer</summary><code>console.log(user.address?.city ?? "Unknown city");</code></details></li>
+<li>Model a traffic light as a discriminated union where the "green" state also has <code>secondsLeft: number</code>. Write a function that describes each state.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+type Light =
+  | { color: "red" }
+  | { color: "yellow" }
+  | { color: "green"; secondsLeft: number };
+
+function describe(light: Light): string {
+  switch (light.color) {
+    case "red": return "Stop";
+    case "yellow": return "Get ready";
+    case "green": return `Go (${light.secondsLeft}s left)`;
+  }
+}
+console.log(describe({ color: "green", secondsLeft: 12 }));
+</textarea></details></li>
+</ol></section>
+
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>What does "narrowing" mean?</summary>Using a check (like <code>typeof x === "string"</code>) so that TypeScript knows a more specific type inside that branch of code.</details>
+<details><summary>What's the difference between <code>a || b</code> and <code>a ?? b</code>?</summary><code>||</code> uses <code>b</code> whenever <code>a</code> is falsy (including 0 and ""). <code>??</code> uses <code>b</code> only when <code>a</code> is null or undefined.</details>
+<details><summary>What makes a union "discriminated"?</summary>Every option has a shared property (like <code>status</code>) with a different exact value, so checking that property tells you which option you have.</details>
+<details><summary>Why is <code>unknown</code> safer than <code>any</code>?</summary>With <code>unknown</code>, TypeScript forces you to check what the value is before using it. <code>any</code> skips all checks.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>
