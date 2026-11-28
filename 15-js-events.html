@@ -3,143 +3,397 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lesson 15 — Events</title>
+<title>Events: reacting to the user</title>
 <link rel="stylesheet" href="assets/course.css">
 </head>
 <body data-slug="15-js-events">
 <main><article>
-<h1>Lesson 15 — Events</h1>
-<p class="lede">Events are how the page responds to the user: clicks, keys, input, scrolling, timers, and more.</p>
+<h1>Events: reacting to the user</h1>
+<p class="lede">A web page isn't much use if it can't respond. Clicks, key presses, typing in a box, submitting a form: each of these is an <strong>event</strong>, and your code can listen for them. By the end of this lesson you'll build a working to-do list.</p>
 
-<h2>Listening</h2>
-<textarea class="code" data-lang="html" data-run>
-<style>body{font-family:system-ui} button{font:inherit;padding:.5em 1em}</style>
-<button id="b">Click me</button> <pre id="out"></pre>
-<script>
-const out = document.getElementById("out");
-const b = document.getElementById("b");
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Run code when something happens, with <code>addEventListener</code>.</li>
+<li>Use the event object to find out what happened.</li>
+<li>React to typing, and handle form submissions properly.</li>
+<li>Handle clicks on many items with one listener (event delegation).</li>
+<li>Run code later, or repeatedly, with timers.</li>
+<li>Use TypeScript's event types, and safely narrow <code>event.target</code>.</li>
+</ul><p class="time">About 60 minutes.</p></section>
 
-function onClick(event) {
-  out.textContent = [
-    "type: " + event.type,
-    "target: " + event.target.tagName,
-    "x,y: " + event.clientX + "," + event.clientY,
-    "shift held: " + event.shiftKey,
-  ].join("\n");
-}
-b.addEventListener("click", onClick);
-// b.removeEventListener("click", onClick);   // needs the same function reference
-// b.addEventListener("click", fn, { once: true });
-</script>
+<h2>Listening for an event</h2>
+<p>To react to an event, you find an element and give it a callback to run when the event happens:</p>
+<textarea class="code" data-lang="js" data-run data-html='<button id="hello">Say hello</button>'>
+const button = document.querySelector("#hello");
+
+button.addEventListener("click", () => {
+  console.log("Hello! You clicked the button.");
+});
+
+console.log("Listener added. Now click the button on the page.");
 </textarea>
-<p>Use <code>addEventListener</code> (not <code>onclick=</code> attributes): it allows multiple listeners and options like <code>once</code>, <code>passive</code>, <code>signal</code>.</p>
+<p>Press Run, then click the button in the Page panel a few times. Let's break down <code>addEventListener("click", callback)</code>:</p>
+<ul>
+<li><code>"click"</code> is the name of the event to listen for.</li>
+<li>The arrow function is the <dfn>event handler</dfn> (or listener): a callback that the browser calls <em>every time</em> the event happens.</li>
+</ul>
+<p>Notice the order of the output. "Listener added" prints straight away. The handler's code doesn't run until you click, which could be in one second or never. This is <dfn>event-driven</dfn> programming: you set up what should happen, and the browser calls your code at the right moment.</p>
+
+<h3>A counter</h3>
+<p>Handlers can change variables and update the page. Here's the classic first interactive program:</p>
+<textarea class="code" data-lang="js" data-run data-html='<p>Clicks: <strong id="count">0</strong></p><button id="plus">+1</button> <button id="reset">Reset</button>'>
+let count = 0;
+const display = document.querySelector("#count");
+
+function render() {
+  display.textContent = count;
+}
+
+document.querySelector("#plus").addEventListener("click", () => {
+  count++;
+  render();
+});
+
+document.querySelector("#reset").addEventListener("click", () => {
+  count = 0;
+  render();
+});
+</textarea>
+<p>See the pattern again? The data lives in a variable (<code>count</code>). Events change the data, then a <code>render</code> function updates the page from the data.</p>
+<div class="try"><span class="label">Try it</span>Add a "−1" button that subtracts one, but never lets the count go below zero.</div>
 
 <h2>Common events</h2>
 <table>
-<tr><th>Group</th><th>Events</th></tr>
-<tr><td>Mouse/pointer</td><td><code>click dblclick pointerdown pointermove pointerup pointerenter pointerleave contextmenu wheel</code></td></tr>
-<tr><td>Keyboard</td><td><code>keydown keyup</code> (use <code>event.key</code>, <code>event.code</code>)</td></tr>
-<tr><td>Forms</td><td><code>input change submit focus blur invalid reset</code></td></tr>
-<tr><td>Page</td><td><code>DOMContentLoaded load resize scroll visibilitychange beforeunload</code></td></tr>
-<tr><td>Touch/drag</td><td><code>touchstart touchmove dragstart dragover drop</code></td></tr>
+<tr><th>Event</th><th>Happens when…</th></tr>
+<tr><td><code>click</code></td><td>an element is clicked (or tapped, or activated with the keyboard)</td></tr>
+<tr><td><code>input</code></td><td>the text in an input or textarea changes (every keystroke)</td></tr>
+<tr><td><code>change</code></td><td>a checkbox, dropdown or input's value is committed</td></tr>
+<tr><td><code>submit</code></td><td>a form is submitted</td></tr>
+<tr><td><code>keydown</code></td><td>a key is pressed</td></tr>
+<tr><td><code>mouseenter</code> / <code>mouseleave</code></td><td>the pointer moves onto / off an element</td></tr>
+<tr><td><code>focus</code> / <code>blur</code></td><td>an element gains / loses keyboard focus</td></tr>
 </table>
-<p>Prefer <strong>pointer events</strong> over separate mouse + touch handlers.</p>
+
+<h2>The event object</h2>
+<p>When the browser calls your handler, it passes in an <dfn>event object</dfn> full of details about what happened. Add a parameter to receive it (it's usually called <code>event</code> or just <code>e</code>):</p>
+<textarea class="code" data-lang="js" data-run data-html='<input id="box" placeholder="Type something…">' data-height="120px">
+const box = document.querySelector("#box");
+
+box.addEventListener("input", (event) => {
+  console.log("Event type:", event.type);
+  console.log("Current text:", event.target.value);
+});
+</textarea>
+<p><code>event.target</code> is the element where the event happened. For an input, its <code>value</code> is the text inside. Type in the box and watch the console.</p>
+
+<h3>Live text example</h3>
+<textarea class="code" data-lang="js" data-run data-html='<label>Your name: <input id="name"></label><p id="greeting">Hello, stranger!</p><p id="chars"></p>' data-height="140px">
+const nameInput = document.querySelector("#name");
+const greeting = document.querySelector("#greeting");
+const chars = document.querySelector("#chars");
+
+nameInput.addEventListener("input", () => {
+  const name = nameInput.value.trim();
+  greeting.textContent = name ? `Hello, ${name}!` : "Hello, stranger!";
+  chars.textContent = `${name.length} characters`;
+});
+</textarea>
+
+<h3>Keyboard events</h3>
+<textarea class="code" data-lang="js" data-run data-html='<input id="field" placeholder="Click here and press keys (try Enter and Escape)">' data-height="100px">
+const field = document.querySelector("#field");
+
+field.addEventListener("keydown", (e) => {
+  console.log("You pressed:", e.key);
+  if (e.key === "Enter") {
+    console.log("→ Enter! Submitting:", field.value);
+  }
+  if (e.key === "Escape") {
+    field.value = "";
+  }
+});
+</textarea>
 
 <h2>Forms</h2>
-<textarea class="code" data-lang="html" data-run>
-<style>body{font-family:system-ui} input,button{font:inherit;padding:.4em}</style>
-<form id="f">
-  <input name="name" placeholder="Your name" required>
-  <button>Greet</button>
-</form>
-<p id="msg"></p>
-<script>
-const f = document.getElementById("f");
-f.addEventListener("input", e => { msg.textContent = "typing: " + e.target.value; });
-f.addEventListener("submit", e => {
-  e.preventDefault();                       // stop page navigation
-  const data = Object.fromEntries(new FormData(f));
-  msg.textContent = "Hello, " + data.name + "!";
+<p>When a form is submitted, the browser's default behaviour is to send the data to a server and <strong>reload the page</strong>. In a JavaScript app, you usually want to handle it yourself instead. <code>event.preventDefault()</code> stops the default behaviour:</p>
+<textarea class="code" data-lang="js" data-run data-html='<form id="signup"><label>Email <input name="email" type="email" required></label> <label><input name="news" type="checkbox"> Send me news</label> <button>Sign up</button></form><p id="result"></p>' data-height="140px">
+const form = document.querySelector("#signup");
+const result = document.querySelector("#result");
+
+form.addEventListener("submit", (e) => {
+  e.preventDefault();                  // don't reload the page!
+
+  const data = new FormData(form);     // read all the fields at once
+  const email = data.get("email");
+  const wantsNews = data.has("news");  // a checkbox is only included when ticked
+
+  result.textContent = `Thanks! We'll write to ${email}${wantsNews ? " with news" : ""}.`;
+  form.reset();                        // clear the form
 });
-</script>
 </textarea>
+<div class="callout tip"><span class="label">Listen to submit, not to the button's click</span>A <code>submit</code> listener on the form also catches the user pressing <kbd>Enter</kbd> in a field, and the browser's built-in checks (like <code>required</code> and <code>type="email"</code>) run first. Try submitting with an empty or invalid email.</div>
 
-<h2>Bubbling &amp; event delegation</h2>
-<p>Most events <strong>bubble</strong>: they fire on the target, then on each ancestor. So one listener on a parent can handle all children, including ones added later. This is called <em>delegation</em>.</p>
-<textarea class="code" data-lang="html" data-run>
-<style>body{font-family:system-ui} li{cursor:pointer;margin:4px 0} .done{text-decoration:line-through;opacity:.5}</style>
-<ul id="todos"><li>Learn HTML</li><li>Learn CSS</li><li>Learn JS</li></ul>
-<button id="add">Add dynamic item</button>
-<script>
-const ul = document.getElementById("todos");
-ul.addEventListener("click", (e) => {
-  const li = e.target.closest("li");            // which item was clicked?
-  if (li && ul.contains(li)) li.classList.toggle("done");
-});
-let n = 0;
-add.onclick = () => { const li = document.createElement("li"); li.textContent = "New " + (++n); ul.append(li); };
-</script>
+<h2>Bubbling and event delegation</h2>
+<p>When you click an element, the event doesn't just happen on that element. It then travels up through every parent: the <code>&lt;li&gt;</code>, then the <code>&lt;ul&gt;</code>, then the <code>&lt;body&gt;</code>, and so on. This is called <dfn>bubbling</dfn>.</p>
+<textarea class="code" data-lang="js" data-run data-html='<div id="outer" style="padding:16px;background:#eef">Outer div <button id="inner">Click me</button></div>' data-height="100px">
+document.querySelector("#outer").addEventListener("click", () => console.log("outer div heard it"));
+document.querySelector("#inner").addEventListener("click", () => console.log("button heard it"));
+// Click the button: both run, button first, then its parent.
+// Click the blue area outside the button: only the div runs.
 </textarea>
-<p><code>event.target</code> = where it happened; <code>event.currentTarget</code> = where the listener is attached. <code>event.stopPropagation()</code> stops bubbling (use rarely). Capture phase: pass <code>{ capture: true }</code>.</p>
+<p>Bubbling enables a very useful trick. Instead of adding a listener to every item in a list (including ones that don't exist yet), add <strong>one</strong> listener to the list, and check which item was clicked. This is called <dfn>event delegation</dfn>:</p>
+<textarea class="code" data-lang="js" data-run data-html='<ul id="colors"><li>Red</li><li>Green</li><li>Blue</li></ul><button id="add">Add Purple</button>' data-height="160px">
+const list = document.querySelector("#colors");
 
-<h2>Keyboard &amp; pointer</h2>
-<textarea class="code" data-lang="html" data-run>
-<style>body{margin:0;font-family:system-ui} #pad{height:200px;background:#eee;position:relative;touch-action:none}
-#dot{position:absolute;width:24px;height:24px;border-radius:50%;background:#7c5cff;transform:translate(-50%,-50%);pointer-events:none}</style>
-<div id="pad" tabindex="0">Move the pointer here, press keys (click first to focus)</div><pre id="k"></pre>
-<script>
-const pad = document.getElementById("pad");
-const dot = document.createElement("div"); dot.id = "dot"; pad.append(dot);
-pad.addEventListener("pointermove", e => {
-  const r = pad.getBoundingClientRect();
-  dot.style.left = e.clientX - r.left + "px"; dot.style.top = e.clientY - r.top + "px";
+list.addEventListener("click", (e) => {
+  const li = e.target.closest("li");   // the clicked <li> (or null if you missed)
+  if (!li) return;
+  li.classList.toggle("highlight");
+  console.log("You clicked", li.textContent);
 });
-pad.addEventListener("keydown", e => {
-  k.textContent = "key=" + e.key + " code=" + e.code;
-  if (e.key === "Escape") dot.style.background = "crimson";
-  if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); k.textContent = "Cmd/Ctrl+K!"; }
+
+document.querySelector("#add").addEventListener("click", () => {
+  const li = document.createElement("li");
+  li.textContent = "Purple";
+  list.append(li);   // works with the existing listener, no extra setup!
 });
-</script>
 </textarea>
+<p><code>closest("li")</code> walks up from the clicked element to the nearest <code>&lt;li&gt;</code>. This matters when list items contain other elements, like a button inside the <code>&lt;li&gt;</code>.</p>
 
-<h2>Timers, throttle, debounce</h2>
-<textarea class="code" data-lang="js" data-run>
-const t = setTimeout(() => console.log("once, after 100ms"), 100);
-// clearTimeout(t);
-let n = 0;
-const id = setInterval(() => {
-  console.log("tick", ++n);
-  if (n === 3) clearInterval(id);
-}, 100);
+<h2>Putting it together: a to-do list</h2>
+<p>Here's a complete little app using everything so far: data in an array, a render function, a form, and event delegation. Read it slowly, top to bottom. Every line uses something you've learned.</p>
+<textarea class="code" data-lang="js" data-run data-html='<form id="new"><input id="text" placeholder="What needs doing?" autocomplete="off"> <button>Add</button></form><ul id="todos"></ul><p id="left"></p>' data-height="240px">
+const todos = [
+  { id: 1, text: "Learn events", done: true },
+  { id: 2, text: "Build a to-do app", done: false },
+];
+let nextId = 3;
 
-function debounce(fn, ms) {            // run after the user STOPS for ms
-  let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+const form = document.querySelector("#new");
+const input = document.querySelector("#text");
+const list = document.querySelector("#todos");
+const left = document.querySelector("#left");
+
+function render() {
+  list.replaceChildren();                       // clear the list
+  for (const todo of todos) {
+    const li = document.createElement("li");
+    li.dataset.id = todo.id;                    // remember which todo this is
+    li.textContent = todo.text + " ";
+    li.classList.toggle("done", todo.done);
+    const del = document.createElement("button");
+    del.textContent = "✕";
+    del.dataset.action = "delete";
+    li.append(del);
+    list.append(li);
+  }
+  const remaining = todos.filter((t) => !t.done).length;
+  left.textContent = `${remaining} left to do`;
 }
-const search = debounce(q => console.log("search for", q), 200);
-search("a"); search("ab"); search("abc");        // only "abc" runs
 
-// For animation use requestAnimationFrame(cb), called before each paint.
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text) return;
+  todos.push({ id: nextId++, text, done: false });
+  input.value = "";
+  render();
+});
+
+list.addEventListener("click", (e) => {
+  const li = e.target.closest("li");
+  if (!li) return;
+  const id = Number(li.dataset.id);
+  const index = todos.findIndex((t) => t.id === id);
+  if (e.target.dataset.action === "delete") {
+    todos.splice(index, 1);                    // remove it
+  } else {
+    todos[index].done = !todos[index].done;    // toggle done
+  }
+  render();
+});
+
+render();
+</textarea>
+<div class="try"><span class="label">Try it</span><ol>
+<li>Add a few to-dos, tick some off by clicking them, delete one.</li>
+<li>Add a "Clear completed" button that removes all done items. (Hint: <code>filter</code>, then put the result back into the array, or make <code>todos</code> a <code>let</code>.)</li>
+</ol></div>
+
+<h2>Timers</h2>
+<p>Not every event comes from the user. You can ask the browser to call your code later, or repeatedly:</p>
+<textarea class="code" data-lang="js" data-run data-html='<p>Seconds: <strong id="secs">0</strong></p><button id="stop">Stop</button>' data-height="110px">
+// Once, after 1500 milliseconds (1.5 seconds)
+setTimeout(() => console.log("1.5 seconds have passed"), 1500);
+
+// Repeatedly, every 1000 milliseconds
+let seconds = 0;
+const timer = setInterval(() => {
+  seconds++;
+  document.querySelector("#secs").textContent = seconds;
+}, 1000);
+
+// Stop it with the id that setInterval returned
+document.querySelector("#stop").addEventListener("click", () => {
+  clearInterval(timer);
+  console.log("Stopped at", seconds);
+});
 </textarea>
 
-<h2>Custom events</h2>
-<textarea class="code" data-lang="js" data-run>
-const bus = new EventTarget();
-bus.addEventListener("login", e => console.log("welcome", e.detail.name));
-bus.dispatchEvent(new CustomEvent("login", { detail: { name: "Ada" } }));
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Calling the handler instead of passing it</strong>: <code>addEventListener("click", sayHi())</code> runs <code>sayHi</code> once, immediately. Write <code>addEventListener("click", sayHi)</code>.</li>
+<li><strong>Forgetting <code>preventDefault()</code></strong> on form submit: the page reloads and your changes vanish.</li>
+<li><strong>Typos in event names</strong>: <code>"onclick"</code> or <code>"Click"</code> silently never fire. It's <code>"click"</code>.</li>
+<li><strong>Adding listeners inside <code>render()</code></strong>: every render adds another listener, so one click runs the code many times. Add listeners once, or use delegation.</li>
+</ul></div>
+
+<h2 class="ts-head">In TypeScript</h2>
+<h3>Event types are inferred</h3>
+<p>TypeScript knows what kind of event each event name produces. Hover over <code>e</code> in each handler:</p>
+<textarea class="code" data-lang="ts" data-run data-html='<button>Click</button> <input placeholder="type here">' data-height="80px">
+const button = document.querySelector("button");
+const input = document.querySelector("input");
+
+button?.addEventListener("click", (e) => {
+  console.log("clicked at", e.clientX, e.clientY);   // e: MouseEvent
+});
+
+input?.addEventListener("keydown", (e) => {
+  console.log(e.key);       // e: KeyboardEvent, so .key autocompletes
+  console.log(e.clientX);   // ✖ keyboard events don't have a mouse position
+});
+
+button?.addEventListener("clik", () => {});   // no error, sadly: custom event names are allowed
+</textarea>
+<p>The last line shows a limit: because you're allowed to invent your own event names, TypeScript can't catch a misspelled one. It does, however, stop offering you mouse properties in the handler, which is often the hint you need.</p>
+
+<h3><code>event.target</code> needs narrowing</h3>
+<p>Here's something that surprises everyone. Hover over <code>e.target</code>:</p>
+<textarea class="code" data-lang="ts" data-run data-html='<input id="box" placeholder="type">' data-height="80px">
+const box = document.querySelector("#box");
+
+box?.addEventListener("input", (e) => {
+  console.log(e.target.value);    // ✖ 'e.target' is possibly 'null'... and EventTarget has no .value
+});
+</textarea>
+<p>Its type is <code>EventTarget | null</code>, very general, because events can come from all kinds of things (elements, windows, network requests…). Narrow it with <code>instanceof</code>, just like in the DOM lesson:</p>
+<textarea class="code" data-lang="ts" data-run data-html='<input id="box" placeholder="type">' data-height="80px">
+const box = document.querySelector("#box");
+
+box?.addEventListener("input", (e) => {
+  if (e.target instanceof HTMLInputElement) {
+    console.log(e.target.value);   // ✔
+  }
+});
+</textarea>
+<p>Often there's an easier way: you already have the element in a variable, so use that instead of <code>e.target</code>:</p>
+<textarea class="code" data-lang="ts" data-run data-html='<input id="box" placeholder="type">' data-height="80px">
+const box = document.querySelector<HTMLInputElement>("#box");
+if (!box) throw new Error("#box missing");
+
+box.addEventListener("input", () => {
+  console.log(box.value);   // box is already an HTMLInputElement
+});
 </textarea>
 
-<section class="exercises"><h2>Exercises</h2><ol>
-<li>Build a to-do list with add, complete-toggle and delete, using <strong>one</strong> delegated click listener.</li>
-<li>Live-filter a list of 20 names as you type (debounced).</li>
-<li>Make a draggable box using <code>pointerdown/move/up</code> and <code>setPointerCapture</code>.</li>
-<li>Build keyboard shortcuts: <kbd>/</kbd> focuses search, <kbd>Esc</kbd> clears it.</li>
-<li>Build a modal using <code>&lt;dialog&gt;</code> with <code>showModal()</code> and close on backdrop click.</li>
-<li>Validate a form with custom messages via <code>setCustomValidity</code>.</li>
+<h3>A typed to-do list</h3>
+<p>Here's the to-do app in TypeScript. Compare it with the JavaScript version: the logic is identical, with a <code>Todo</code> type and a few null checks added. Hover around to see the types.</p>
+<textarea class="code" data-lang="ts" data-run data-html='<form id="new"><input id="text" placeholder="What needs doing?" autocomplete="off"> <button>Add</button></form><ul id="todos"></ul>' data-height="200px">
+type Todo = { id: number; text: string; done: boolean };
+
+const todos: Todo[] = [{ id: 1, text: "Learn TypeScript events", done: false }];
+let nextId = 2;
+
+// Find every element once, and fail clearly if the page is wrong.
+function get<T extends Element>(selector: string, type: new () => T): T {
+  const el = document.querySelector(selector);
+  if (!(el instanceof type)) throw new Error(`Missing ${selector}`);
+  return el;
+}
+const form = get("#new", HTMLFormElement);
+const input = get("#text", HTMLInputElement);
+const list = get("#todos", HTMLUListElement);
+
+function render(): void {
+  list.replaceChildren(...todos.map((todo) => {
+    const li = document.createElement("li");
+    li.dataset.id = String(todo.id);           // dataset values must be strings
+    li.textContent = todo.text;
+    li.classList.toggle("done", todo.done);
+    return li;
+  }));
+}
+
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (text) todos.push({ id: nextId++, text, done: false });
+  input.value = "";
+  render();
+});
+
+list.addEventListener("click", (e) => {
+  if (!(e.target instanceof Element)) return;
+  const li = e.target.closest("li");
+  const todo = todos.find((t) => t.id === Number(li?.dataset.id));
+  if (todo) {
+    todo.done = !todo.done;
+    render();
+  }
+});
+
+render();
+</textarea>
+<p>Don't worry about the details of the <code>get</code> helper yet; it uses <em>generics</em> (the <code>&lt;T&gt;</code>), which have their own lesson soon. What matters is the idea: check that every element exists once, at the top, and everything after can be written without worrying about <code>null</code>. Notice also <code>String(todo.id)</code>: <code>dataset</code> values must be strings, and TypeScript flags a number there. (Try removing the <code>String( )</code>.)</p>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li><code>el.addEventListener("click", handler)</code> runs <code>handler</code> every time the event happens.</li>
+<li>The handler receives an event object: <code>e.target</code>, <code>e.key</code>, <code>e.preventDefault()</code>…</li>
+<li>Handle forms with the <code>submit</code> event, call <code>preventDefault()</code>, and read fields with <code>FormData</code>.</li>
+<li>Events bubble up to parents, so one listener on a list can handle all its items (delegation, with <code>closest</code>).</li>
+<li><code>setTimeout</code> runs code once later; <code>setInterval</code> repeats until <code>clearInterval</code>.</li>
+<li>TypeScript infers <code>MouseEvent</code>, <code>KeyboardEvent</code> etc. <code>e.target</code> is <code>EventTarget | null</code>: narrow with <code>instanceof</code>, or use the element you already have.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run data-html='<button id="toggle">Show details</button><p id="details" class="hidden">Here are the secret details!</p><input id="search" placeholder="Filter fruit…"><ul id="fruit"><li>Apple</li><li>Banana</li><li>Cherry</li><li>Date</li></ul>' data-height="220px">
+// The page has: #toggle button, #details paragraph (hidden), #search input, and #fruit list
+
+</textarea>
+<ol>
+<li>Make <code>#toggle</code> show and hide <code>#details</code>, and change its own text between "Show details" and "Hide details".
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const toggle = document.querySelector("#toggle");
+const details = document.querySelector("#details");
+toggle?.addEventListener("click", () => {
+  const nowHidden = details?.classList.toggle("hidden");
+  if (toggle) toggle.textContent = nowHidden ? "Show details" : "Hide details";
+});
+</textarea></details></li>
+<li>As the user types in <code>#search</code>, hide fruit that doesn't contain the typed text (ignore capitals).
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const search = document.querySelector<HTMLInputElement>("#search");
+search?.addEventListener("input", () => {
+  const q = search.value.toLowerCase();
+  for (const li of document.querySelectorAll("#fruit li")) {
+    const match = li.textContent?.toLowerCase().includes(q) ?? false;
+    li.classList.toggle("hidden", !match);
+  }
+});
+</textarea></details></li>
+<li>Make clicking a fruit highlight it, using one listener on the list.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+document.querySelector("#fruit")?.addEventListener("click", (e) => {
+  if (e.target instanceof HTMLLIElement) {
+    e.target.classList.toggle("highlight");
+  }
+});
+</textarea></details></li>
 </ol></section>
 
-<section class="checkpoint"><h2>Checkpoint</h2>
-<details><summary>Why is delegation useful?</summary>One listener handles many (even future) children, saving memory and avoiding re-attaching handlers after DOM changes.</details>
-<details><summary>target vs currentTarget?</summary>target is the innermost element that triggered the event; currentTarget is the element whose listener is running.</details>
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>What does <code>preventDefault()</code> do on a form's submit event?</summary>It stops the browser's default action: sending the form and reloading the page. Your JavaScript handles the data instead.</details>
+<details><summary>What is event delegation?</summary>Putting one listener on a parent element, and using <code>e.target</code> (often with <code>closest</code>) to work out which child was clicked. It also works for children added later.</details>
+<details><summary>Why can't you use <code>e.target.value</code> directly in TypeScript?</summary><code>e.target</code> has the general type <code>EventTarget | null</code>, which has no <code>value</code>. Narrow it with <code>instanceof HTMLInputElement</code> first.</details>
 </section>
 </article></main>
 <script src="assets/lessons.js"></script>
