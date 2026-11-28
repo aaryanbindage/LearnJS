@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Booleans &amp; comparisons</title>
+<link rel="stylesheet" href="assets/course.css">
+</head>
+<body data-slug="js-booleans">
+<main><article>
+<h1>Booleans &amp; comparisons</h1>
+<p class="lede">Programs constantly ask yes-or-no questions. Is the password long enough? Is the player out of lives? Is it the weekend? The answers are <code>true</code> or <code>false</code>, and this lesson is about asking those questions. It sets you up for the next lesson, where programs start making decisions.</p>
+
+<section class="goals"><h2>In this lesson you will</h2><ul>
+<li>Use the boolean values <code>true</code> and <code>false</code>.</li>
+<li>Compare values with <code>===</code>, <code>!==</code>, <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>.</li>
+<li>Combine questions with AND (<code>&amp;&amp;</code>), OR (<code>||</code>) and NOT (<code>!</code>).</li>
+<li>Understand "truthy" and "falsy" values, and why to avoid <code>==</code>.</li>
+<li>See how TypeScript catches comparisons that can never be true.</li>
+</ul><p class="time">About 35 minutes.</p></section>
+
+<h2>Booleans</h2>
+<p>A <dfn>boolean</dfn> is the simplest type there is. It has exactly two possible values: <code>true</code> and <code>false</code>. (It's named after George Boole, a mathematician who worked out the logic of true and false in the 1800s.)</p>
+<textarea class="code" data-lang="js" data-run>
+const isLoggedIn = true;
+const hasPaid = false;
+console.log(isLoggedIn, hasPaid);
+console.log(typeof isLoggedIn);   // "boolean"
+</textarea>
+<p>Notice there are no quotes. <code>true</code> is a boolean; <code>"true"</code> is a string that happens to contain the word true.</p>
+<div class="callout tip"><span class="label">Naming tip</span>Boolean variable names usually read like a yes/no question: <code>isOpen</code>, <code>hasAccount</code>, <code>canEdit</code>, <code>shouldSave</code>. When you read <code>if (isOpen)</code> later, it sounds like English.</div>
+
+<h2>Comparisons produce booleans</h2>
+<p>You'll rarely type <code>true</code> or <code>false</code> directly. Most booleans come from <dfn>comparing</dfn> values. A comparison asks a question and the answer is a boolean:</p>
+<table>
+<tr><th>Operator</th><th>Question it asks</th><th>Example</th><th>Answer</th></tr>
+<tr><td><code>===</code></td><td>Are these equal?</td><td><code>5 === 5</code></td><td>true</td></tr>
+<tr><td><code>!==</code></td><td>Are these different?</td><td><code>5 !== 3</code></td><td>true</td></tr>
+<tr><td><code>&gt;</code></td><td>Is the left bigger?</td><td><code>5 &gt; 3</code></td><td>true</td></tr>
+<tr><td><code>&lt;</code></td><td>Is the left smaller?</td><td><code>5 &lt; 3</code></td><td>false</td></tr>
+<tr><td><code>&gt;=</code></td><td>Bigger, or equal?</td><td><code>5 &gt;= 5</code></td><td>true</td></tr>
+<tr><td><code>&lt;=</code></td><td>Smaller, or equal?</td><td><code>4 &lt;= 3</code></td><td>false</td></tr>
+</table>
+<textarea class="code" data-lang="js" data-run>
+const age = 17;
+console.log(age >= 18);          // false: not an adult yet
+console.log(age === 17);         // true
+console.log(age !== 17);         // false
+
+const password = "hunter2";
+console.log(password.length >= 8);     // false: too short
+console.log(password === "hunter2");   // true
+
+// You can store the answer in a variable:
+const canVote = age >= 18;
+console.log("Can vote?", canVote);
+</textarea>
+
+<h3>One, two or three equals signs?</h3>
+<p>This is the single most important thing in this lesson:</p>
+<ul>
+<li><code>=</code> (one) <strong>assigns</strong>: "put this value in this variable".</li>
+<li><code>===</code> (three) <strong>compares</strong>: "are these two values equal?"</li>
+<li><code>==</code> (two) also compares, but in a sloppy way. Don't use it. You'll see why below.</li>
+</ul>
+<div class="quiz"><p>What does <code>console.log(10 === "10")</code> print?</p>
+<button>true</button><button data-correct>false</button><button>an error</button>
+<p class="why"><code>===</code> checks that the values are equal <em>and</em> the same type. <code>10</code> is a number and <code>"10"</code> is a string, so they're not equal.</p></div>
+
+<h3>Comparing strings</h3>
+<p>Strings compare exactly, character by character, and capitals count:</p>
+<textarea class="code" data-lang="js" data-run>
+console.log("cat" === "cat");     // true
+console.log("cat" === "Cat");     // false: capital C
+console.log("cat" === "cat ");    // false: extra space!
+
+// So compare cleaned-up versions:
+const answer = "  Paris ";
+console.log(answer.trim().toLowerCase() === "paris");   // true
+</textarea>
+
+<h2>Combining questions: AND, OR, NOT</h2>
+<p>Real questions often have more than one part: "Is the user logged in <em>and</em> an admin?" There are three <dfn>logical operators</dfn> for this.</p>
+<h3>AND: <code>&amp;&amp;</code></h3>
+<p><code>a &amp;&amp; b</code> is true only when <strong>both</strong> sides are true.</p>
+<textarea class="code" data-lang="js" data-run>
+const age = 25;
+const hasTicket = true;
+
+const canEnter = age >= 18 && hasTicket;
+console.log(canEnter);   // true: both are true
+
+console.log(true && false);   // false
+</textarea>
+<h3>OR: <code>||</code></h3>
+<p><code>a || b</code> is true when <strong>at least one</strong> side is true. (The <code>|</code> key is usually above <kbd>Enter</kbd>, with <kbd>Shift</kbd>.)</p>
+<textarea class="code" data-lang="js" data-run>
+const day = "Saturday";
+const isWeekend = day === "Saturday" || day === "Sunday";
+console.log(isWeekend);   // true
+
+console.log(false || false);   // false: neither is true
+</textarea>
+<h3>NOT: <code>!</code></h3>
+<p><code>!</code> flips a boolean: true becomes false, false becomes true.</p>
+<textarea class="code" data-lang="js" data-run>
+const isRaining = false;
+console.log(!isRaining);   // true
+
+const isOpen = true;
+const isClosed = !isOpen;
+console.log(isClosed);     // false
+</textarea>
+<p>Here's the full picture in one table:</p>
+<table>
+<tr><th>a</th><th>b</th><th>a &amp;&amp; b</th><th>a || b</th><th>!a</th></tr>
+<tr><td>true</td><td>true</td><td>true</td><td>true</td><td>false</td></tr>
+<tr><td>true</td><td>false</td><td>false</td><td>true</td><td>false</td></tr>
+<tr><td>false</td><td>true</td><td>false</td><td>true</td><td>true</td></tr>
+<tr><td>false</td><td>false</td><td>false</td><td>false</td><td>true</td></tr>
+</table>
+<div class="try"><span class="label">Try it</span>A cinema lets you in if you're 13 or older, <em>or</em> if you're with an adult. Write it with two variables, <code>age</code> and <code>withAdult</code>, and test it with a few different values.</div>
+
+<div class="quiz"><p>With <code>const x = 7</code>, what is <code>x &gt; 5 &amp;&amp; x &lt; 10</code>?</p>
+<button data-correct>true</button><button>false</button>
+<p class="why">Both parts are true: 7 is more than 5, and 7 is less than 10. This is the standard way to ask "is x between 5 and 10?". (Writing <code>5 &lt; x &lt; 10</code> like in math does <em>not</em> work in JavaScript.)</p></div>
+
+<h2>Truthy and falsy</h2>
+<p>JavaScript lets you use any value where it expects a boolean. When it does, it treats the value as either "true-ish" (<dfn>truthy</dfn>) or "false-ish" (<dfn>falsy</dfn>). You only need to remember the short list of falsy values. <strong>Everything else is truthy.</strong></p>
+<table>
+<tr><th>Falsy value</th><th>What it is</th></tr>
+<tr><td><code>false</code></td><td>the boolean</td></tr>
+<tr><td><code>0</code></td><td>the number zero</td></tr>
+<tr><td><code>""</code></td><td>the empty string</td></tr>
+<tr><td><code>null</code></td><td>deliberately empty</td></tr>
+<tr><td><code>undefined</code></td><td>not set</td></tr>
+<tr><td><code>NaN</code></td><td>not a number</td></tr>
+</table>
+<p>You can check how any value is treated with <code>Boolean(value)</code>:</p>
+<textarea class="code" data-lang="js" data-run>
+console.log(Boolean(0), Boolean(""), Boolean(null), Boolean(undefined));  // all false
+console.log(Boolean(42), Boolean("hi"), Boolean(-1));                    // all true
+
+// Some surprises: these are all truthy!
+console.log(Boolean("0"), Boolean("false"), Boolean(" "));
+</textarea>
+<p>Truthiness lets you write short checks like "has the user typed anything?". You'll use this in the next lesson:</p>
+<textarea class="code" data-lang="js" data-run>
+const typedName = "";
+console.log(Boolean(typedName));   // false: the empty string means nothing was typed
+console.log(!typedName);           // true:  "is it empty?"
+</textarea>
+
+<h2>Why not <code>==</code>?</h2>
+<p>The two-equals <code>==</code> tries to convert values to the same type before comparing. The rules for that are so complicated that even experts get them wrong:</p>
+<textarea class="code" data-lang="js" data-run>
+console.log(1 == "1");      // true   (the string is turned into a number)
+console.log(0 == "");       // true   (?!)
+console.log(0 == false);    // true
+console.log(null == undefined);  // true
+
+console.log(1 === "1");     // false: different types, so not equal. Simple.
+</textarea>
+<div class="callout"><span class="label">The rule</span>Always use <code>===</code> and <code>!==</code>. If you need to compare a string to a number, convert one of them yourself first (like <code>Number(input) === 10</code>), so it's obvious what's happening.</div>
+
+<div class="callout mistake"><span class="label">Common mistakes</span><ul>
+<li><strong>Using <code>=</code> when you meant <code>===</code>.</strong> <code>if (score = 10)</code> <em>sets</em> score to 10 instead of checking it.</li>
+<li><strong>Math-style ranges.</strong> <code>1 &lt; x &lt; 10</code> doesn't do what you think. Write <code>x &gt; 1 &amp;&amp; x &lt; 10</code>.</li>
+<li><strong>Repeating the variable in OR.</strong> <code>day === "Sat" || "Sun"</code> is always truthy, because <code>"Sun"</code> on its own is a non-empty string. Write <code>day === "Sat" || day === "Sun"</code>.</li>
+<li><strong>Comparing against <code>"true"</code>.</strong> <code>isOpen === "true"</code> compares a boolean to a string, so it's always false.</li>
+</ul></div>
+
+<h2 class="ts-head">In TypeScript</h2>
+<p>The type for true/false values is <code>boolean</code>. Comparisons always produce a <code>boolean</code>: hover over <code>canVote</code> to confirm.</p>
+<textarea class="code" data-lang="ts" data-run>
+const age = 20;
+const canVote = age >= 18;           // hover: boolean
+let isMember: boolean = false;
+isMember = "yes";                    // ✖ a string isn't a boolean
+console.log(canVote, isMember);
+</textarea>
+
+<h3>TypeScript catches impossible comparisons</h3>
+<p>Comparing values of types that can never be equal is almost always a bug. TypeScript points it out:</p>
+<textarea class="code" data-lang="ts" data-run>
+const count = 10;
+const input = "10";
+
+console.log(count === input);          // ✖ a number can never === a string
+console.log(count === Number(input));  // ✔ convert first, then compare
+
+const isOpen = true;
+console.log(isOpen === "true");        // ✖ boolean vs string: always false
+</textarea>
+<p>The message is <code>This comparison appears to be unintentional because the types 'number' and 'string' have no overlap</code>. "No overlap" means there's no value that could be both, so the answer would always be <code>false</code>. In JavaScript you'd only find this by testing; TypeScript finds it as you type.</p>
+
+<h3>The "repeated variable" mistake, caught</h3>
+<p>Remember <code>day === "Sat" || "Sun"</code> from the mistakes box? TypeScript notices too. Hover over <code>isWeekend</code>:</p>
+<textarea class="code" data-lang="ts" data-run>
+const day: string = "Monday";
+const isWeekend = day === "Saturday" || "Sunday";
+console.log(isWeekend);   // prints "Sunday", not false!
+</textarea>
+<p>Its type is <code>true | "Sunday"</code>, not <code>boolean</code>. That odd type is the clue that something's wrong: the expression can produce the string <code>"Sunday"</code>. You'll learn what the <code>|</code> means in a later lesson on union types. For now, the habit to build is: <strong>if a type looks strange when you hover, look closer at the code</strong>.</p>
+
+<section class="recap"><h2>Recap</h2><ul>
+<li>A <strong>boolean</strong> is <code>true</code> or <code>false</code>. Comparisons produce booleans.</li>
+<li>Compare with <code>===</code>, <code>!==</code>, <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>. Never use <code>==</code>.</li>
+<li><code>&amp;&amp;</code> = both true, <code>||</code> = at least one true, <code>!</code> = flip.</li>
+<li><strong>Falsy</strong>: <code>false</code>, <code>0</code>, <code>""</code>, <code>null</code>, <code>undefined</code>, <code>NaN</code>. Everything else is truthy.</li>
+<li>TypeScript flags comparisons between types that can never be equal.</li>
+</ul></section>
+
+<section class="exercises"><h2>Practice</h2>
+<textarea class="code" data-lang="ts" data-run>
+// Practice space
+
+</textarea>
+<ol>
+<li>Make a variable <code>temperature</code>. Create a boolean <code>isComfortable</code> that's true when the temperature is between 18 and 24 (including both).
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const temperature = 21;
+const isComfortable = temperature >= 18 && temperature <= 24;
+console.log(isComfortable);
+</textarea></details></li>
+<li>A password is valid if it's at least 8 characters long <em>and</em> isn't <code>"password"</code>. Write the check.
+<details><summary>Show answer</summary><textarea class="code" data-lang="ts">
+const pw = "correcthorse";
+const isValid = pw.length >= 8 && pw !== "password";
+console.log(isValid);
+</textarea></details></li>
+<li>Predict whether each is truthy or falsy, then check with <code>Boolean()</code>: <code>"0"</code>, <code>0</code>, <code>" "</code>, <code>""</code>, <code>-5</code>, <code>null</code>.
+<details><summary>Show answer</summary>truthy, falsy, truthy (it contains a space), falsy, truthy, falsy.</details></li>
+<li>Fix this so it's true on Saturday or Sunday: <code>const weekend = day === "Saturday" || "Sunday";</code>
+<details><summary>Show answer</summary><code>const weekend = day === "Saturday" || day === "Sunday";</code></details></li>
+</ol></section>
+
+<section class="checkpoint"><h2>Check your understanding</h2>
+<details><summary>What's the difference between <code>=</code> and <code>===</code>?</summary><code>=</code> stores a value in a variable. <code>===</code> asks whether two values are equal and gives back true or false.</details>
+<details><summary>When is <code>a || b</code> false?</summary>Only when both <code>a</code> and <code>b</code> are false (or falsy).</details>
+<details><summary>Is the string <code>"false"</code> truthy or falsy?</summary>Truthy. It's a non-empty string. Only the empty string <code>""</code> is falsy.</details>
+</section>
+</article></main>
+<script src="assets/lessons.js"></script>
+<script src="assets/course.js"></script>
+</body>
+</html>
