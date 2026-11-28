@@ -3,89 +3,211 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Project 2 — Weather & Todo App (Vanilla JS)</title>
+<title>Weather &amp; to-do app (TypeScript)</title>
 <link rel="stylesheet" href="assets/course.css">
 </head>
 <body data-slug="p2-vanilla-app">
 <main><article>
-<h1>Project 2 — Weather &amp; todo dashboard (vanilla JS)</h1>
-<p class="lede">Build a small dashboard with no frameworks. This project proves you understand the DOM, events, async, modules and storage, which is exactly what React will later abstract for you.</p>
+<h1>Weather &amp; to-do app (TypeScript)</h1>
+<p class="lede">Time to build something real, on your own computer, in TypeScript, with no framework. You'll make a small dashboard with a to-do list that remembers its items, and a weather panel that loads live forecasts. It uses everything from Parts 3 and 4. It's broken into small milestones, so build and commit one at a time.</p>
 
-<h2>Requirements</h2>
-<h3>Todo panel</h3>
-<ol>
-<li>Add, complete-toggle, edit-in-place and delete todos. One delegated listener.</li>
-<li>Filter: All / Active / Done, with counts. Persist to <code>localStorage</code>.</li>
-<li>Keyboard accessible; announce changes via an <code>aria-live</code> region.</li>
-</ol>
-<h3>Weather panel</h3>
-<ol>
-<li>Search a city; fetch coordinates from Open-Meteo's geocoding API, then the forecast. No API key needed.</li>
-<li>Show loading, error and empty states. Cancel stale requests with <code>AbortController</code>.</li>
-<li>Remember the last city; debounce the search input.</li>
-</ol>
-<h3>Engineering</h3>
-<ol>
-<li>Vite + ES modules: <code>api.js</code>, <code>store.js</code>, <code>ui.js</code>, <code>main.js</code>. Pure logic in testable functions.</li>
-<li>At least 8 Vitest tests (filtering, store updates, API response mapping with a mocked <code>fetch</code>).</li>
-<li>Responsive and dark-mode aware using your CSS from Part 2.</li>
-</ol>
+<section class="goals"><h2>What you'll practise</h2><ul>
+<li>Types for your data, and functions that update it.</li>
+<li>DOM rendering, events, forms and event delegation.</li>
+<li>Saving to <code>localStorage</code>.</li>
+<li>Fetching from a real API with loading and error states.</li>
+<li>Modules, a Vite TypeScript project, Git and Vitest.</li>
+</ul><p class="time">Expect a few evenings. Getting stuck is part of it: re-read the relevant lesson, use the debugger, and keep going.</p></section>
 
-<h2>Starter: the weather call</h2>
-<p>Try the API below, then structure it into your <code>api.js</code>.</p>
-<textarea class="code" data-lang="js" data-run>
-async function getJSON(url, signal) {
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+<h2>Milestone 0: set up</h2>
+<ol class="steps">
+<li>Create a project: <code>npm create vite@latest dashboard -- --template vanilla-ts</code>, then <code>cd dashboard</code>, <code>npm install</code>, <code>npm run dev</code>.</li>
+<li>Delete the demo code in <code>src/main.ts</code> and <code>src/style.css</code>, and the counter file.</li>
+<li>In <code>tsconfig.json</code>, make sure <code>"strict": true</code> is on.</li>
+<li><code>git init</code>, then commit: "Set up project".</li>
+</ol>
+<p>Plan to end up with these files. Each has one job:</p>
+<textarea class="code" data-lang="bash">
+src/
+  main.ts        # finds the elements, adds event listeners, starts everything
+  types.ts       # the Todo, Filter and Weather types
+  todos.ts       # pure functions: addTodo, toggleTodo, deleteTodo, visibleTodos
+  storage.ts     # safe load/save to localStorage
+  weather.ts     # fetches and tidies up weather data
+  todos.test.ts  # Vitest tests for todos.ts
+</textarea>
+
+<h2>Milestone 1: the to-do types and logic</h2>
+<p>Start with no DOM at all: just data and functions. Write them in <code>types.ts</code> and <code>todos.ts</code>. Every function takes the current list and returns a <strong>new</strong> list (like in the Destructuring &amp; spread lesson), never changing the old one.</p>
+<p>Here's a start. Try it here, then finish the missing functions yourself:</p>
+<textarea class="code" data-lang="ts" data-run>
+// types.ts
+type Todo = { id: number; text: string; done: boolean };
+type Filter = "all" | "active" | "done";
+
+// todos.ts
+function addTodo(todos: Todo[], text: string): Todo[] {
+  const trimmed = text.trim();
+  if (!trimmed) return todos;                         // ignore empty input
+  const id = Math.max(0, ...todos.map((t) => t.id)) + 1;
+  return [...todos, { id, text: trimmed, done: false }];
 }
 
-async function weatherFor(city, signal) {
-  const geo = await getJSON(
-    `https://geocoding-api.open-meteo.com/v1/search?count=1&name=${encodeURIComponent(city)}`, signal);
-  const place = geo.results?.[0];
-  if (!place) throw new Error(`No city named "${city}"`);
+function toggleTodo(todos: Todo[], id: number): Todo[] {
+  return todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t));
+}
 
-  const w = await getJSON(
+// TODO: deleteTodo(todos, id) and visibleTodos(todos, filter)
+
+// Quick check
+let list: Todo[] = [];
+list = addTodo(list, "Learn TypeScript");
+list = addTodo(list, "  Build a dashboard  ");
+list = toggleTodo(list, 1);
+console.log(list);
+</textarea>
+<details><summary>Show the missing functions</summary><textarea class="code" data-lang="ts">
+function deleteTodo(todos: Todo[], id: number): Todo[] {
+  return todos.filter((t) => t.id !== id);
+}
+
+function visibleTodos(todos: Todo[], filter: Filter): Todo[] {
+  if (filter === "active") return todos.filter((t) => !t.done);
+  if (filter === "done") return todos.filter((t) => t.done);
+  return todos;
+}
+</textarea></details>
+<p>In your project, add <code>export</code> in front of each type and function, and <code>import</code> them where needed. Commit.</p>
+
+<h2>Milestone 2: show the list</h2>
+<p>Add the HTML to <code>index.html</code>, then write a <code>render()</code> function in <code>main.ts</code> that rebuilds the list from the data. Remember the pattern from the Events lesson: <em>data → render → page</em>.</p>
+<textarea class="code" data-lang="html" data-file="index.html (inside body)">
+<main>
+  <section>
+    <h2>To-do</h2>
+    <form id="todo-form">
+      <label for="todo-text">New to-do</label>
+      <input id="todo-text" autocomplete="off">
+      <button>Add</button>
+    </form>
+    <div id="filters">
+      <button data-filter="all">All</button>
+      <button data-filter="active">Active</button>
+      <button data-filter="done">Done</button>
+    </div>
+    <ul id="todo-list"></ul>
+    <p id="todo-count"></p>
+  </section>
+  <section id="weather"></section>
+</main>
+<script type="module" src="/src/main.ts"></script>
+</textarea>
+<p>Checklist for this milestone:</p>
+<ul>
+<li>Find each element once, at the top of <code>main.ts</code>, and throw a clear error if it's missing (see the Events lesson's <code>get</code> helper, or use <code>instanceof</code>).</li>
+<li>Keep the state in two variables: <code>let todos: Todo[]</code> and <code>let filter: Filter</code>.</li>
+<li><code>render()</code> clears the list and creates one <code>&lt;li&gt;</code> per visible to-do, using <code>textContent</code> (never <code>innerHTML</code> for user text), and updates the count ("3 left").</li>
+</ul>
+<p>Commit.</p>
+
+<h2>Milestone 3: make it interactive</h2>
+<ul>
+<li>The form's <code>submit</code> event adds a to-do (remember <code>preventDefault()</code>).</li>
+<li><strong>One</strong> click listener on the list handles both toggling and deleting (event delegation with <code>closest("li")</code> and <code>dataset.id</code>).</li>
+<li>One click listener on <code>#filters</code> changes the filter. Highlight the active filter button.</li>
+<li>After every change: update the variable, then call <code>render()</code>.</li>
+</ul>
+<p>Commit.</p>
+
+<h2>Milestone 4: remember the list</h2>
+<p>Write <code>storage.ts</code> with <code>load&lt;T&gt;(key, fallback)</code> and <code>save(key, value)</code> from the Errors &amp; storage lesson. Load the to-dos when the app starts, and save them at the end of <code>render()</code>. Reload the page: your to-dos should still be there. Commit.</p>
+
+<h2>Milestone 5: tests</h2>
+<p>Install Vitest (<code>npm install -D vitest</code>, add <code>"test": "vitest"</code> to the scripts) and write <code>todos.test.ts</code>. Aim for at least 8 tests. Ideas:</p>
+<ul>
+<li><code>addTodo</code> adds an item, trims spaces, ignores empty text, and gives unique ids.</li>
+<li><code>addTodo</code> and <code>toggleTodo</code> don't change the original array.</li>
+<li><code>toggleTodo</code> only changes the matching item.</li>
+<li><code>visibleTodos</code> returns the right items for each filter.</li>
+</ul>
+<p>Because all the logic is in pure functions with no DOM, these tests are short and easy. That's the payoff for Milestone 1's design. Commit.</p>
+
+<h2>Milestone 6: the weather panel</h2>
+<p>We'll use <a href="https://open-meteo.com/" rel="noopener">Open-Meteo</a>, a free weather API that needs no account or key. It takes two requests: first look up the city's coordinates, then get the forecast for those coordinates. Run this to see the data:</p>
+<textarea class="code" data-lang="ts" data-run>
+type Place = { name: string; country: string; latitude: number; longitude: number };
+type Weather = { city: string; country: string; temperature: number; wind: number; maxTemps: number[] };
+
+async function getJSON<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json() as Promise<T>;
+}
+
+async function weatherFor(city: string): Promise<Weather> {
+  const geo = await getJSON<{ results?: Place[] }>(
+    `https://geocoding-api.open-meteo.com/v1/search?count=1&name=${encodeURIComponent(city)}`
+  );
+  const place = geo.results?.[0];
+  if (!place) throw new Error(`No city called "${city}"`);
+
+  const w = await getJSON<{
+    current: { temperature_2m: number; wind_speed_10m: number };
+    daily: { temperature_2m_max: number[] };
+  }>(
     `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}` +
-    `&current=temperature_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto`, signal);
-  return { city: place.name, country: place.country, now: w.current, days: w.daily };
+    `&amp;current=temperature_2m,wind_speed_10m&daily=temperature_2m_max&timezone=auto`
+  );
+
+  // Turn the API's awkward names into our own tidy type
+  return {
+    city: place.name,
+    country: place.country,
+    temperature: w.current.temperature_2m,
+    wind: w.current.wind_speed_10m,
+    maxTemps: w.daily.temperature_2m_max,
+  };
 }
 
 try {
   const r = await weatherFor("Tokyo");
-  console.log(`${r.city}, ${r.country}: ${r.now.temperature_2m}°C, wind ${r.now.wind_speed_10m} km/h`);
-  console.log("Max temps:", r.days.temperature_2m_max);
-} catch (e) { console.log("Error:", e.message); }
+  console.log(`${r.city}, ${r.country}: ${r.temperature}°C, wind ${r.wind} km/h`);
+  console.log("Next days' highs:", r.maxTemps);
+} catch (err) {
+  console.log("Error:", err instanceof Error ? err.message : err);
+}
 </textarea>
-
-<h2>Suggested architecture</h2>
-<textarea class="code" data-lang="bash">
-src/
-  main.js        # wires modules, registers event listeners
-  store.js       # state + pure update functions (addTodo, toggleTodo, filterTodos)
-  storage.js     # safe localStorage load/save
-  api.js         # fetch wrappers, mapping, errors
-  ui.js          # render functions: render(state) -> DOM
-  *.test.js      # Vitest
-</textarea>
-<div class="callout"><span class="label">Key idea</span>Keep a single <code>state</code> object, change it only through functions, and call one <code>render(state)</code> after each change. This "state → UI" loop is precisely what React automates in Part 4.</div>
+<p>Notice how <code>weatherFor</code> converts the API's data into our own <code>Weather</code> type. The rest of your app only ever sees the tidy type, so if the API changes, only this function needs updating.</p>
+<p>Put this in <code>weather.ts</code>, then build the panel:</p>
+<ul>
+<li>A form with a city input. On submit, call <code>weatherFor</code>.</li>
+<li>Model the panel's state as a discriminated union, and render each state: <code>{ status: "idle" } | { status: "loading" } | { status: "error"; message: string } | { status: "done"; weather: Weather }</code>.</li>
+<li>Save the last city searched, and load its weather on start-up.</li>
+</ul>
+<p>Commit, and push to GitHub.</p>
 
 <h2>Stretch goals</h2>
+<p>Pick any that sound fun. Each one is a chance to look something up and learn on your own, which is a big part of being a developer.</p>
 <ul>
-<li>Drag-and-drop reorder with the pointer events API.</li>
-<li>7-day forecast chart on a <code>&lt;canvas&gt;</code> (draw it yourself).</li>
-<li>Installable PWA: manifest + service worker for offline todos.</li>
-<li>Undo/redo using a history stack of immutable states.</li>
+<li><strong>Edit in place</strong>: double-click a to-do to edit its text.</li>
+<li><strong>"Clear completed"</strong> button, and a "mark all done" checkbox.</li>
+<li><strong>Accessibility</strong>: make everything work with the keyboard only, and announce changes to screen readers with an <code>aria-live</code> region (see the HTML forms &amp; accessibility lesson).</li>
+<li><strong>Search as you type</strong> for the weather, waiting until the user pauses typing (look up "debounce"), and ignoring out-of-date responses (look up <code>AbortController</code>).</li>
+<li><strong>A chart</strong> of the week's temperatures drawn on a <code>&lt;canvas&gt;</code>.</li>
+<li><strong>Publish it</strong> with <code>npm run build</code> and GitHub Pages or Netlify.</li>
 </ul>
 
 <section class="checkpoint"><h2>Self-review checklist</h2>
-<details><summary>Ready for Part 4 if…</summary>
-<ul><li>No <code>innerHTML</code> with user data.</li>
-<li>Every async path has loading and error UI.</li>
-<li>Rapid typing never shows stale results.</li>
-<li>Tests pass and cover logic that isn't DOM-related.</li>
-<li>You can explain every line of the code.</li></ul></details>
+<p>You're ready for React when you can say yes to these:</p>
+<details><summary>Show the checklist</summary><ul>
+<li><code>npx tsc --noEmit</code> shows no errors, with <code>strict</code> on, and there's no <code>any</code> in your code.</li>
+<li>User text is only ever added with <code>textContent</code>.</li>
+<li>The weather panel shows a loading message and a friendly error (try a made-up city, and try with Wi-Fi off).</li>
+<li>All to-do logic is in pure functions, and the tests pass.</li>
+<li>Reloading the page keeps your to-dos and last city.</li>
+<li>You can explain every line of your code to someone else.</li>
+</ul></details>
+<p>In React (next part), you'll find that <code>render()</code>, the state variables and the event wiring are done for you. Because you've built them by hand, you'll understand what React is doing.</p>
 </section>
 </article></main>
 <script src="assets/lessons.js"></script>
